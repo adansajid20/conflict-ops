@@ -1,0 +1,165 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   CONFLICT OPS — Design System
+   Two themes: ops (spy) | professional (enterprise)
+   ============================================ */
+
+:root[data-theme="ops"] {
+  --bg-base: #080A0E;
+  --bg-surface: #0D1117;
+  --bg-surface-2: #161B22;
+  --border: #21262D;
+  --primary: #00FF88;
+  --accent-blue: #0EA5E9;
+  --accent-amber: #F59E0B;
+  --alert-red: #EF4444;
+  --alert-amber: #F59E0B;
+  --alert-green: #10B981;
+  --text-primary: #F0F6FC;
+  --text-muted: #7D8590;
+  --text-mono: #58A6FF;
+  --scanline-opacity: 0.003;
+}
+
+:root[data-theme="professional"] {
+  --bg-base: #0D1B2A;
+  --bg-surface: #112236;
+  --bg-surface-2: #162D47;
+  --border: #1E3A5F;
+  --primary: #3B82F6;
+  --accent-blue: #60A5FA;
+  --accent-amber: #F59E0B;
+  --alert-red: #EF4444;
+  --alert-amber: #F59E0B;
+  --alert-green: #10B981;
+  --text-primary: #E2E8F0;
+  --text-muted: #94A3B8;
+  --text-mono: #7DD3FC;
+  --scanline-opacity: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+/* Monospace data values */
+.mono {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', monospace;
+  color: var(--text-mono);
+}
+
+/* Classification banner */
+.classification-banner {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  padding: 4px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* Scanline overlay (ops mode only) */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, var(--scanline-opacity)) 2px,
+    rgba(255, 255, 255, var(--scanline-opacity)) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+  animation: scanlines 8s linear infinite;
+}
+
+@keyframes scanlines {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 100%; }
+}
+
+/* Counter roll-up animation */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.count-up {
+  animation: countUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Pulse ring for events */
+@keyframes pulseRing {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+/* Connection dot pulse */
+@keyframes connectionPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: connectionPulse 2s ease-in-out infinite;
+}
+
+.status-dot.green { background: var(--alert-green); }
+.status-dot.amber { background: var(--alert-amber); }
+.status-dot.red { background: var(--alert-red); }
+
+/* Typewriter cursor */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.cursor::after {
+  content: '█';
+  animation: blink 1s step-end infinite;
+  color: var(--primary);
+}
+
+/* Slide-in for feed items */
+@keyframes slideIn {
+  from { transform: translateY(-8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.feed-item-enter {
+  animation: slideIn 0.2s ease-out forwards;
+}
+
+/* Loading states */
+.loading-text::after {
+  content: '...';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60%, 100% { content: '...'; }
+}

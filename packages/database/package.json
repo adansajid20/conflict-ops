@@ -1,0 +1,8 @@
+{
+  "name": "@conflict-ops/database",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "migrate": "echo 'Run migrations in Supabase dashboard or via supabase CLI'"
+  }
+}
