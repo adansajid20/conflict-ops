@@ -1,18 +1,21 @@
+import { EventFeed } from '@/components/feed/EventFeed'
+
 export default function FeedPage() {
   return (
-    <div className="p-6">
-      <div className="mb-4">
-        <h1 className="text-xl font-bold tracking-widest uppercase mono" style={{ color: 'var(--text-primary)' }}>
-          FEED
-        </h1>
-      </div>
+    <div className="h-full flex flex-col">
       <div
-        className="rounded border p-12 text-center"
-        style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
+        className="px-4 py-3 border-b flex items-center justify-between"
+        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}
       >
+        <h1 className="text-sm font-bold tracking-widest uppercase mono" style={{ color: 'var(--text-primary)' }}>
+          INTELLIGENCE FEED
+        </h1>
         <div className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
-          NO DATA — MODULE INITIALIZING. AVAILABLE IN PHASE 2.
+          AUTO-REFRESHES EVERY 60S
         </div>
+      </div>
+      <div className="flex-1 overflow-hidden">
+        <EventFeed />
       </div>
     </div>
   )
