@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* MapLibre GL CSS */
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
 /* ============================================
    CONFLICT OPS — Design System
    Two themes: ops (spy) | professional (enterprise)

@@ -24,7 +24,7 @@ export function ConflictMap({ events = [], className = '' }: ConflictMapProps) {
     const initMap = async () => {
       // Dynamic import — never SSR
       maplibregl = await import('maplibre-gl')
-      await import('maplibre-gl/dist/maplibre-gl.css')
+      // CSS is imported at module level via globals.css @import or next.config.js
 
       if (!mapContainer.current || isInitialized.current) return
       isInitialized.current = true
