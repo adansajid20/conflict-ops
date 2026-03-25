@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { OrgRequired } from '@/components/org/OrgRequired'
 
 const EVENTS = ['alert.created','event.high_severity','escalation.changed','vessel.dark','aircraft.emergency','forecast.updated']
 
@@ -73,7 +74,11 @@ export function WebhooksManager() {
         </div>
       )}
 
-      {error && <div className="p-3 rounded border mb-4 text-xs mono" style={{ borderColor: '#EF4444', color: '#EF4444' }}>{error}</div>}
+      {error && (
+        error.toLowerCase().includes('org') || error.toLowerCase().includes('organization')
+          ? <OrgRequired feature="Webhooks" description="Webhooks are scoped to your organization." />
+          : <div className="p-3 rounded border mb-4 text-xs mono" style={{ borderColor: '#EF4444', color: '#EF4444' }}>{error}</div>
+      )}
 
       {/* Create form */}
       <div className="p-4 rounded border mb-6" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>

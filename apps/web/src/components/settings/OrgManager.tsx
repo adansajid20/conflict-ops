@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { OrgRequired } from '@/components/org/OrgRequired'
 
 type Member = { id: string; email: string; role: string; created_at: string; last_active: string | null }
 type OrgData = {
@@ -59,7 +60,14 @@ export function OrgManager() {
     } finally { setUpdating(null) }
   }
 
-  if (loading) return <p className="text-xs mono text-center py-8" style={{ color: 'var(--text-muted)' }}>LOADING...</p>
+  if (loading) return (
+    <div className="space-y-3 p-2">
+      {[...Array(3)].map((_, i) => <div key={i} className="skeleton h-12 rounded" />)}
+    </div>
+  )
+
+  // No org — show CTA
+  if (!org) return <OrgRequired feature="Organization" description="Set up your organization to manage team members, billing, and SSO." />
 
   return (
     <div>

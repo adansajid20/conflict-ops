@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { OrgRequired } from '@/components/org/OrgRequired'
 
 type APIKey = {
   id: string
@@ -67,17 +68,10 @@ export function APIKeysManager() {
   if (loading) return <div className="text-xs mono p-4" style={{ color: 'var(--text-muted)' }}>LOADING...</div>
 
   if (noOrg) return (
-    <div className="p-8 text-center rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-      <div className="text-3xl mb-4">⊢</div>
-      <p className="text-sm mono font-bold mb-2" style={{ color: 'var(--text-muted)' }}>ORGANIZATION REQUIRED</p>
-      <p className="text-xs mb-6" style={{ color: 'var(--text-disabled)' }}>
-        API keys are scoped to organizations. Complete onboarding to create your org and unlock API access.
-      </p>
-      <a href="/onboarding" className="inline-block px-6 py-2 rounded text-xs mono font-bold"
-        style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
-        COMPLETE ONBOARDING →
-      </a>
-    </div>
+    <OrgRequired
+      feature="API Keys"
+      description="API keys are scoped to your organization. Create one now to unlock programmatic access."
+    />
   )
 
   return (
