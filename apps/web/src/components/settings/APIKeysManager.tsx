@@ -20,13 +20,20 @@ export function APIKeysManager() {
   const [creating, setCreating] = useState(false)
   const [newKey, setNewKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [noOrg, setNoOrg] = useState(false)
+  const [planError, setPlanError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
       const res = await fetch('/api/v1/apikeys')
       const json = await res.json() as { data?: APIKey[]; error?: string }
-      if (json.data) setKeys(json.data)
-      else if (json.error) setError(json.error)
+      if (json.data) {
+        setKeys(json.data)
+      } else if (json.error === 'No org') {
+        setNoOrg(true)
+      } else if (json.error) {
+        setError(json.error)
+      }
     } finally { setLoading(false) }
   }, [])
 
@@ -46,6 +53,8 @@ export function APIKeysManager() {
         setNewKey(json.data.key ?? null)
         setName('')
         await load()
+      } else if (json.error?.includes('Business')) {
+        setPlanError(json.error)
       } else if (json.error) setError(json.error)
     } finally { setCreating(false) }
   }
@@ -54,6 +63,22 @@ export function APIKeysManager() {
     await fetch(`/api/v1/apikeys?id=${id}`, { method: 'DELETE' })
     await load()
   }
+
+  if (loading) return <div className="text-xs mono p-4" style={{ color: 'var(--text-muted)' }}>LOADING...</div>
+
+  if (noOrg) return (
+    <div className="p-8 text-center rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+      <div className="text-3xl mb-4">⊢</div>
+      <p className="text-sm mono font-bold mb-2" style={{ color: 'var(--text-muted)' }}>ORGANIZATION REQUIRED</p>
+      <p className="text-xs mb-6" style={{ color: 'var(--text-disabled)' }}>
+        API keys are scoped to organizations. Complete onboarding to create your org and unlock API access.
+      </p>
+      <a href="/onboarding" className="inline-block px-6 py-2 rounded text-xs mono font-bold"
+        style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
+        COMPLETE ONBOARDING →
+      </a>
+    </div>
+  )
 
   return (
     <div>

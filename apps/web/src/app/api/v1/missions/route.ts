@@ -22,12 +22,12 @@ async function getOrgId(userId: string): Promise<string | null> {
   return data?.org_id ?? null
 }
 
-export async function GET(): Promise<NextResponse<ApiResponse<Mission[]>>> {
+export async function GET(): Promise<NextResponse<{ success: boolean; data?: Mission[] | null; error?: string; meta?: Record<string, unknown> }>> {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const orgId = await getOrgId(userId)
-  if (!orgId) return NextResponse.json({ success: false, error: 'No organization found' }, { status: 400 })
+  if (!orgId) return NextResponse.json({ success: true, data: [], meta: { personal_mode: true } })
 
   const supabase = createServiceClient()
   const { data, error } = await supabase
@@ -41,12 +41,12 @@ export async function GET(): Promise<NextResponse<ApiResponse<Mission[]>>> {
   return NextResponse.json({ success: true, data: (data ?? []) as unknown as Mission[] })
 }
 
-export async function POST(req: Request): Promise<NextResponse<ApiResponse<Mission>>> {
+export async function POST(req: Request): Promise<NextResponse<{ success: boolean; data?: Mission | null; error?: string; meta?: Record<string, unknown> }>> {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const orgId = await getOrgId(userId)
-  if (!orgId) return NextResponse.json({ success: false, error: 'No organization found' }, { status: 400 })
+  if (!orgId) return NextResponse.json({ success: false, error: 'Complete onboarding to create missions', meta: { personal_mode: true } }, { status: 400 })
 
   // Enforce plan limit SERVER-SIDE
   const limits = await getOrgPlanLimits(orgId)

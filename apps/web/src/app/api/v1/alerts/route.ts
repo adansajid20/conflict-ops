@@ -1,9 +1,12 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import type { ApiResponse, Alert } from '@conflict-ops/shared'
+import type { Alert } from '@conflict-ops/shared'
 
-export async function GET(req: Request): Promise<NextResponse<ApiResponse<Alert[]>>> {
+// Relaxed response type — includes personal_mode meta
+type AlertsResponse = { success: boolean; data?: Alert[] | null; error?: string; meta?: Record<string, unknown> }
+
+export async function GET(req: Request): Promise<NextResponse<AlertsResponse>> {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
@@ -13,7 +16,11 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Alert[
 
   const supabase = createServiceClient()
   const { data: user } = await supabase.from('users').select('org_id').eq('clerk_user_id', userId).single()
-  if (!user?.org_id) return NextResponse.json({ success: false, error: 'No org found' }, { status: 400 })
+
+  // Personal mode: no org yet — return empty, not an error
+  if (!user?.org_id) {
+    return NextResponse.json({ success: true, data: [], meta: { personal_mode: true } })
+  }
 
   let query = supabase
     .from('alerts')
@@ -30,7 +37,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Alert[
   return NextResponse.json({ success: true, data: (data ?? []) as unknown as Alert[] })
 }
 
-export async function PATCH(req: Request): Promise<NextResponse<ApiResponse<null>>> {
+export async function PATCH(req: Request): Promise<NextResponse<AlertsResponse>> {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
@@ -38,7 +45,9 @@ export async function PATCH(req: Request): Promise<NextResponse<ApiResponse<null
 
   const supabase = createServiceClient()
   const { data: user } = await supabase.from('users').select('org_id').eq('clerk_user_id', userId).single()
-  if (!user?.org_id) return NextResponse.json({ success: false, error: 'No org found' }, { status: 400 })
+
+  // No org — nothing to update, succeed silently
+  if (!user?.org_id) return NextResponse.json({ success: true, data: null, meta: { personal_mode: true } })
 
   await supabase
     .from('alerts')

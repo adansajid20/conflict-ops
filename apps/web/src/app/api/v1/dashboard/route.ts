@@ -29,18 +29,24 @@ export async function GET(): Promise<NextResponse<ApiResponse<DashboardStats>>> 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
+  const h3 = new Date(Date.now() - 3 * 3600000).toISOString()
   const [eventsResult, alertsResult, missionsResult, sourcesResult] = await Promise.allSettled([
     supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', today.toISOString()),
     supabase.from('alerts').select('id', { count: 'exact', head: true }).eq('read', false),
     supabase.from('missions').select('id', { count: 'exact', head: true }),
-    supabase.from('circuit_breakers').select('id', { count: 'exact', head: true }).eq('status', 'closed'),
+    // Count distinct sources ingested in last 3h (no circuit_breakers table needed)
+    supabase.from('events').select('source').gte('ingested_at', h3),
   ])
+
+  const distinctSources = sourcesResult.status === 'fulfilled'
+    ? new Set((sourcesResult.value.data ?? []).map((r: { source: string }) => r.source)).size
+    : 0
 
   const stats: DashboardStats = {
     eventsToday: eventsResult.status === 'fulfilled' ? (eventsResult.value.count ?? 0) : 0,
     activeAlerts: alertsResult.status === 'fulfilled' ? (alertsResult.value.count ?? 0) : 0,
     openMissions: missionsResult.status === 'fulfilled' ? (missionsResult.value.count ?? 0) : 0,
-    sourcesOnline: sourcesResult.status === 'fulfilled' ? (sourcesResult.value.count ?? 0) : 0,
+    sourcesOnline: distinctSources,
     lastUpdated: new Date().toISOString(),
   }
 

@@ -1,6 +1,8 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { SidebarStatus } from '@/components/layout/SidebarStatus'
+import { FreshnessBanner } from '@/components/layout/FreshnessBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,21 +87,15 @@ export default async function DashboardLayout({
             ))}
           </nav>
 
-          {/* Status bar */}
-          <div
-            className="p-3 border-t text-xs"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
-          >
-            <div className="flex items-center gap-2">
-              <span className="status-dot green" />
-              <span className="mono">ALL SYSTEMS NOMINAL</span>
-            </div>
-          </div>
+          <SidebarStatus />
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-auto">
-          {children}
+        <main className="flex-1 overflow-auto flex flex-col">
+          <FreshnessBanner />
+          <div className="flex-1">
+            {children}
+          </div>
         </main>
       </div>
 
