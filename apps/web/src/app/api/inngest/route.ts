@@ -14,7 +14,7 @@ import {
   trialExpiryNotifier,
 } from '@/inngest/functions'
 
-const handler = serve({
+export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
     fastLaneIngest,
@@ -25,7 +25,4 @@ const handler = serve({
     weeklyBrief,
     trialExpiryNotifier,
   ],
-  signingKey: process.env['INNGEST_SIGNING_KEY'],
 })
-
-export const { GET, POST, PUT } = handler
