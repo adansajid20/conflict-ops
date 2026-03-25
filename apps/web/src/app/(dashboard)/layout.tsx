@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: '/settings/api',     label: 'API KEYS', icon: '⊢', section: 'settings' },
   { href: '/settings/org',     label: 'ORG',      icon: '⊕', section: 'settings' },
   { href: '/settings/webhooks',label: 'WEBHOOKS', icon: '⇢', section: 'settings' },
+  { href: '/admin',            label: 'DOCTOR',   icon: '⊗', section: 'settings' },
 ]
 
 export default async function DashboardLayout({
