@@ -1,3 +1,6 @@
+// NOTE: Server-only functions (computeTravelRisk) live at the bottom.
+// Client-safe exports (types, constants, generateTravelBrief) are pure.
+
 /**
  * Travel Risk Engine — ISO 31030 aligned
  * ISO 31030:2021 — Travel risk management guidance for organizations
@@ -11,8 +14,6 @@
  *
  * Inputs: event data + forecast score + escalation level + AIS/FIRMS signals
  */
-
-import { createServiceClient } from '@/lib/supabase/server'
 
 export type TravelRiskLevel = 1 | 2 | 3 | 4 | 5
 
@@ -80,6 +81,8 @@ export async function computeTravelRisk(countryCode: string): Promise<{
   risk_score: number
   key_threats: string[]
 } | null> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createServiceClient } = require('@/lib/supabase/server') as typeof import('@/lib/supabase/server')
   const supabase = createServiceClient()
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()

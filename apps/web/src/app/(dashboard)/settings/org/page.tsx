@@ -1,20 +1,20 @@
 export const dynamic = 'force-dynamic'
 
-import { WebhooksManager } from '@/components/settings/WebhooksManager'
+import { OrgManager } from '@/components/settings/OrgManager'
 
-export default function WebhooksPage() {
+export default function OrgSettingsPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold mono tracking-wide" style={{ color: 'var(--text-primary)' }}>
-          WEBHOOKS
+          ORGANIZATION
         </h1>
         <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-          Real-time event delivery to your endpoints. Business plan required.
-          Supports: alert.created, event.high_severity, escalation.changed, vessel.dark, aircraft.emergency.
+          Manage team members, roles, SSO configuration, and tenant controls.
+          SSO/SAML requires Enterprise plan.
         </p>
       </div>
-      <WebhooksManager />
+      <OrgManager />
     </div>
   )
 }
