@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 interface Assumption {
   id: string
@@ -36,7 +35,6 @@ function runMonteCarlo(assumptions: Assumption[], iterations = 1000): MonteCarlo
     const weights = [0.30, 0.25, 0.20, 0.15]
 
     assumptions.slice(0, 4).forEach((assumption, idx) => {
-      // Uniform distribution ±20% around value
       const range = (assumption.max - assumption.min) * 0.2
       const sampled = assumption.value + (Math.random() * 2 - 1) * range
       const normalized = (sampled - assumption.min) / (assumption.max - assumption.min)
@@ -53,7 +51,6 @@ function runMonteCarlo(assumptions: Assumption[], iterations = 1000): MonteCarlo
   const p90 = results[Math.floor(iterations * 0.9)] ?? 0
   const mean = results.reduce((a, b) => a + b, 0) / iterations
 
-  // Build histogram (10 buckets)
   const bucketSize = 0.1
   const histogram = Array.from({ length: 10 }, (_, i) => {
     const bucketMin = i * bucketSize
@@ -105,7 +102,6 @@ export function MonteCarloEngine({ planHasScenarios }: { planHasScenarios: boole
       </div>
 
       <div className="p-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Assumptions */}
         <div>
           <div className="text-xs mono tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>
             ASSUMPTIONS (±20% UNIFORM DISTRIBUTION)
@@ -151,7 +147,6 @@ export function MonteCarloEngine({ planHasScenarios }: { planHasScenarios: boole
           </button>
         </div>
 
-        {/* Results */}
         <div>
           <div className="text-xs mono tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>
             SIMULATION RESULTS
@@ -163,7 +158,6 @@ export function MonteCarloEngine({ planHasScenarios }: { planHasScenarios: boole
             </div>
           ) : (
             <>
-              {/* P10/P50/P90 */}
               <div className="grid grid-cols-3 gap-2 mb-4">
                 {[
                   { label: 'P10 (OPTIMISTIC)', value: result.p10, color: 'var(--alert-green)' },
@@ -181,25 +175,34 @@ export function MonteCarloEngine({ planHasScenarios }: { planHasScenarios: boole
                 ))}
               </div>
 
-              {/* Histogram */}
-              <div className="h-32">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={result.histogram} margin={{ top: 0, right: 0, bottom: 0, left: -30 }}>
-                    <XAxis dataKey="bucket" tick={{ fontSize: 9, fill: 'var(--text-muted)', fontFamily: 'monospace' }} />
-                    <YAxis tick={{ fontSize: 9, fill: 'var(--text-muted)', fontFamily: 'monospace' }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'var(--bg-surface-2)',
-                        border: '1px solid var(--border)',
-                        fontSize: 11,
-                        fontFamily: 'monospace',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-                    <Bar dataKey="count" fill="var(--primary)" opacity={0.8} />
-                    <ReferenceLine x={`${Math.round(result.p50 * 100)}-${Math.round(result.p50 * 100) + 10}%`} stroke="var(--accent-blue)" />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="rounded border p-3" style={{ borderColor: 'var(--border)' }}>
+                <div className="flex items-end gap-1 h-32">
+                  {result.histogram.map((bar, idx) => {
+                    const maxCount = Math.max(...result.histogram.map(h => h.count), 1)
+                    const height = `${Math.max((bar.count / maxCount) * 100, 4)}%`
+                    const isMedianBucket = idx === Math.min(Math.floor(result.p50 * 10), 9)
+                    return (
+                      <div key={bar.bucket} className="flex-1 flex flex-col items-center justify-end h-full">
+                        <div
+                          className="w-full rounded-t"
+                          style={{
+                            height,
+                            backgroundColor: isMedianBucket ? 'var(--accent-blue)' : 'var(--primary)',
+                            opacity: 0.85,
+                            minHeight: '4px',
+                          }}
+                          title={`${bar.bucket}: ${bar.count}`}
+                        />
+                        <div className="text-[9px] mono mt-1" style={{ color: 'var(--text-muted)' }}>
+                          {bar.bucket.split('-')[0]}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="mt-2 text-xs mono" style={{ color: 'var(--text-muted)' }}>
+                  Mean: {Math.round(result.mean * 100)}% · Median bucket highlighted in blue
+                </div>
               </div>
             </>
           )}
