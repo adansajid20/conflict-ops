@@ -1,252 +1,303 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import type { ConflictEvent } from '@conflict-ops/shared'
-import { useTimeWindow, TIME_WINDOWS, type TimeWindow } from '@/hooks/useTimeWindow'
+import { eventToIntelItem, safeTimeAgo, severityLabel, severityColor, type IntelItem } from '@/types/intel-item'
 
-const SEVERITY_COLORS: Record<number, string> = {
-  1: '#888888', 2: '#3B82F6', 3: '#F59E0B', 4: '#EF4444', 5: '#FF0000',
-}
-const SEVERITY_LABELS: Record<number, string> = {
-  1: 'INFO', 2: 'LOW', 3: 'MEDIUM', 4: 'HIGH', 5: 'CRITICAL',
-}
+type TimeWindow = '1h' | '6h' | '24h' | '7d' | '30d'
 
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
-}
+const WINDOWS: { label: string; value: TimeWindow; ms: number }[] = [
+  { label: '1H',  value: '1h',  ms: 3600000 },
+  { label: '6H',  value: '6h',  ms: 21600000 },
+  { label: '24H', value: '24h', ms: 86400000 },
+  { label: '7D',  value: '7d',  ms: 604800000 },
+  { label: '30D', value: '30d', ms: 2592000000 },
+]
 
-function EventSkeleton() {
-  return (
-    <div className="border-l-2 p-3 mb-2 rounded-r"
-      style={{ borderLeftColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-      <div className="skeleton h-3 rounded mb-2" style={{ width: '60%' }} />
-      <div className="skeleton h-4 rounded mb-2" style={{ width: '90%' }} />
-      <div className="skeleton h-3 rounded" style={{ width: '40%' }} />
-    </div>
-  )
+function sourceLabel(source: string): string {
+  const map: Record<string, string> = {
+    gdelt: 'GDELT', reliefweb: 'ReliefWeb', gdacs: 'GDACS',
+    unhcr: 'UNHCR', nasa_eonet: 'NASA EONET',
+  }
+  return map[source] ?? source.toUpperCase()
 }
 
-function EventCard({ event }: { event: ConflictEvent }) {
-  const severity = event.severity ?? 2
-  const color = SEVERITY_COLORS[severity] ?? SEVERITY_COLORS[2]
-  const label = SEVERITY_LABELS[severity] ?? 'LOW'
-  const [expanded, setExpanded] = useState(false)
+// Detail drawer component
+function IntelDrawer({ item, onClose }: { item: IntelItem; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
 
   return (
-    <div
-      className="border-l-2 p-3 mb-2 rounded-r cursor-pointer transition-colors hover:bg-white/5 feed-item-enter"
-      style={{ backgroundColor: 'var(--bg-surface)', borderLeftColor: color }}
-      onClick={() => setExpanded(e => !e)}
-    >
-      <div className="flex items-start gap-2">
-        <span className="text-xs mono font-bold shrink-0 mt-0.5 px-1.5 py-0.5 rounded"
-          style={{ color, backgroundColor: `${color}22` }}>
-          {label}
-        </span>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-snug" style={{ color: 'var(--text-primary)' }}>
-            {event.title}
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs mono" style={{ color: 'var(--text-muted)' }}>
-            {event.countryCode && <span>{event.countryCode}</span>}
-            {event.region && <span>· {event.region}</span>}
-            <span>· {event.source?.toUpperCase()}</span>
-            <span>· {timeAgo(event.occurredAt)}</span>
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-40"
+        style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
+        onClick={onClose}
+      />
+      {/* Panel */}
+      <div
+        className="fixed right-0 top-0 bottom-0 z-50 flex flex-col overflow-hidden"
+        style={{
+          width: 'min(480px, 95vw)',
+          backgroundColor: 'var(--bg-surface)',
+          borderLeft: '1px solid var(--border)',
+          boxShadow: '-8px 0 32px rgba(0,0,0,0.4)',
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between p-4 border-b shrink-0"
+          style={{ borderColor: 'var(--border)' }}>
+          <div className="flex-1 pr-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs mono font-bold px-2 py-0.5 rounded"
+                style={{
+                  backgroundColor: 'rgba(0,255,136,0.1)',
+                  color: 'var(--primary)',
+                  border: '1px solid rgba(0,255,136,0.2)',
+                }}>
+                {sourceLabel(item.source)}
+              </span>
+              {item.severity && (
+                <span className="text-xs mono font-bold"
+                  style={{ color: severityColor(item.severity) }}>
+                  SEV {item.severity} · {severityLabel(item.severity)}
+                </span>
+              )}
+            </div>
+            <h2 className="text-sm font-bold leading-snug" style={{ color: 'var(--text-primary)' }}>
+              {item.title}
+            </h2>
           </div>
-          {expanded && event.description && (
-            <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              {event.description}
-            </p>
-          )}
-          {expanded && (
-            <div className="mt-1 text-xs mono" style={{ color: 'var(--text-disabled)' }}>
-              {event.eventType && <span>TYPE: {event.eventType.toUpperCase()} · </span>}
-              INGESTED: {timeAgo(event.ingestedAt ?? event.occurredAt)}
+          <button
+            onClick={onClose}
+            className="text-lg leading-none shrink-0 p-1 hover:opacity-70 transition-opacity"
+            style={{ color: 'var(--text-muted)' }}
+          >✕</button>
+        </div>
+
+        {/* Meta */}
+        <div className="px-4 py-2 border-b text-xs mono flex gap-4 shrink-0"
+          style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+          <span>⏱ {safeTimeAgo(item.occurred_at ?? item.ingested_at)}</span>
+          {item.country_code && <span>📍 {item.country_code}{item.region ? ` · ${item.region}` : ''}</span>}
+          {item.event_type && <span>◈ {item.event_type.replace(/_/g, ' ').toUpperCase()}</span>}
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {item.description ? (
+            <div>
+              <div className="text-xs mono mb-2 tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                SUMMARY
+              </div>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)', lineHeight: 1.6 }}>
+                {item.description}
+              </p>
+            </div>
+          ) : (
+            <div className="text-xs italic" style={{ color: 'var(--text-muted)' }}>
+              No description available for this event.
             </div>
           )}
+
+          {item.url && (
+            <div>
+              <div className="text-xs mono mb-2 tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                SOURCE LINK
+              </div>
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs mono break-all hover:underline"
+                style={{ color: 'var(--primary)' }}
+              >
+                ↗ {item.url.length > 80 ? item.url.slice(0, 80) + '…' : item.url}
+              </a>
+            </div>
+          )}
+
+          <div className="text-xs mono pt-2 border-t" style={{ borderColor: 'var(--border)', color: 'var(--text-disabled)' }}>
+            ID: {item.id}<br />
+            Ingested: {safeTimeAgo(item.ingested_at)}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
 
 export function EventFeed() {
-  const { window, setWindow, sinceISO } = useTimeWindow('24h')
-  const [events, setEvents] = useState<ConflictEvent[]>([])
+  const [items, setItems] = useState<IntelItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [apiStatus, setApiStatus] = useState<'live' | 'degraded' | 'error'>('live')
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [window_, setWindow] = useState<TimeWindow>('24h')
+  const [selectedItem, setSelectedItem] = useState<IntelItem | null>(null)
   const abortRef = useRef<AbortController | null>(null)
-  const seqRef = useRef(0)
 
   const fetchEvents = useCallback(async (w: TimeWindow) => {
-    // Cancel any in-flight request
     abortRef.current?.abort()
     abortRef.current = new AbortController()
-    const seq = ++seqRef.current
-
-    setLoading(true)
-
+    const ms = WINDOWS.find(x => x.value === w)?.ms ?? 86400000
+    const since = new Date(Date.now() - ms).toISOString()
     try {
-      const since = new Date(Date.now() - windowToMs(w)).toISOString()
+      setError(null)
       const res = await fetch(`/api/v1/events?limit=100&since=${since}`, {
         signal: abortRef.current.signal,
+        cache: 'no-store',
       })
-
-      // Only update state if this is still the latest request
-      if (seq !== seqRef.current) return
-
-      if (!res.ok) {
-        const text = await res.text()
-        let msg = `HTTP ${res.status}`
-        try { msg = (JSON.parse(text) as { error?: string }).error ?? msg } catch { /* HTML response */ }
-        setApiStatus('error')
-        setErrorMsg(msg)
-        return
-      }
-
-      const json = await res.json() as { success: boolean; data?: ConflictEvent[]; error?: string }
-      if (!json.success) {
-        setApiStatus('degraded')
-        setErrorMsg(json.error ?? 'Request failed')
-        return
-      }
-
-      setEvents(json.data ?? [])
-      setApiStatus('live')
-      setErrorMsg(null)
-      setLastFetchedAt(new Date())
-    } catch (e: unknown) {
-      if ((e as Error)?.name === 'AbortError') return
-      if (seq !== seqRef.current) return
-      setApiStatus('degraded')
-      setErrorMsg('Network error — check connection')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const d = await res.json() as { success: boolean; data?: Record<string, unknown>[] }
+      setItems((d.data ?? []).map(eventToIntelItem))
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return
+      setError(String(e))
     } finally {
-      if (seq === seqRef.current) setLoading(false)
+      setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void fetchEvents(window)
-    const id = setInterval(() => void fetchEvents(window), 60_000)
-    return () => { clearInterval(id); abortRef.current?.abort() }
-  }, [window, fetchEvents])
-
-  const statusColor = apiStatus === 'live' ? 'var(--alert-green)' : apiStatus === 'degraded' ? 'var(--alert-amber)' : '#FF4444'
-  const statusLabel = apiStatus === 'live' ? 'LIVE' : apiStatus === 'degraded' ? 'DEGRADED' : 'ERROR'
+    setLoading(true)
+    void fetchEvents(window_)
+    const id = setInterval(() => void fetchEvents(window_), 60_000)
+    return () => {
+      clearInterval(id)
+      abortRef.current?.abort()
+    }
+  }, [window_, fetchEvents])
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Toolbar */}
+    <div className="h-full flex flex-col relative">
+      {/* Controls */}
       <div className="px-4 py-2 border-b flex items-center justify-between shrink-0"
         style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
         <div className="flex items-center gap-1">
-          {TIME_WINDOWS.map(w => (
-            <button key={w} onClick={() => setWindow(w)}
-              className="px-2 py-1 rounded text-xs mono transition-colors"
+          {WINDOWS.map(w => (
+            <button
+              key={w.value}
+              onClick={() => { setWindow(w.value); setLoading(true) }}
+              className="px-2 py-1 text-xs mono rounded transition-colors"
               style={{
-                backgroundColor: window === w ? 'var(--primary)' : 'transparent',
-                color: window === w ? '#000' : 'var(--text-muted)',
-              }}>
-              {w}
+                backgroundColor: window_ === w.value ? 'rgba(0,255,136,0.15)' : 'transparent',
+                color: window_ === w.value ? 'var(--primary)' : 'var(--text-muted)',
+                border: window_ === w.value ? '1px solid rgba(0,255,136,0.3)' : '1px solid transparent',
+              }}
+            >
+              {w.label}
             </button>
           ))}
         </div>
         <div className="flex items-center gap-3">
-          {errorMsg && (
-            <span className="text-xs mono" style={{ color: 'var(--alert-amber)' }}>
-              ⚠ {errorMsg.slice(0, 60)}
-            </span>
-          )}
-          {lastFetchedAt && (
-            <span className="text-xs mono" style={{ color: 'var(--text-disabled)' }}>
-              {timeAgo(lastFetchedAt.toISOString())}
-            </span>
-          )}
-          <div className="flex items-center gap-1 text-xs mono" style={{ color: statusColor }}>
-            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColor }} />
-            {statusLabel}
+          <span className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
+            {items.length} EVENTS
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="status-dot green" />
+            <span className="text-xs mono" style={{ color: 'var(--alert-green)' }}>LIVE</span>
           </div>
-          {apiStatus !== 'live' && (
-            <button onClick={() => void fetchEvents(window)}
-              className="text-xs mono px-2 py-0.5 rounded border"
-              style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
-              RETRY
-            </button>
-          )}
+          <button
+            onClick={() => { setLoading(true); void fetchEvents(window_) }}
+            className="text-xs mono hover:opacity-70 transition-opacity"
+            style={{ color: 'var(--text-muted)' }}
+          >↺</button>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {loading ? (
-          <div>{Array.from({ length: 8 }).map((_, i) => <EventSkeleton key={i} />)}</div>
-        ) : apiStatus === 'error' ? (
-          <div className="text-center py-12">
-            <div className="text-3xl mb-4">⚠</div>
-            <p className="mono text-sm mb-2" style={{ color: '#FF4444' }}>INTEL FEED UNAVAILABLE</p>
-            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-              {errorMsg ?? 'Unknown error occurred'}
-            </p>
-            <button onClick={() => void fetchEvents(window)}
-              className="px-6 py-2 rounded text-xs mono font-bold"
-              style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
+      {/* Feed */}
+      <div className="flex-1 overflow-y-auto">
+        {loading && (
+          <div className="p-4 space-y-2">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="skeleton h-14 rounded" style={{ animationDelay: `${i * 80}ms` }} />
+            ))}
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="p-6 text-center">
+            <div className="text-sm font-bold mb-2" style={{ color: '#EF4444' }}>FEED ERROR</div>
+            <div className="text-xs mono mb-4" style={{ color: 'var(--text-muted)' }}>{error}</div>
+            <button
+              onClick={() => { setLoading(true); void fetchEvents(window_) }}
+              className="text-xs mono px-3 py-1.5 rounded border hover:opacity-80 transition-opacity"
+              style={{ color: 'var(--primary)', borderColor: 'var(--primary)' }}
+            >
               RETRY
             </button>
           </div>
-        ) : events.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-3xl mb-4">📡</div>
-            <p className="mono text-sm mb-2" style={{ color: 'var(--text-muted)' }}>
-              No events in the {window} window
-            </p>
-            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-              Intel ingest runs every 15 minutes. Try expanding the time window.
-            </p>
-            <div className="flex gap-2 justify-center">
-              <button onClick={() => setWindow('7d')}
-                className="px-4 py-2 rounded text-xs mono"
-                style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
-                View 7d window
-              </button>
-              <button onClick={() => void fetchEvents(window)}
-                className="px-4 py-2 rounded text-xs mono border"
-                style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
-                Refresh
-              </button>
+        )}
+
+        {!loading && !error && items.length === 0 && (
+          <div className="p-8 text-center">
+            <div className="text-2xl mb-3 opacity-30">◈</div>
+            <div className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>NO EVENTS IN WINDOW</div>
+            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Try expanding the time window or trigger an ingest from the Doctor page.
             </div>
           </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
-                {events.length} EVENTS — {window.toUpperCase()} WINDOW
-              </span>
-              {lastFetchedAt && (
-                <span className="text-xs mono" style={{ color: 'var(--text-disabled)' }}>
-                  Updated {timeAgo(lastFetchedAt.toISOString())}
-                </span>
-              )}
-            </div>
-            {events.map(event => <EventCard key={event.id} event={event} />)}
-          </>
+        )}
+
+        {!loading && !error && items.length > 0 && (
+          <div>
+            {items.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setSelectedItem(item)}
+                className="w-full text-left border-b px-4 py-3 transition-colors hover:bg-white/5 active:bg-white/10"
+                style={{ borderColor: 'var(--border)', display: 'block' }}
+              >
+                <div className="flex items-start gap-3">
+                  {/* Severity bar */}
+                  <div
+                    className="w-0.5 rounded-full mt-0.5 shrink-0"
+                    style={{
+                      height: 36,
+                      backgroundColor: severityColor(item.severity),
+                      opacity: 0.8,
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    {/* Source + time */}
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs mono font-bold px-1.5 py-0.5 rounded"
+                        style={{
+                          backgroundColor: 'rgba(0,255,136,0.08)',
+                          color: 'var(--primary)',
+                          fontSize: 10,
+                        }}>
+                        {sourceLabel(item.source)}
+                      </span>
+                      {item.country_code && (
+                        <span className="text-xs" style={{ color: 'var(--text-muted)', fontSize: 10 }}>
+                          {item.country_code}
+                        </span>
+                      )}
+                      <span className="text-xs ml-auto shrink-0" style={{ color: 'var(--text-disabled)', fontSize: 10 }}>
+                        {safeTimeAgo(item.occurred_at ?? item.ingested_at)}
+                      </span>
+                    </div>
+                    {/* Title */}
+                    <div className="text-xs leading-snug truncate" style={{ color: 'var(--text-primary)' }}>
+                      {item.title}
+                    </div>
+                  </div>
+                  {/* Arrow */}
+                  <span className="text-xs shrink-0 mt-1" style={{ color: 'var(--text-disabled)' }}>›</span>
+                </div>
+              </button>
+            ))}
+          </div>
         )}
       </div>
+
+      {/* Detail drawer */}
+      {selectedItem && (
+        <IntelDrawer item={selectedItem} onClose={() => setSelectedItem(null)} />
+      )}
     </div>
   )
-}
-
-// Helper (duplicated from hook to avoid circular import in this file)
-function windowToMs(w: TimeWindow): number {
-  const map: Record<TimeWindow, number> = {
-    '1h': 3600000, '6h': 21600000, '24h': 86400000, '7d': 604800000, '30d': 2592000000,
-  }
-  return map[w]
 }
