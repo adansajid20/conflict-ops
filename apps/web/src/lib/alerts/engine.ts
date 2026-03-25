@@ -144,12 +144,13 @@ export async function createAlerts(alerts: AlertToCreate[]): Promise<void> {
 
   await supabase.from('alerts').insert(rows)
 
-  // Fire webhooks for orgs that have them configured
+  // Fire webhooks + email for orgs that have them configured
   for (const alert of alerts) {
     if (alert.channels.includes('webhook')) {
-      void fireWebhooks(alert).catch(err => {
-        console.error('[alert-engine] webhook error:', err)
-      })
+      void fireWebhooks(alert).catch(err => console.error('[alert-engine] webhook error:', err))
+    }
+    if (alert.channels.includes('email')) {
+      void fireAlertEmail(alert, supabase).catch(err => console.error('[alert-engine] email error:', err))
     }
   }
 }
@@ -186,5 +187,34 @@ async function fireWebhooks(alert: AlertToCreate): Promise<void> {
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(5000),
     }).catch(() => undefined) // fire-and-forget, best effort
+  }
+}
+
+async function fireAlertEmail(alert: AlertToCreate, supabase: ReturnType<typeof createServiceClient>): Promise<void> {
+  const { sendEmail } = await import('@/lib/email/client')
+
+  // Get org member emails (owner + admin)
+  const { data: members } = await supabase
+    .from('users')
+    .select('email')
+    .eq('org_id', alert.org_id)
+    .in('role', ['owner', 'admin'])
+    .not('email', 'is', null)
+
+  if (!members?.length) return
+
+  for (const member of members) {
+    if (!member.email) continue
+    await sendEmail({
+      to: member.email,
+      template: 'alert_triggered',
+      data: {
+        alert_name: alert.title,
+        description: alert.body,
+        escalation_level: (alert.metadata as Record<string, unknown>)?.escalation_level ?? 'ELEVATED',
+        event_count: (alert.metadata as Record<string, unknown>)?.event_count ?? '—',
+        region: (alert.metadata as Record<string, unknown>)?.region ?? 'Unknown',
+      },
+    })
   }
 }

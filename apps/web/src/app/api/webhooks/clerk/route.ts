@@ -103,6 +103,12 @@ async function processClerkEvent(event: ClerkEvent): Promise<void> {
         { clerk_user_id: data.id, email, name },
         { onConflict: 'clerk_user_id', ignoreDuplicates: false }
       )
+
+      // Send welcome email (best-effort, non-blocking)
+      if (email) {
+        const { sendEmail } = await import('@/lib/email/client')
+        void sendEmail({ to: email, template: 'welcome', data: { name: name ?? 'Operator' } })
+      }
       break
     }
 
