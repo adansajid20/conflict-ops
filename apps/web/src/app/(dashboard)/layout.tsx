@@ -5,7 +5,7 @@ import Link from 'next/link'
 export const dynamic = 'force-dynamic'
 
 const NAV_ITEMS = [
-  { href: '/',              label: 'OVERVIEW',    icon: '◈', section: 'main' },
+  { href: '/overview',      label: 'OVERVIEW',    icon: '◈', section: 'main' },
   { href: '/feed',          label: 'INTEL FEED',  icon: '▤', section: 'main' },
   { href: '/map',           label: 'MAP',         icon: '⊞', section: 'main' },
   { href: '/alerts',        label: 'ALERTS',      icon: '⚠', section: 'main' },
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: '/markets',       label: 'MARKETS',     icon: '◷', section: 'analysis' },
   { href: '/geoverify',     label: 'GEOVERIFY',   icon: '⊛', section: 'analysis' },
   { href: '/travel',        label: 'TRAVEL RISK', icon: '⊲', section: 'analysis' },
+  { href: '/usage',            label: 'USAGE',     icon: '◷', section: 'settings' },
   { href: '/settings/billing', label: 'BILLING',  icon: '○', section: 'settings' },
   { href: '/settings/api',     label: 'API KEYS', icon: '⊢', section: 'settings' },
   { href: '/settings/org',     label: 'ORG',      icon: '⊕', section: 'settings' },

@@ -260,8 +260,11 @@ export default function LandingPage() {
           <div className="text-xs" style={{ color: '#484f58' }}>
             Active fire data courtesy of NASA FIRMS · Vessel data via AISStream.io · Flight data by The OpenSky Network
           </div>
-          <div className="text-xs" style={{ color: '#484f58' }}>
-            © 2026 CONFLICT OPS · All rights reserved
+          <div className="text-xs flex gap-4 items-center" style={{ color: '#484f58' }}>
+            <span>© 2026 CONFLICT OPS</span>
+            <a href="/privacy" className="hover:text-white transition-colors">Privacy</a>
+            <a href="/terms" className="hover:text-white transition-colors">Terms</a>
+            <a href="mailto:support@conflictradar.co" className="hover:text-white transition-colors">Support</a>
           </div>
         </div>
       </footer>

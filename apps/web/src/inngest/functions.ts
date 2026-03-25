@@ -7,6 +7,8 @@ import { HIGH_CONFLICT_COUNTRIES } from '@/lib/ingest/acled'
 import { ingestAISVessels, detectDarkVessels } from '@/lib/ingest/tracking/ais'
 import { ingestFIRMS } from '@/lib/ingest/tracking/firms'
 import { ingestADSB } from '@/lib/ingest/tracking/adsb'
+import { createServiceClient } from '@/lib/supabase/server'
+import { sendEmail } from '@/lib/email/client'
 
 // ============================================
 // FAST LANE — every 15 minutes
@@ -247,3 +249,117 @@ async function computeCountryForecast(countryCode: string): Promise<void> {
     { onConflict: 'region,forecast_type,horizon_days' }
   )
 }
+
+// ============================================
+// WEEKLY BRIEF — every Monday 08:00 UTC
+// ============================================
+
+export const weeklyBrief = inngest.createFunction(
+  { id: 'weekly-brief', name: 'Weekly Situation Brief Email', retries: 1 },
+  { cron: '0 8 * * 1' },
+  async ({ step }) => {
+    await step.run('send-weekly-briefs', async () => {
+      const supabase = createServiceClient()
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      const weekLabel = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+
+      // Get orgs on Pro+ with scheduledBriefs enabled
+      const { data: orgs } = await supabase
+        .from('orgs')
+        .select('id, name')
+        .in('plan_id', ['pro', 'business', 'enterprise'])
+        .eq('subscription_status', 'active')
+
+      if (!orgs?.length) return { sent: 0 }
+
+      let sent = 0
+
+      for (const org of orgs) {
+        const [events, alerts, topRegion] = await Promise.allSettled([
+          supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', sevenDaysAgo),
+          supabase.from('alerts').select('id', { count: 'exact', head: true }).eq('org_id', org.id).gte('created_at', sevenDaysAgo),
+          supabase.from('events').select('region').gte('occurred_at', sevenDaysAgo).limit(100),
+        ])
+
+        const eventCount = events.status === 'fulfilled' ? (events.value.count ?? 0) : 0
+        const alertCount = alerts.status === 'fulfilled' ? (alerts.value.count ?? 0) : 0
+
+        // Tally top region
+        let topRegionName = 'Global'
+        if (topRegion.status === 'fulfilled' && topRegion.value.data) {
+          const counts: Record<string, number> = {}
+          for (const r of topRegion.value.data) {
+            if (r.region) counts[r.region] = (counts[r.region] ?? 0) + 1
+          }
+          const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1])
+          if (sorted[0]) topRegionName = sorted[0][0]
+        }
+
+        // Get owner/admin emails
+        const { data: members } = await supabase
+          .from('users')
+          .select('email')
+          .eq('org_id', org.id)
+          .in('role', ['owner', 'admin'])
+          .not('email', 'is', null)
+
+        for (const member of (members ?? [])) {
+          if (!member.email) continue
+          await sendEmail({
+            to: member.email,
+            template: 'weekly_brief',
+            data: { week: weekLabel, events_this_week: eventCount, active_alerts: alertCount, top_region: topRegionName },
+          })
+          sent++
+        }
+      }
+
+      return { sent }
+    })
+  }
+)
+
+// ============================================
+// TRIAL EXPIRY NOTIFIER — daily at 10:00 UTC
+// ============================================
+
+export const trialExpiryNotifier = inngest.createFunction(
+  { id: 'trial-expiry-notifier', name: 'Trial Expiry Email (3 days warning)', retries: 1 },
+  { cron: '0 10 * * *' },
+  async ({ step }) => {
+    await step.run('check-expiring-trials', async () => {
+      const supabase = createServiceClient()
+      const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+      const fourDaysFromNow = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000)
+
+      // Orgs whose trial ends in the next 3-4 days (send once in that window)
+      const { data: expiringOrgs } = await supabase
+        .from('orgs')
+        .select('id, name')
+        .eq('subscription_status', 'trialing')
+        .gte('trial_ends_at', threeDaysFromNow.toISOString())
+        .lt('trial_ends_at', fourDaysFromNow.toISOString())
+
+      if (!expiringOrgs?.length) return { notified: 0 }
+
+      let notified = 0
+
+      for (const org of expiringOrgs) {
+        const { data: owners } = await supabase
+          .from('users')
+          .select('email')
+          .eq('org_id', org.id)
+          .eq('role', 'owner')
+          .not('email', 'is', null)
+
+        for (const owner of (owners ?? [])) {
+          if (!owner.email) continue
+          await sendEmail({ to: owner.email, template: 'trial_ending', data: { org_name: org.name } })
+          notified++
+        }
+      }
+
+      return { notified }
+    })
+  }
+)
