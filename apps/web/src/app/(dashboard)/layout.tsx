@@ -5,12 +5,17 @@ import Link from 'next/link'
 export const dynamic = 'force-dynamic'
 
 const NAV_ITEMS = [
-  { href: '/missions', label: 'MISSIONS', icon: '◉' },
-  { href: '/map', label: 'MAP', icon: '⊞' },
-  { href: '/feed', label: 'INTEL FEED', icon: '▤' },
-  { href: '/alerts', label: 'ALERTS', icon: '⚠' },
-  { href: '/workbench', label: 'WORKBENCH', icon: '⊡' },
-  { href: '/admin', label: 'ADMIN', icon: '⚙' },
+  { href: '/',           label: 'OVERVIEW',   icon: '◈', section: 'main' },
+  { href: '/feed',       label: 'INTEL FEED', icon: '▤', section: 'main' },
+  { href: '/map',        label: 'MAP',        icon: '⊞', section: 'main' },
+  { href: '/alerts',     label: 'ALERTS',     icon: '⚠', section: 'main' },
+  { href: '/missions',   label: 'MISSIONS',   icon: '◉', section: 'main' },
+  { href: '/workbench',  label: 'WORKBENCH',  icon: '⊡', section: 'analysis' },
+  { href: '/admin',      label: 'TRACKING',   icon: '⊙', section: 'analysis' },
+  { href: '/settings/billing', label: 'BILLING',  icon: '○', section: 'settings' },
+  { href: '/settings/api',     label: 'API',       icon: '⊢', section: 'settings' },
+  { href: '/settings/team',    label: 'TEAM',      icon: '⊕', section: 'settings' },
+  { href: '/settings/webhooks',label: 'WEBHOOKS',  icon: '⇢', section: 'settings' },
 ]
 
 export default async function DashboardLayout({
@@ -54,17 +59,24 @@ export default async function DashboardLayout({
           </div>
 
           {/* Nav */}
-          <nav className="flex-1 p-2">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-3 px-3 py-2 rounded text-sm font-mono tracking-wider transition-colors hover:bg-white/5"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                <span style={{ color: 'var(--primary)' }}>{item.icon}</span>
-                {item.label}
-              </Link>
+          <nav className="flex-1 p-2 overflow-y-auto">
+            {(['main','analysis','settings'] as const).map(section => (
+              <div key={section}>
+                <div className="px-3 pt-3 pb-1 text-xs mono tracking-widest" style={{ color: 'var(--border)' }}>
+                  {section === 'main' ? 'INTELLIGENCE' : section === 'analysis' ? 'ANALYSIS' : 'SETTINGS'}
+                </div>
+                {NAV_ITEMS.filter(i => i.section === section).map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex items-center gap-3 px-3 py-2 rounded text-sm font-mono tracking-wider transition-colors hover:bg-white/5"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    <span style={{ color: 'var(--primary)' }}>{item.icon}</span>
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
             ))}
           </nav>
 
