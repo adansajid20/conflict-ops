@@ -21,6 +21,9 @@ const CONFLICT_BBOX = [
   { name: 'East/Central Africa', minLat: -5, maxLat: 20, minLng: 22, maxLng: 52 },
   { name: 'West Africa Sahel', minLat: 10, maxLat: 22, minLng: -18, maxLng: 25 },
   { name: 'South/Southeast Asia', minLat: 10, maxLat: 35, minLng: 60, maxLng: 105 },
+  { name: 'North Africa', minLat: 18, maxLat: 38, minLng: -18, maxLng: 38 },
+  { name: 'Latin America', minLat: -20, maxLat: 22, minLng: -92, maxLng: -60 },
+  { name: 'Russia/Central Asia', minLat: 36, maxLat: 56, minLng: 42, maxLng: 78 },
 ]
 
 type EONETEvent = {
@@ -105,7 +108,9 @@ export async function ingestNASAEONET(): Promise<{ stored: number; skipped: numb
       if (typeof lat !== 'number' || typeof lng !== 'number') continue
 
       const region = inConflictZone(lat, lng)
-      if (!region) continue // skip events outside conflict zones
+      // Only skip low-severity events outside conflict zones
+      const sevScore = severityFromCategory(category.id, latestGeom?.magnitudeValue ?? null)
+      if (!region && sevScore < 4) continue
 
       const severity = severityFromCategory(category.id, latestGeom.magnitudeValue)
 

@@ -85,7 +85,7 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
   let stored = 0, skipped = 0
 
   // Fetch recent reports tagged with conflict/security themes
-  const reportsRes = await fetch(`${RELIEFWEB_API}/reports?appname=${APP_NAME}&filter[operator]=AND&filter[conditions][0][field]=theme.name&filter[conditions][0][value][]=Conflict+and+Violence&filter[conditions][0][value][]=Security&filter[conditions][0][value][]=Mine+Action&filter[conditions][0][operator]=OR&filter[conditions][1][field]=date.created&filter[conditions][1][value][from]=${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}&fields[include][]=title&fields[include][]=body&fields[include][]=date&fields[include][]=country&fields[include][]=theme&fields[include][]=source&fields[include][]=url&sort[]=date.created:desc&limit=50`, {
+  const reportsRes = await fetch(`${RELIEFWEB_API}/reports?appname=${APP_NAME}&filter[operator]=AND&filter[conditions][0][field]=theme.name&filter[conditions][0][value][]=Conflict+and+Violence&filter[conditions][0][value][]=Security&filter[conditions][0][value][]=Mine+Action&filter[conditions][0][operator]=OR&filter[conditions][1][field]=date.created&filter[conditions][1][value][from]=${new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString()}&fields[include][]=title&fields[include][]=body&fields[include][]=date&fields[include][]=country&fields[include][]=theme&fields[include][]=source&fields[include][]=url&sort[]=date.created:desc&limit=50`, {
     headers: { 'User-Agent': `ConflictOps/1.0 (${APP_NAME})` },
     signal: AbortSignal.timeout(15000),
   }).catch(() => null)

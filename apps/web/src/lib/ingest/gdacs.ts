@@ -11,7 +11,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 
 const GDACS_RSS = 'https://www.gdacs.org/xml/rss_conflict.xml'
-const GDACS_API = 'https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS?eventtype=CE&alertlevel=Green,Orange,Red&limit=50'
+const GDACS_API = 'https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS?eventtype=EQ,TC,FL,CE&alertlevel=Orange,Red&limit=50'
 
 type GDACSEvent = {
   eventid: number
@@ -69,7 +69,7 @@ export async function ingestGDACS(): Promise<{ stored: number; skipped: number }
 
     for (const feature of (data.features ?? [])) {
       const e = feature.properties
-      if (e.eventtype !== 'CE') continue // CE = Complex Emergency
+      // Accept all event types — EQ, TC, FL, CE
 
       const { error } = await supabase.from('events').upsert({
         source: 'gdacs',
