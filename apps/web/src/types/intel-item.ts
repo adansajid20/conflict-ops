@@ -13,8 +13,46 @@ export type IntelItem = {
   url: string | null
 }
 
+/** Extract source URL from provenance_raw for any source format */
+function extractUrl(raw: Record<string, unknown>): string | null {
+  // Direct url field
+  if (raw.url) return String(raw.url)
+  // GDELT uses ActionGeo_SourceURL or SOURCEURL
+  if (raw.SOURCEURL) return String(raw.SOURCEURL)
+  if (raw.ActionGeo_SourceURL) return String(raw.ActionGeo_SourceURL)
+  // ReliefWeb
+  if (raw.fields && typeof raw.fields === 'object') {
+    const f = raw.fields as Record<string, unknown>
+    if (f.url) return String(f.url)
+    if (f.origin) return String(f.origin)
+  }
+  // NASA EONET
+  if (Array.isArray(raw.sources) && raw.sources.length > 0) {
+    const s = (raw.sources as Array<Record<string, unknown>>)[0]
+    if (s?.url) return String(s.url)
+  }
+  // GDACS
+  if (raw.link) return String(raw.link)
+  return null
+}
+
+/** Extract description from provenance_raw if DB description field is null */
+function extractDesc(raw: Record<string, unknown>): string | null {
+  if (raw.description) return String(raw.description).slice(0, 500)
+  if (raw.body) return String(raw.body).slice(0, 500)
+  // ReliefWeb
+  if (raw.fields && typeof raw.fields === 'object') {
+    const f = raw.fields as Record<string, unknown>
+    if (f.body) return String(f.body).slice(0, 500)
+  }
+  // GDACS
+  if (raw.summary) return String(raw.summary).slice(0, 500)
+  return null
+}
+
 export function eventToIntelItem(e: Record<string, unknown>): IntelItem {
   const raw = ((e.provenance_raw ?? e.raw ?? {}) as Record<string, unknown>)
+  const desc = (e.description as string) ?? extractDesc(raw) ?? null
   return {
     id: String(e.id ?? ''),
     kind: 'event',
@@ -26,8 +64,8 @@ export function eventToIntelItem(e: Record<string, unknown>): IntelItem {
     event_type: (e.event_type as string) ?? null,
     occurred_at: (e.occurred_at as string) ?? null,
     ingested_at: String(e.ingested_at ?? new Date().toISOString()),
-    description: (e.description as string) ?? null,
-    url: (raw.url as string) ?? null,
+    description: desc,
+    url: extractUrl(raw),
   }
 }
 
@@ -40,7 +78,9 @@ export function safeTimeAgo(iso: string | null | undefined): string {
   if (m < 60) return `${m}m ago`
   const h = Math.floor(m / 60)
   if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
+  const days = Math.floor(h / 24)
+  if (days < 30) return `${days}d ago`
+  return `${Math.floor(days / 30)}mo ago`
 }
 
 export function severityLabel(s: number | null): string {

@@ -119,7 +119,7 @@ export function ConflictMap({ className = '' }: { className?: string }) {
     try {
       const res = await fetch('/api/v1/events/geo', { cache: 'no-store' })
       if (!res.ok) return
-      const d = await res.json() as { data?: RawEvent[] }
+      const d = await res.json() as { ok?: boolean; data?: RawEvent[] }
       setAllEvents(d.data ?? [])
     } catch { /* keep existing */ }
     finally { setLoading(false) }
