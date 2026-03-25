@@ -33,4 +33,4 @@ export async function requireFeature(
   }
 }
 
-export { getPlanLimits } from '@conflict-ops/shared'
+export { getPlanLimits, isAtMissionLimit, planHasFeature } from '@conflict-ops/shared'
