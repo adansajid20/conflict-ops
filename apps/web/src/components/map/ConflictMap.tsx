@@ -160,7 +160,7 @@ function buildGeoJSON(events: ConflictEvent[]): GeoJSON.FeatureCollection {
     .filter(e => e.location !== null)
     .map(event => {
       const loc = event.location as { coordinates: [number, number] } | null
-      if (!loc) return null
+      if (!loc) return null as unknown as GeoJSON.Feature
 
       const severity = event.severity ?? 1
       const color = SEVERITY_COLORS[(severity - 1)] ?? SEVERITY_COLORS[0]
