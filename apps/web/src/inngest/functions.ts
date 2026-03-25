@@ -4,6 +4,9 @@ import { ingestGDELT } from '@/lib/ingest/gdelt'
 import { runHeavyLane } from '@/lib/ingest/heavy-lane'
 import { computeEscalationLevel } from '@/lib/alerts/escalation'
 import { HIGH_CONFLICT_COUNTRIES } from '@/lib/ingest/acled'
+import { ingestAISVessels, detectDarkVessels } from '@/lib/ingest/tracking/ais'
+import { ingestFIRMS } from '@/lib/ingest/tracking/firms'
+import { ingestADSB } from '@/lib/ingest/tracking/adsb'
 
 // ============================================
 // FAST LANE — every 15 minutes
@@ -110,6 +113,33 @@ export const forecastRecompute = inngest.createFunction(
     })
 
     return { ...result, timestamp: new Date().toISOString() }
+  }
+)
+
+// ============================================
+// TRACKING LAYER — every 30 minutes
+// AIS vessels + ADS-B flights + FIRMS thermal
+// No LLM cost — rule-based signals only
+// ============================================
+
+export const trackingIngest = inngest.createFunction(
+  { id: 'tracking-ingest', name: 'Tracking Layer: AIS + ADS-B + FIRMS', concurrency: { limit: 1 }, retries: 0 },
+  { cron: '*/30 * * * *' },
+  async ({ step }) => {
+    const [aisResult, adsbResult, firmsResult, darkResult] = await Promise.allSettled([
+      step.run('ingest-ais', () => ingestAISVessels()),
+      step.run('ingest-adsb', () => ingestADSB()),
+      step.run('ingest-firms', () => ingestFIRMS(1)),
+      step.run('detect-dark-vessels', () => detectDarkVessels()),
+    ])
+
+    return {
+      ais: aisResult.status === 'fulfilled' ? aisResult.value : { error: String((aisResult as PromiseRejectedResult).reason) },
+      adsb: adsbResult.status === 'fulfilled' ? adsbResult.value : { error: String((adsbResult as PromiseRejectedResult).reason) },
+      firms: firmsResult.status === 'fulfilled' ? firmsResult.value : { error: String((firmsResult as PromiseRejectedResult).reason) },
+      dark_vessels: darkResult.status === 'fulfilled' ? darkResult.value : 0,
+      timestamp: new Date().toISOString(),
+    }
   }
 )
 
