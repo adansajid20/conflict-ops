@@ -12,12 +12,12 @@ const CreateMissionSchema = z.object({
   tags: z.array(z.string()).default([]),
 })
 
-async function getOrgId(userId: string): Promise<string | null> {
+async function getOrgId(clerkUserId: string): Promise<string | null> {
   const supabase = createServiceClient()
   const { data } = await supabase
     .from('users')
     .select('org_id')
-    .eq('clerk_user_id', userId)
+    .eq('clerk_user_id', clerkUserId)
     .single()
   return data?.org_id ?? null
 }

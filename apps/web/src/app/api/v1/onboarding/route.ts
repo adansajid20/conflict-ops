@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { ensureUserProvisioned } from '@/lib/user/provision'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -25,11 +26,12 @@ export async function POST(req: Request) {
   const parsed = Schema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 })
 
-  const supabase = createServiceClient()
+  // Auto-provision user if not in DB (webhook might not be configured)
+  const provisioned = await ensureUserProvisioned(userId)
 
-  // Get or create user record
-  const { data: user } = await supabase.from('users').select('id, org_id').eq('clerk_user_id', userId).single()
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const supabase = createServiceClient()
+  const { data: user } = await supabase.from('users').select('id, org_id').eq('id', provisioned.userId).single()
+  if (!user) return NextResponse.json({ error: 'Failed to create user record' }, { status: 500 })
 
   let orgId = user.org_id
 

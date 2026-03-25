@@ -68,9 +68,8 @@ export default async function DashboardPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const supabase = createServiceClient()
-  const { data: userCheck } = await supabase.from('users').select('onboarding_complete').eq('clerk_user_id', userId).single()
-  if (userCheck && !userCheck.onboarding_complete) redirect('/onboarding')
+  // Onboarding is optional — don't block access to the dashboard
+  // Users can access everything; onboarding CTA shows in the UI if they have no org
 
   const stats = await getDashboardStats()
   const isFirstRun = stats.events24h === 0 && stats.events7d === 0
