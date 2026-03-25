@@ -23,7 +23,8 @@ export type SendEmailParams = {
 }
 
 const RESEND_API = 'https://api.resend.com/emails'
-const FROM = 'CONFLICT OPS <noreply@conflictops.com>'
+const FROM = process.env['EMAIL_FROM'] ?? 'CONFLICT OPS <noreply@conflictops.com>'
+const APP_URL = process.env['NEXT_PUBLIC_APP_URL'] ?? '${APP_URL}'
 
 function buildSubject(template: EmailTemplate, data: Record<string, unknown>): string {
   switch (template) {
@@ -70,7 +71,7 @@ function buildHtml(template: EmailTemplate, data: Record<string, unknown>): stri
         <p>1. Open the <strong style="color:#e6edf3">Intel Feed</strong> — live conflict events updated every 15 minutes<br>
         2. Create a <strong style="color:#e6edf3">Mission</strong> — define your area of interest and PIR<br>
         3. Set <strong style="color:#e6edf3">Alerts</strong> — get notified when thresholds are crossed</p>
-        <a href="https://conflict-ops.vercel.app" class="btn">Open Dashboard →</a>
+        <a href="${APP_URL}" class="btn">Open Dashboard →</a>
       `)
 
     case 'alert_triggered':
@@ -87,7 +88,7 @@ function buildHtml(template: EmailTemplate, data: Record<string, unknown>): stri
         </div>
         <p>${data['description'] ?? 'A Priority Intelligence Requirement threshold has been crossed.'}</p>
         <p>Region: <strong style="color:#e6edf3">${data['region'] ?? 'Unknown'}</strong></p>
-        <a href="https://conflict-ops.vercel.app/alerts" class="btn">View Alert →</a>
+        <a href="${APP_URL}/alerts" class="btn">View Alert →</a>
       `)
 
     case 'trial_ending':
@@ -96,7 +97,7 @@ function buildHtml(template: EmailTemplate, data: Record<string, unknown>): stri
         <h2>3 days left on your trial</h2>
         <p>Your CONFLICT OPS trial ends in 3 days. Upgrade to keep your missions, alerts, and analysis history.</p>
         <p>Start at <strong style="color:#e6edf3">$29/month</strong> for Individual access, or <strong style="color:#e6edf3">$99/month</strong> for Pro with full workbench access.</p>
-        <a href="https://conflict-ops.vercel.app/settings/billing" class="btn">Upgrade Now →</a>
+        <a href="${APP_URL}/settings/billing" class="btn">Upgrade Now →</a>
       `)
 
     case 'weekly_brief':
@@ -107,7 +108,7 @@ function buildHtml(template: EmailTemplate, data: Record<string, unknown>): stri
         <div class="stat"><div class="stat-val">${data['active_alerts'] ?? 0}</div><div class="stat-label">ACTIVE ALERTS</div></div>
         <div class="stat"><div class="stat-val">${data['top_region'] ?? '—'}</div><div class="stat-label">HIGHEST ACTIVITY REGION</div></div>
         <p>${data['summary'] ?? 'Review your full situation dashboard for detailed analysis.'}</p>
-        <a href="https://conflict-ops.vercel.app" class="btn">Open Dashboard →</a>
+        <a href="${APP_URL}" class="btn">Open Dashboard →</a>
       `)
   }
 }
