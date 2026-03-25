@@ -15,30 +15,36 @@ export async function POST(req: Request) {
   const results: Record<string, unknown> = {}
   const start = Date.now()
 
-  try {
+  const runSource = async (name: string, fn: () => Promise<unknown>) => {
+    const t = Date.now()
+    try {
+      const r = await fn()
+      results[name] = { ...((r && typeof r === 'object') ? r : { result: r }), _ms: Date.now() - t }
+    } catch (e) {
+      results[name] = { error: String(e), stack: (e instanceof Error ? e.stack?.split('\n').slice(0,3).join(' | ') : ''), _ms: Date.now() - t }
+    }
+  }
+
+  await runSource('gdelt', async () => {
     const { ingestGDELT } = await import('@/lib/ingest/gdelt')
-    results['gdelt'] = await ingestGDELT()
-  } catch (e) { results['gdelt'] = { error: String(e) } }
-
-  try {
+    return ingestGDELT()
+  })
+  await runSource('reliefweb', async () => {
     const { ingestReliefWeb } = await import('@/lib/ingest/reliefweb')
-    results['reliefweb'] = await ingestReliefWeb()
-  } catch (e) { results['reliefweb'] = { error: String(e) } }
-
-  try {
+    return ingestReliefWeb()
+  })
+  await runSource('gdacs', async () => {
     const { ingestGDACS } = await import('@/lib/ingest/gdacs')
-    results['gdacs'] = await ingestGDACS()
-  } catch (e) { results['gdacs'] = { error: String(e) } }
-
-  try {
+    return ingestGDACS()
+  })
+  await runSource('unhcr', async () => {
     const { ingestUNHCR } = await import('@/lib/ingest/unhcr')
-    results['unhcr'] = await ingestUNHCR()
-  } catch (e) { results['unhcr'] = { error: String(e) } }
-
-  try {
+    return ingestUNHCR()
+  })
+  await runSource('nasa-eonet', async () => {
     const { ingestNASAEONET } = await import('@/lib/ingest/nasa-eonet')
-    results['nasa-eonet'] = await ingestNASAEONET()
-  } catch (e) { results['nasa-eonet'] = { error: String(e) } }
+    return ingestNASAEONET()
+  })
 
   const totalMs = Date.now() - start
   const totalInserted = Object.values(results).reduce((acc: number, r) => {
