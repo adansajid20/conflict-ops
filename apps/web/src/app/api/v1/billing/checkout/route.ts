@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       .eq('id', user.id)
   }
 
-  const appUrl = process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://conflictops.com'
+  const appUrl = process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://conflictradar.co'
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,

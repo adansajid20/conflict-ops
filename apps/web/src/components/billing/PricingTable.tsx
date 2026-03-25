@@ -219,7 +219,7 @@ export function PricingTable({ currentPlan }: { currentPlan?: string }) {
         <div className="text-right shrink-0 ml-4">
           <div className="text-lg font-bold mono" style={{ color: 'var(--text-primary)' }}>$2,000+/mo</div>
           <a
-            href="mailto:enterprise@conflictops.com"
+            href="mailto:enterprise@conflictradar.co"
             className="text-xs mono"
             style={{ color: 'var(--primary)' }}
           >

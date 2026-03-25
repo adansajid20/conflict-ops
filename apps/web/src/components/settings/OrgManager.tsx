@@ -123,7 +123,7 @@ export function OrgManager() {
           <div className="text-xs mono font-bold mb-1" style={{ color: 'var(--text-muted)' }}>SSO / SAML</div>
           <p className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
             SSO with SAML 2.0 or OIDC is available on the Enterprise plan.
-            Contact sales to enable: <span style={{ color: 'var(--primary)' }}>enterprise@conflictops.com</span>
+            Contact sales to enable: <span style={{ color: 'var(--primary)' }}>enterprise@conflictradar.co</span>
           </p>
         </div>
       )}

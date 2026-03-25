@@ -129,7 +129,7 @@ export function APIKeysManager() {
       <div className="mt-6 p-4 rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
         <div className="text-xs mono font-bold mb-2" style={{ color: 'var(--text-muted)' }}>QUICK START</div>
         <code className="text-xs mono block" style={{ color: 'var(--text-primary)' }}>
-          {`curl https://conflict-ops.vercel.app/api/public/v1/events \\
+          {`curl https://conflictradar.co/api/public/v1/events \\
   -H "Authorization: Bearer cok_live_..." \\
   -d "limit=50&severity_gte=3"`}
         </code>

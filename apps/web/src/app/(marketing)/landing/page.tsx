@@ -219,7 +219,7 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link href={p.name === 'ENTERPRISE' ? 'mailto:enterprise@conflictops.com' : '/sign-up'}
+                <Link href={p.name === 'ENTERPRISE' ? 'mailto:enterprise@conflictradar.co' : '/sign-up'}
                   className="block text-center py-2 rounded text-sm font-bold transition-colors"
                   style={{
                     backgroundColor: p.highlight ? '#1f6feb' : 'transparent',

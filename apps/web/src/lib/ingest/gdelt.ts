@@ -57,7 +57,7 @@ export async function ingestGDELT(): Promise<IngestResult> {
 
   try {
     const res = await fetch(`${GDELT_BASE}?${params.toString()}`, {
-      headers: { 'User-Agent': 'ConflictOps/1.0 (https://conflictops.com)' },
+      headers: { 'User-Agent': 'ConflictOps/1.0 (https://conflictradar.co)' },
     })
 
     if (!res.ok) throw new Error(`GDELT API ${res.status}`)

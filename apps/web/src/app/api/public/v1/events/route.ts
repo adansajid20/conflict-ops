@@ -60,7 +60,7 @@ export async function GET(req: Request) {
   const auth = await authenticateAPIKey(req)
   if (!auth) {
     return NextResponse.json(
-      { error: 'Unauthorized', message: 'Valid API key required. Get one at conflictops.com/settings/api' },
+      { error: 'Unauthorized', message: 'Valid API key required. Get one at conflictradar.co/settings/api' },
       { status: 401 }
     )
   }
@@ -121,7 +121,7 @@ export async function GET(req: Request) {
   }, {
     headers: {
       'X-API-Version': 'v1',
-      'X-Attribution': 'Powered by CONFLICT OPS (conflictops.com)',
+      'X-Attribution': 'Powered by CONFLICT OPS (conflictradar.co)',
     },
   })
 }

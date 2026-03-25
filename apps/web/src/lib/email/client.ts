@@ -23,7 +23,7 @@ export type SendEmailParams = {
 }
 
 const RESEND_API = 'https://api.resend.com/emails'
-const FROM = process.env['EMAIL_FROM'] ?? 'CONFLICT OPS <noreply@conflictops.com>'
+const FROM = process.env['EMAIL_FROM'] ?? 'CONFLICT OPS <noreply@conflictradar.co>'
 const APP_URL = process.env['NEXT_PUBLIC_APP_URL'] ?? '${APP_URL}'
 
 function buildSubject(template: EmailTemplate, data: Record<string, unknown>): string {

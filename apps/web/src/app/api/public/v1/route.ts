@@ -7,7 +7,7 @@ export function GET() {
   return NextResponse.json({
     api: 'CONFLICT OPS',
     version: 'v1',
-    documentation: 'https://conflict-ops.vercel.app/api-docs',
+    documentation: 'https://conflictradar.co/api-docs',
     authentication: 'Bearer token — generate at /settings/api',
     rate_limit: '1,000 requests per hour (Business plan)',
     endpoints: [
