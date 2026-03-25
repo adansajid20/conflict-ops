@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { eventToIntelItem, safeTimeAgo, severityLabel, severityColor, type IntelItem } from '@/types/intel-item'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { eventToIntelItem, safeTimeAgo, severityColor, type IntelItem } from '@/types/intel-item'
+import { IntelDrawer } from '@/components/intel/IntelDrawer'
 
 type TimeWindow = '1h' | '6h' | '24h' | '7d' | '30d'
 
@@ -21,122 +23,28 @@ function sourceLabel(source: string): string {
   return map[source] ?? source.toUpperCase()
 }
 
-// Detail drawer component
-function IntelDrawer({ item, onClose }: { item: IntelItem; onClose: () => void }) {
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40"
-        style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
-        onClick={onClose}
-      />
-      {/* Panel */}
-      <div
-        className="fixed right-0 top-0 bottom-0 z-50 flex flex-col overflow-hidden"
-        style={{
-          width: 'min(480px, 95vw)',
-          backgroundColor: 'var(--bg-surface)',
-          borderLeft: '1px solid var(--border)',
-          boxShadow: '-8px 0 32px rgba(0,0,0,0.4)',
-        }}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between p-4 border-b shrink-0"
-          style={{ borderColor: 'var(--border)' }}>
-          <div className="flex-1 pr-3">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs mono font-bold px-2 py-0.5 rounded"
-                style={{
-                  backgroundColor: 'rgba(0,255,136,0.1)',
-                  color: 'var(--primary)',
-                  border: '1px solid rgba(0,255,136,0.2)',
-                }}>
-                {sourceLabel(item.source)}
-              </span>
-              {item.severity && (
-                <span className="text-xs mono font-bold"
-                  style={{ color: severityColor(item.severity) }}>
-                  SEV {item.severity} · {severityLabel(item.severity)}
-                </span>
-              )}
-            </div>
-            <h2 className="text-sm font-bold leading-snug" style={{ color: 'var(--text-primary)' }}>
-              {item.title}
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-lg leading-none shrink-0 p-1 hover:opacity-70 transition-opacity"
-            style={{ color: 'var(--text-muted)' }}
-          >✕</button>
-        </div>
-
-        {/* Meta */}
-        <div className="px-4 py-2 border-b text-xs mono flex gap-4 shrink-0"
-          style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
-          <span>⏱ {safeTimeAgo(item.occurred_at ?? item.ingested_at)}</span>
-          {item.country_code && <span>📍 {item.country_code}{item.region ? ` · ${item.region}` : ''}</span>}
-          {item.event_type && <span>◈ {item.event_type.replace(/_/g, ' ').toUpperCase()}</span>}
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {item.description ? (
-            <div>
-              <div className="text-xs mono mb-2 tracking-widest" style={{ color: 'var(--text-muted)' }}>
-                SUMMARY
-              </div>
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)', lineHeight: 1.6 }}>
-                {item.description}
-              </p>
-            </div>
-          ) : (
-            <div className="text-xs italic" style={{ color: 'var(--text-muted)' }}>
-              No description available for this event.
-            </div>
-          )}
-
-          {item.url && (
-            <div>
-              <div className="text-xs mono mb-2 tracking-widest" style={{ color: 'var(--text-muted)' }}>
-                SOURCE LINK
-              </div>
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs mono break-all hover:underline"
-                style={{ color: 'var(--primary)' }}
-              >
-                ↗ {item.url.length > 80 ? item.url.slice(0, 80) + '…' : item.url}
-              </a>
-            </div>
-          )}
-
-          <div className="text-xs mono pt-2 border-t" style={{ borderColor: 'var(--border)', color: 'var(--text-disabled)' }}>
-            ID: {item.id}<br />
-            Ingested: {safeTimeAgo(item.ingested_at)}
-          </div>
-        </div>
-      </div>
-    </>
-  )
-}
+// Drawer is now the shared IntelDrawer component
 
 export function EventFeed() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [items, setItems] = useState<IntelItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [window_, setWindow] = useState<TimeWindow>('24h')
   const [selectedItem, setSelectedItem] = useState<IntelItem | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  // Persist window in URL (?w=7d) + localStorage fallback
+  const getInitialWindow = (): TimeWindow => {
+    const urlW = searchParams?.get('w') as TimeWindow | null
+    if (urlW && WINDOWS.find(x => x.value === urlW)) return urlW
+    try {
+      const stored = localStorage.getItem('intel_feed_window') as TimeWindow | null
+      if (stored && WINDOWS.find(x => x.value === stored)) return stored
+    } catch { /* ignore */ }
+    return '7d'
+  }
+  const [window_, setWindow] = useState<TimeWindow>(getInitialWindow)
 
   const fetchEvents = useCallback(async (w: TimeWindow) => {
     abortRef.current?.abort()
@@ -179,7 +87,14 @@ export function EventFeed() {
           {WINDOWS.map(w => (
             <button
               key={w.value}
-              onClick={() => { setWindow(w.value); setLoading(true) }}
+              onClick={() => {
+                setWindow(w.value)
+                setLoading(true)
+                try { localStorage.setItem('intel_feed_window', w.value) } catch { /* ignore */ }
+                const params = new URLSearchParams(searchParams?.toString() ?? '')
+                params.set('w', w.value)
+                router.replace(`?${params.toString()}`, { scroll: false })
+              }}
               className="px-2 py-1 text-xs mono rounded transition-colors"
               style={{
                 backgroundColor: window_ === w.value ? 'rgba(0,255,136,0.15)' : 'transparent',
@@ -295,9 +210,12 @@ export function EventFeed() {
       </div>
 
       {/* Detail drawer */}
-      {selectedItem && (
-        <IntelDrawer item={selectedItem} onClose={() => setSelectedItem(null)} />
-      )}
+      <IntelDrawer
+        item={selectedItem}
+        items={items}
+        onClose={() => setSelectedItem(null)}
+        onNavigate={setSelectedItem}
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { RecentIntelFeed } from '@/components/intel/RecentIntelFeed'
 
 async function getDashboardStats() {
   try {
@@ -11,16 +12,12 @@ async function getDashboardStats() {
     const h168 = new Date(Date.now() - 7 * 24 * 3600000).toISOString()
     const h3 = new Date(Date.now() - 3 * 3600000).toISOString()
 
-    const [e24h, e7d, alerts, missions, lastIngest, recentEvents, activeSources] = await Promise.allSettled([
+    const [e24h, e7d, alerts, missions, lastIngest, activeSources] = await Promise.allSettled([
       supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', h24),
       supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', h168),
       supabase.from('alerts').select('id', { count: 'exact', head: true }).eq('read', false),
       supabase.from('missions').select('id', { count: 'exact', head: true }),
       supabase.from('events').select('ingested_at').order('ingested_at', { ascending: false }).limit(1).single(),
-      supabase.from('events')
-        .select('id,title,event_type,severity,country_code,region,occurred_at,source')
-        .order('occurred_at', { ascending: false })
-        .limit(8),
       supabase.from('events').select('source').gte('ingested_at', h3),
     ])
 
@@ -34,24 +31,14 @@ async function getDashboardStats() {
       activeAlerts: alerts.status === 'fulfilled' ? (alerts.value.count ?? 0) : 0,
       openMissions: missions.status === 'fulfilled' ? (missions.value.count ?? 0) : 0,
       lastIngestAt: lastIngest.status === 'fulfilled' ? lastIngest.value.data?.ingested_at ?? null : null,
-      recentEvents: recentEvents.status === 'fulfilled' ? (recentEvents.value.data ?? []) : [],
       sourcesOnline: distinctSources,
     }
   } catch {
-    return { events24h: 0, events7d: 0, activeAlerts: 0, openMissions: 0, lastIngestAt: null, recentEvents: [], sourcesOnline: 0 }
+    return { events24h: 0, events7d: 0, activeAlerts: 0, openMissions: 0, lastIngestAt: null, sourcesOnline: 0 }
   }
 }
 
-const SEV_COLOR: Record<number, string> = { 5: '#FF4444', 4: '#FF8800', 3: '#FFCC00', 2: '#3B82F6', 1: '#888' }
-const SEV_LABEL: Record<number, string> = { 5: 'CRIT', 4: 'HIGH', 3: 'MED', 2: 'LOW', 1: 'INFO' }
 const SOURCES = ['gdelt', 'reliefweb', 'gdacs', 'unhcr', 'nasa-eonet']
-
-function timeAgo(iso: string) {
-  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1) return 'now'
-  if (m < 60) return `${m}m`
-  return `${Math.floor(m / 60)}h`
-}
 
 function formatIngestTime(iso: string | null) {
   if (!iso) return 'Never'
@@ -165,38 +152,9 @@ export default async function DashboardPage() {
               ALL EVENTS →
             </Link>
           </div>
+          {/* Client component: self-fetches, clickable rows, IntelDrawer */}
           <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-            {stats.recentEvents.length === 0 ? (
-              <div className="p-8 text-center">
-                <div className="text-3xl mb-3" style={{ opacity: 0.3 }}>◈</div>
-                <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
-                  No events yet — feeds initializing
-                </p>
-                <Link href="/wire" className="text-xs font-mono mt-2 block" style={{ color: 'var(--primary)' }}>
-                  View public wire →
-                </Link>
-              </div>
-            ) : (
-              stats.recentEvents.map((e: {
-                id: string; title: string; severity: number;
-                country_code: string | null; source: string; occurred_at: string
-              }) => (
-                <div key={e.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/2 transition-colors">
-                  <span className="text-xs font-mono font-bold shrink-0 px-1.5 py-0.5 rounded"
-                    style={{
-                      color: SEV_COLOR[e.severity] ?? '#888',
-                      backgroundColor: `${SEV_COLOR[e.severity] ?? '#888'}18`,
-                      minWidth: 38, textAlign: 'center',
-                    }}>
-                    {SEV_LABEL[e.severity] ?? 'INFO'}
-                  </span>
-                  <p className="text-xs flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{e.title}</p>
-                  <span className="text-xs font-mono shrink-0" style={{ color: 'var(--text-disabled)' }}>
-                    {e.country_code && `${e.country_code} · `}{timeAgo(e.occurred_at)}
-                  </span>
-                </div>
-              ))
-            )}
+            <RecentIntelFeed limit={8} />
           </div>
         </div>
 

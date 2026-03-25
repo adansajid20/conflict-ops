@@ -1,16 +1,7 @@
 'use client'
 
 import { useHealthStatus, getStatusLevel } from '@/hooks/useHealthStatus'
-
-function timeAgo(iso: string | null) {
-  if (!iso) return 'never'
-  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
-}
+import { safeTimeAgo } from '@/types/intel-item'
 
 export function SidebarStatus() {
   const { health, statusLevel } = useHealthStatus(60_000)
@@ -25,44 +16,60 @@ export function SidebarStatus() {
     : statusLevel === 'outage' ? 'OUTAGE'
     : 'CHECKING'
 
-  const ingestAge = health?.lastIngestAt
-    ? Math.floor((Date.now() - new Date(health.lastIngestAt).getTime()) / 60000)
-    : null
+  // Live sources: use new envelope if available, fall back to legacy
+  const sources = health?.sources?.detail ?? health?.enabledSources ?? []
+  const liveCount = sources.filter(s => s.ok).length
+  const totalCount = sources.length || 5
+
+  // Last ingest: new envelope preferred
+  const lastIngestAt = health?.ingest?.last_success_at ?? health?.lastIngestAt ?? null
+  const ingestAge = lastIngestAt ? Math.floor((Date.now() - new Date(lastIngestAt).getTime()) / 60000) : null
+
+  // Event count
+  const eventCount = health?.events?.total ?? health?.eventCount ?? null
 
   return (
-    <div className="p-3 border-t text-xs space-y-1" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+    <div className="p-3 border-t text-xs space-y-1.5 shrink-0"
+      style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
       {/* System status */}
       <div className="flex items-center gap-2">
         <span className={`status-dot ${statusLevel === 'nominal' ? 'green' : statusLevel === 'degraded' ? 'amber' : 'red'}`} />
-        <span className="mono" style={{ color }}>{label}</span>
-        {health?.safeMode && (
-          <span className="mono px-1 rounded text-xs" style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: 'var(--alert-amber)' }}>
+        <span className="mono font-bold" style={{ color }}>
+          {/* Only show LIVE if health actually says ok=true */}
+          {statusLevel === 'loading' ? 'CHECKING...' : label}
+        </span>
+        {health?.safe_mode && (
+          <span className="mono px-1 rounded text-xs"
+            style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: 'var(--alert-amber)', fontSize: 9 }}>
             SAFE
           </span>
         )}
       </div>
 
-      {/* Last ingest */}
+      {/* Sources */}
       <div className="mono" style={{ color: 'var(--text-disabled)', fontSize: 10 }}>
-        {health === null
-          ? 'CHECKING...'
-          : `INGEST: ${timeAgo(health.lastIngestAt)}`}
-        {ingestAge !== null && ingestAge > 120 && (
-          <span style={{ color: 'var(--alert-amber)' }}> ⚠</span>
-        )}
+        {health === null ? 'SOURCES: ...' : `FEEDS: ${liveCount}/${totalCount}`}
       </div>
 
-      {/* Error summary */}
-      {health?.errors && health.errors.length > 0 && (
-        <div className="mono" style={{ color: '#FF4444', fontSize: 10 }}>
-          {(health.errors[0] ?? '').slice(0, 40)}
+      {/* Events */}
+      {eventCount !== null && (
+        <div className="mono" style={{ color: 'var(--text-disabled)', fontSize: 10 }}>
+          EVENTS: {eventCount.toLocaleString()}
         </div>
       )}
 
-      {/* Sources count */}
-      {health?.enabledSources && (
-        <div className="mono" style={{ color: 'var(--text-disabled)', fontSize: 10 }}>
-          {health.enabledSources.filter(s => s.ok).length}/{health.enabledSources.length} SOURCES LIVE
+      {/* Last ingest */}
+      <div className="mono flex items-center gap-1" style={{ color: 'var(--text-disabled)', fontSize: 10 }}>
+        INGEST: {health === null ? '...' : safeTimeAgo(lastIngestAt)}
+        {ingestAge !== null && ingestAge > 120 && (
+          <span style={{ color: 'var(--alert-amber)' }}>⚠</span>
+        )}
+      </div>
+
+      {/* Degraded reason */}
+      {statusLevel === 'degraded' && health?.degraded_reasons?.[0] && (
+        <div className="mono" style={{ color: 'var(--alert-amber)', fontSize: 9 }}>
+          {health.degraded_reasons[0].slice(0, 45)}
         </div>
       )}
     </div>

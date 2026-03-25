@@ -4,6 +4,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { pingRedis, isSafeMode, getRedisInitError } from '@/lib/cache/redis'
 
 const ENABLED_SOURCES = ['gdelt', 'reliefweb', 'gdacs', 'unhcr', 'nasa_eonet']
+const STALE_THRESHOLD_MS = 2 * 3600 * 1000   // 2h = degraded
+const SOURCE_STALE_MS    = 3 * 3600 * 1000   // 3h per source
 
 export async function GET() {
   const start = Date.now()
@@ -14,15 +16,20 @@ export async function GET() {
   let safeMode = false
   let lastIngestAt: string | null = null
   let eventCount = 0
+  let inserted24h = 0
+  let deduped24h = 0
   let sourcesLastSeen: Record<string, string | null> = {}
 
   // --- DB check ---
   try {
     const supabase = createServiceClient()
-    const [countResult, lastIngestResult, sourceResult] = await Promise.allSettled([
+    const h24 = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+    const [countResult, lastIngestResult, sourceResult, ingest24h] = await Promise.allSettled([
       supabase.from('events').select('id', { count: 'exact', head: true }),
       supabase.from('events').select('ingested_at').order('ingested_at', { ascending: false }).limit(1).single(),
-      supabase.from('events').select('source, ingested_at').order('ingested_at', { ascending: false }).limit(100),
+      supabase.from('events').select('source, ingested_at').order('ingested_at', { ascending: false }).limit(500),
+      supabase.from('events').select('id', { count: 'exact', head: true }).gte('ingested_at', h24),
     ])
 
     if (countResult.status === 'fulfilled' && !countResult.value.error) {
@@ -34,7 +41,7 @@ export async function GET() {
     }
 
     if (lastIngestResult.status === 'fulfilled' && lastIngestResult.value.data) {
-      lastIngestAt = lastIngestResult.value.data.ingested_at
+      lastIngestAt = lastIngestResult.value.data.ingested_at as string
     }
 
     if (sourceResult.status === 'fulfilled' && sourceResult.value.data) {
@@ -42,6 +49,22 @@ export async function GET() {
         if (!sourcesLastSeen[row.source]) sourcesLastSeen[row.source] = row.ingested_at
       }
     }
+
+    if (ingest24h.status === 'fulfilled' && ingest24h.value) {
+      inserted24h = ingest24h.value.count ?? 0
+    }
+
+    // Check raw_ingest_log for dedup stats
+    try {
+      const logResult = await supabase
+        .from('raw_ingest_log')
+        .select('record_count')
+        .gte('fetched_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      if (!logResult.error && logResult.data) {
+        const fetched = logResult.data.reduce((a, r) => a + ((r as { record_count: number }).record_count ?? 0), 0)
+        deduped24h = Math.max(0, fetched - inserted24h)
+      }
+    } catch { /* best effort */ }
   } catch (e) {
     errors.push(`db: ${String(e)}`)
   }
@@ -60,39 +83,73 @@ export async function GET() {
 
   // --- Env check ---
   const missingEnvs: string[] = []
-  if (!process.env['NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY']) missingEnvs.push('CLERK_PUBLISHABLE_KEY')
-  if (!process.env['INNGEST_SIGNING_KEY']) missingEnvs.push('INNGEST_SIGNING_KEY')
-  if (!process.env['GEMINI_API_KEY']) missingEnvs.push('GEMINI_API_KEY')
+  if (!process.env['NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY']) missingEnvs.push('CLERK_KEY')
+  if (!process.env['INNGEST_SIGNING_KEY']) missingEnvs.push('INNGEST_KEY')
   if (missingEnvs.length > 0) errors.push(`missing_env: ${missingEnvs.join(', ')}`)
 
   const ingestAgeMs = lastIngestAt ? Date.now() - new Date(lastIngestAt).getTime() : Infinity
-  const ingestOk = isFinite(ingestAgeMs) && ingestAgeMs < 2 * 3600 * 1000
+  const ingestOk = isFinite(ingestAgeMs) && ingestAgeMs < STALE_THRESHOLD_MS
 
   const enabledSources = ENABLED_SOURCES.map(source => {
     const lastSeen = sourcesLastSeen[source] ?? null
     const ageMs = lastSeen ? Date.now() - new Date(lastSeen).getTime() : Infinity
-    return { name: source, ok: isFinite(ageMs) && ageMs < 3 * 3600 * 1000, last_seen_at: lastSeen, stale: !isFinite(ageMs) || ageMs > 3 * 3600 * 1000 }
+    const ok = isFinite(ageMs) && ageMs < SOURCE_STALE_MS
+    return { name: source, ok, last_seen_at: lastSeen, stale: !ok }
   })
 
-  // Health ok = db works AND no critical errors (Redis optional)
-  const ok = dbOk && errors.filter(e => e.startsWith('db:')).length === 0
+  const liveSources = enabledSources.filter(s => s.ok).length
+  const failingSources = enabledSources.filter(s => s.stale).map(s => s.name)
 
-  return Response.json({
+  const ok = dbOk && errors.filter(e => e.startsWith('db:')).length === 0
+  const degradedReasons: string[] = []
+  if (!ingestOk) degradedReasons.push(`ingest stale: ${lastIngestAt ? Math.round(ingestAgeMs / 3600000) + 'h ago' : 'never'}`)
+  if (liveSources === 0) degradedReasons.push('no sources live')
+  if (!redisOk) degradedReasons.push('redis unavailable')
+  if (safeMode) degradedReasons.push('safe mode active')
+
+  const latencyMs = Date.now() - start
+  const versionSha = process.env['VERCEL_GIT_COMMIT_SHA']?.slice(0, 7) ?? 'local'
+
+  const body = {
     ok,
-    versionSha: process.env['VERCEL_GIT_COMMIT_SHA']?.slice(0, 7) ?? 'local',
-    timestamp: new Date().toISOString(),
-    dbOk, redisOk,
-    authOk: !!process.env['NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY'],
-    schedulerOk: !!process.env['INNGEST_SIGNING_KEY'],
-    ingestOk, lastIngestAt, eventCount, safeMode,
-    enabledSources, errors,
-    latencyMs: Date.now() - start,
-    // legacy aliases
-    build_sha: process.env['VERCEL_GIT_COMMIT_SHA']?.slice(0, 7) ?? 'local',
-    env: process.env['VERCEL_ENV'] ?? 'development',
-    db_ok: dbOk, auth_ok: !!process.env['NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY'],
-    scheduler_ok: !!process.env['INNGEST_SIGNING_KEY'], redis_ok: redisOk,
-    last_ingest_at: lastIngestAt, event_count: eventCount, last_error: errors[0] ?? null,
-    latency_ms: Date.now() - start,
-  }, { headers: { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' } })
+    version_sha: versionSha,
+    now_utc: new Date().toISOString(),
+    db_ok: dbOk,
+    redis_ok: redisOk,
+    auth_ok: !!process.env['NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY'],
+    scheduler_ok: !!process.env['INNGEST_SIGNING_KEY'],
+    ingest: {
+      ok: ingestOk,
+      last_success_at: lastIngestAt,
+      last_run_at: lastIngestAt, // same until we track separately
+      inserted_24h: inserted24h,
+      deduped_24h: deduped24h,
+    },
+    sources: {
+      enabled: ENABLED_SOURCES.length,
+      live: liveSources,
+      failing: failingSources,
+      detail: enabledSources,
+    },
+    events: {
+      total: eventCount,
+      inserted_24h: inserted24h,
+    },
+    safe_mode: safeMode,
+    degraded_reasons: degradedReasons,
+    errors,
+    latency_ms: latencyMs,
+    // Legacy aliases for backward compat
+    dbOk, redisOk, ingestOk, lastIngestAt, eventCount, safeMode,
+    enabledSources,
+    versionSha,
+    latencyMs,
+  }
+
+  return Response.json(body, {
+    headers: {
+      'Cache-Control': 'no-store',
+      'Access-Control-Allow-Origin': '*',
+    },
+  })
 }

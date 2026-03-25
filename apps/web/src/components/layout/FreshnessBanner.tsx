@@ -7,8 +7,9 @@ export function FreshnessBanner() {
 
   if (!health) return null // loading
 
-  const ingestAgeMs = health.lastIngestAt
-    ? Date.now() - new Date(health.lastIngestAt).getTime()
+  const lastIngestAt = health.ingest?.last_success_at ?? health.lastIngestAt ?? null
+  const ingestAgeMs = lastIngestAt
+    ? Date.now() - new Date(lastIngestAt).getTime()
     : Infinity
 
   const stale = ingestAgeMs > 2 * 3600 * 1000 // 2h threshold
@@ -28,8 +29,8 @@ export function FreshnessBanner() {
     return (
       <div className="px-4 py-2 text-xs mono flex items-center gap-2"
         style={{ backgroundColor: 'rgba(245,158,11,0.08)', borderBottom: '1px solid rgba(245,158,11,0.2)', color: 'var(--alert-amber)' }}>
-        ⚠ SYSTEM DEGRADED — {health.errors[0] ?? 'Some services may be slow'}
-        {health.safeMode && <span style={{ marginLeft: 8 }}>· SAFE MODE ACTIVE — heavy jobs paused</span>}
+        ⚠ SYSTEM DEGRADED — {health.degraded_reasons?.[0] ?? health.errors?.[0] ?? 'Some services may be slow'}
+        {(health.safe_mode ?? health.safeMode) && <span style={{ marginLeft: 8 }}>· SAFE MODE ACTIVE — heavy jobs paused</span>}
       </div>
     )
   }
