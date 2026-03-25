@@ -10,7 +10,7 @@ export async function getOrgPlanLimits(orgId: string): Promise<PlanLimits> {
   const supabase = createServiceClient()
 
   const { data, error } = await supabase
-    .from('organizations')
+    .from('orgs')
     .select('plan_id')
     .eq('id', orgId)
     .single()

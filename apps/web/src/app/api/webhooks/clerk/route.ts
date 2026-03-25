@@ -72,7 +72,7 @@ async function processClerkEvent(event: ClerkEvent): Promise<void> {
   switch (event.type) {
     case 'organization.created': {
       const data = (event as ClerkOrgEvent).data
-      await supabase.from('organizations').upsert(
+      await supabase.from('orgs').upsert(
         {
           clerk_org_id: data.id,
           name: data.name,
@@ -88,7 +88,7 @@ async function processClerkEvent(event: ClerkEvent): Promise<void> {
     case 'organization.updated': {
       const data = (event as ClerkOrgEvent).data
       await supabase
-        .from('organizations')
+        .from('orgs')
         .update({ name: data.name, updated_at: new Date().toISOString() })
         .eq('clerk_org_id', data.id)
       break
@@ -117,7 +117,7 @@ async function processClerkEvent(event: ClerkEvent): Promise<void> {
 
       // Get org id from clerk_org_id
       const { data: org } = await supabase
-        .from('organizations')
+        .from('orgs')
         .select('id')
         .eq('clerk_org_id', data.organization.id)
         .single()

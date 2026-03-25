@@ -27,7 +27,7 @@ export default async function AdminPage() {
   }
 
   const { data: org } = await supabase
-    .from('organizations')
+    .from('orgs')
     .select('name, plan_id, subscription_status, trial_ends_at')
     .eq('id', user.org_id)
     .single()

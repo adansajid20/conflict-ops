@@ -56,7 +56,7 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
       const planId = getPlanFromSubscription(subscription)
 
       // CRITICAL: upsert org — may not exist yet (race condition fix)
-      await supabase.from('organizations').upsert(
+      await supabase.from('orgs').upsert(
         {
           stripe_customer_id: subscription.customer as string,
           stripe_subscription_id: subscription.id,
@@ -74,7 +74,7 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
       const subscription = event.data.object as Stripe.Subscription
 
       await supabase
-        .from('organizations')
+        .from('orgs')
         .update({
           plan_id: 'individual',
           subscription_status: 'canceled',
@@ -89,7 +89,7 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
       const invoice = event.data.object as Stripe.Invoice
 
       await supabase
-        .from('organizations')
+        .from('orgs')
         .update({
           subscription_status: 'past_due',
           updated_at: new Date().toISOString(),

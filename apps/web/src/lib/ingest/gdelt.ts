@@ -7,8 +7,11 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
-import { HIGH_CONFLICT_COUNTRIES } from './acled'
 import crypto from 'crypto'
+
+const HIGH_CONFLICT_COUNTRIES = [
+  'UA','RU','SY','YE','SD','SS','ET','LY','IQ','AF','MM','CD','SO','ML','BF','NE','CF','MZ','NG','CM','PS','IL','LB','IR','PK',
+]
 
 const GDELT_BASE = 'https://api.gdeltproject.org/api/v2/doc/doc'
 
