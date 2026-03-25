@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'

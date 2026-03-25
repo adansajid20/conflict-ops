@@ -1,7 +1,8 @@
-import dynamic from 'next/dynamic'
+export const dynamic = 'force-dynamic'
+import nextDynamic from 'next/dynamic'
 
 // MapLibre MUST be dynamic — never SSR (execution rule #14)
-const ConflictMap = dynamic(
+const ConflictMap = nextDynamic(
   () => import('@/components/map/ConflictMap').then(m => m.ConflictMap),
   {
     ssr: false,

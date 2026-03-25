@@ -1,15 +1,16 @@
+export const dynamic = 'force-dynamic'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
-import dynamic from 'next/dynamic'
+import nextDynamic from 'next/dynamic'
 
-const MonteCarloEngine = dynamic(
+const MonteCarloEngine = nextDynamic(
   () => import('@/components/workbench/MonteCarloEngine').then(m => m.MonteCarloEngine),
   { ssr: false }
 )
 
-const ACHMatrix = dynamic(
+const ACHMatrix = nextDynamic(
   () => import('@/components/workbench/ACHMatrix').then(m => m.ACHMatrix),
   { ssr: false }
 )

@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/web",
+    "packages/shared",
+    "packages/database"
   ],
   "scripts": {
     "build": "turbo build",
@@ -13,11 +14,16 @@
     "type-check": "turbo type-check",
     "test": "turbo test"
   },
-  "devDependencies": {
-    "turbo": "latest",
-    "typescript": "^5.0.0",
-    "prettier": "^3.0.0"
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
+  "devDependencies": {
+    "prettier": "^3.0.0",
+    "turbo": "latest",
+    "typescript": "^5.0.0"
+  },
+
   "engines": {
     "node": ">=18"
   },

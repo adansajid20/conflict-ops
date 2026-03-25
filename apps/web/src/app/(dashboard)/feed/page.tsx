@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { EventFeed } from '@/components/feed/EventFeed'
 
 export default function FeedPage() {

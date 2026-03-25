@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { AlertPanel } from '@/components/alerts/AlertPanel'
 import { PIRBuilder } from '@/components/pir/PIRBuilder'
 

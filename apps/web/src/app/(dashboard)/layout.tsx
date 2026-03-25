@@ -2,6 +2,8 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 const NAV_ITEMS = [
   { href: '/missions', label: 'MISSIONS', icon: '◉' },
   { href: '/map', label: 'MAP', icon: '⊞' },
