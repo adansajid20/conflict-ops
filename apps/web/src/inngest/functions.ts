@@ -1,14 +1,20 @@
 import { inngest } from './client'
-import { ingestACLED } from '@/lib/ingest/acled'
 import { ingestGDELT } from '@/lib/ingest/gdelt'
+import { ingestReliefWeb } from '@/lib/ingest/reliefweb'
+import { ingestGDACS } from '@/lib/ingest/gdacs'
+import { ingestUNHCR } from '@/lib/ingest/unhcr'
 import { runHeavyLane } from '@/lib/ingest/heavy-lane'
 import { computeEscalationLevel } from '@/lib/alerts/escalation'
-import { HIGH_CONFLICT_COUNTRIES } from '@/lib/ingest/acled'
 import { ingestAISVessels, detectDarkVessels } from '@/lib/ingest/tracking/ais'
 import { ingestFIRMS } from '@/lib/ingest/tracking/firms'
 import { ingestADSB } from '@/lib/ingest/tracking/adsb'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email/client'
+
+// High-conflict countries for escalation monitoring (was in acled.ts)
+const HIGH_CONFLICT_COUNTRIES = [
+  'UA','RU','SY','YE','SD','SS','ET','LY','IQ','AF','MM','CD','SO','ML','BF','NE','CF','MZ','NG','CM','PS','IL','LB','IR','PK',
+]
 
 // ============================================
 // FAST LANE — every 15 minutes
@@ -32,14 +38,18 @@ export const fastLaneIngest = inngest.createFunction(
       return { skipped: true, reason: 'safe-mode-active' }
     }
 
-    const [acledResult, gdeltResult] = await Promise.allSettled([
-      step.run('ingest-acled', () => ingestACLED(48)),
+    const [gdeltResult, reliefwebResult, gdacsResult, unhcrResult] = await Promise.allSettled([
       step.run('ingest-gdelt', () => ingestGDELT()),
+      step.run('ingest-reliefweb', () => ingestReliefWeb()),
+      step.run('ingest-gdacs', () => ingestGDACS()),
+      step.run('ingest-unhcr', () => ingestUNHCR()),
     ])
 
     return {
-      acled: acledResult.status === 'fulfilled' ? acledResult.value : { error: String(acledResult.reason) },
-      gdelt: gdeltResult.status === 'fulfilled' ? gdeltResult.value : { error: String(gdeltResult.reason) },
+      gdelt: gdeltResult.status === 'fulfilled' ? gdeltResult.value : { error: String((gdeltResult as PromiseRejectedResult).reason) },
+      reliefweb: reliefwebResult.status === 'fulfilled' ? reliefwebResult.value : { error: String((reliefwebResult as PromiseRejectedResult).reason) },
+      gdacs: gdacsResult.status === 'fulfilled' ? gdacsResult.value : { error: String((gdacsResult as PromiseRejectedResult).reason) },
+      unhcr: unhcrResult.status === 'fulfilled' ? unhcrResult.value : { error: String((unhcrResult as PromiseRejectedResult).reason) },
       timestamp: new Date().toISOString(),
     }
   }
