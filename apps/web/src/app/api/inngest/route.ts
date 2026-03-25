@@ -1,4 +1,6 @@
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const maxDuration = 300
 
 import { serve } from 'inngest/next'
 import { inngest } from '@/inngest/client'
@@ -12,7 +14,7 @@ import {
   trialExpiryNotifier,
 } from '@/inngest/functions'
 
-export const { GET, POST, PUT } = serve({
+const handler = serve({
   client: inngest,
   functions: [
     fastLaneIngest,
@@ -23,4 +25,7 @@ export const { GET, POST, PUT } = serve({
     weeklyBrief,
     trialExpiryNotifier,
   ],
+  signingKey: process.env['INNGEST_SIGNING_KEY'],
 })
+
+export const { GET, POST, PUT } = handler
