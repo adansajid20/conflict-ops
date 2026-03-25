@@ -14,6 +14,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
   const url = new URL(req.url)
   const countryCode = url.searchParams.get('country')
   const severity = url.searchParams.get('severity')
+  const since = url.searchParams.get('since')
   const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '50'), 200)
   const offset = parseInt(url.searchParams.get('offset') ?? '0')
 
@@ -59,6 +60,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
 
   if (countryCode) query = query.eq('country_code', countryCode)
   if (severity) query = query.eq('severity', parseInt(severity))
+  if (since) query = query.gte('occurred_at', since)
 
   const { data, error } = await query
 
