@@ -3,6 +3,7 @@ import { ingestGDELT } from '@/lib/ingest/gdelt'
 import { ingestReliefWeb } from '@/lib/ingest/reliefweb'
 import { ingestGDACS } from '@/lib/ingest/gdacs'
 import { ingestUNHCR } from '@/lib/ingest/unhcr'
+import { ingestNASAEONET } from '@/lib/ingest/nasa-eonet'
 import { runHeavyLane } from '@/lib/ingest/heavy-lane'
 import { computeEscalationLevel } from '@/lib/alerts/escalation'
 import { ingestAISVessels, detectDarkVessels } from '@/lib/ingest/tracking/ais'
@@ -38,11 +39,12 @@ export const fastLaneIngest = inngest.createFunction(
       return { skipped: true, reason: 'safe-mode-active' }
     }
 
-    const [gdeltResult, reliefwebResult, gdacsResult, unhcrResult] = await Promise.allSettled([
+    const [gdeltResult, reliefwebResult, gdacsResult, unhcrResult, eonetResult] = await Promise.allSettled([
       step.run('ingest-gdelt', () => ingestGDELT()),
       step.run('ingest-reliefweb', () => ingestReliefWeb()),
       step.run('ingest-gdacs', () => ingestGDACS()),
       step.run('ingest-unhcr', () => ingestUNHCR()),
+      step.run('ingest-nasa-eonet', () => ingestNASAEONET()),
     ])
 
     return {
@@ -50,6 +52,7 @@ export const fastLaneIngest = inngest.createFunction(
       reliefweb: reliefwebResult.status === 'fulfilled' ? reliefwebResult.value : { error: String((reliefwebResult as PromiseRejectedResult).reason) },
       gdacs: gdacsResult.status === 'fulfilled' ? gdacsResult.value : { error: String((gdacsResult as PromiseRejectedResult).reason) },
       unhcr: unhcrResult.status === 'fulfilled' ? unhcrResult.value : { error: String((unhcrResult as PromiseRejectedResult).reason) },
+      eonet: eonetResult.status === 'fulfilled' ? eonetResult.value : { error: String((eonetResult as PromiseRejectedResult).reason) },
       timestamp: new Date().toISOString(),
     }
   }
