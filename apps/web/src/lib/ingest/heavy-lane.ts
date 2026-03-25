@@ -6,7 +6,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
-import { extractEvent, getEmbedding } from '@/lib/ai/openai'
+import { extractEvent, getEmbedding } from '@/lib/ai/gemini'
 
 const HEAVY_LANE_BATCH_SIZE = 50
 const CLUSTER_COSINE_THRESHOLD = 0.82
@@ -71,7 +71,7 @@ export async function runHeavyLane(): Promise<HeavyLaneResult> {
             country_code: extracted.country_code ?? event.country_code,
             description: extracted.summary,
             provenance_inferred: {
-              extracted_by: isHighPriority ? 'gpt-4o' : 'gpt-4o-mini',
+              extracted_by: isHighPriority ? 'gemini-2.0-flash' : 'gemini-2.0-flash',
               extracted_at: new Date().toISOString(),
               location_name: extracted.location_name,
               actor_names: extracted.actor_names,

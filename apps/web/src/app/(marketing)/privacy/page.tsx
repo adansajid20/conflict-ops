@@ -71,7 +71,7 @@ However, no method of transmission over the Internet is 100% secure. We cannot g
 • Upstash — Redis caching (upstash.com)
 • Vercel — hosting (vercel.com)
 • Resend — transactional email (resend.com)
-• OpenAI — AI enrichment for event analysis (openai.com)
+• Google Gemini — AI enrichment for event analysis (ai.google.dev)
 • Inngest — background job processing (inngest.com)
 
 Each third-party provider has their own privacy policy governing their data practices.`,
