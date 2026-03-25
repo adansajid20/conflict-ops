@@ -2,6 +2,8 @@ import { inngest } from './client'
 import { ingestACLED } from '@/lib/ingest/acled'
 import { ingestGDELT } from '@/lib/ingest/gdelt'
 import { runHeavyLane } from '@/lib/ingest/heavy-lane'
+import { computeEscalationLevel } from '@/lib/alerts/escalation'
+import { HIGH_CONFLICT_COUNTRIES } from '@/lib/ingest/acled'
 
 // ============================================
 // FAST LANE — every 15 minutes
@@ -108,6 +110,35 @@ export const forecastRecompute = inngest.createFunction(
     })
 
     return { ...result, timestamp: new Date().toISOString() }
+  }
+)
+
+// ============================================
+// ESCALATION MONITOR — every 2 hours
+// Rule-based only, no LLM
+// ============================================
+
+export const escalationMonitor = inngest.createFunction(
+  { id: 'escalation-monitor', name: 'Escalation Ladder Monitor', concurrency: { limit: 1 }, retries: 0 },
+  { cron: '0 */2 * * *' },
+  async ({ step }) => {
+    const results = await step.run('compute-escalations', async () => {
+      const outcomes: Array<{ country: string; level: number; changed: boolean }> = []
+
+      for (const countryCode of HIGH_CONFLICT_COUNTRIES.slice(0, 30)) {
+        try {
+          const result = await computeEscalationLevel(countryCode)
+          outcomes.push({ country: countryCode, level: result.level, changed: result.changed })
+        } catch {
+          // skip failed countries
+        }
+      }
+
+      return outcomes
+    })
+
+    const changed = results.filter(r => r.changed)
+    return { computed: results.length, changed: changed.length, escalations: changed, timestamp: new Date().toISOString() }
   }
 )
 
