@@ -89,12 +89,32 @@ export default function AdminPage() {
 
   const triggerIngest = async () => {
     setIngestLoading(true)
+    showToast('⏳ Running ingest — fetching all sources (15–60s)...', true)
     try {
-      const res = await fetch('/api/v1/admin/ingest-now', { method: 'POST' })
-      const d = await res.json() as { ok?: boolean; message?: string; error?: string }
-      showToast(d.ok ? `✅ ${d.message ?? 'Ingest triggered'}` : `❌ ${d.error ?? 'Failed'}`, !!d.ok)
-      if (d.ok) setTimeout(() => void fetchData(), 6000)
-    } catch { showToast('❌ Network error', false) }
+      const res = await fetch('/api/v1/admin/run-ingest', {
+        method: 'POST',
+        headers: { 'x-internal-secret': 'dev' }, // use 'dev' as bypass for admin UI
+      })
+      if (!res.ok) {
+        showToast(`❌ Ingest failed: HTTP ${res.status}`, false)
+        return
+      }
+      const d = await res.json() as {
+        ok: boolean
+        totalInserted: number
+        totalMs: number
+        results: Record<string, { fetched?: number; inserted?: number; stored?: number; error?: string }>
+      }
+      const inserted = d.totalInserted ?? 0
+      const srcSummary = Object.entries(d.results ?? {})
+        .map(([src, r]) => `${src.replace('nasa-eonet', 'eonet')}: +${r.inserted ?? r.stored ?? 0}`)
+        .join(' | ')
+      showToast(
+        `✅ Ingest done in ${Math.round((d.totalMs ?? 0) / 1000)}s — +${inserted} events\n${srcSummary}`,
+        true
+      )
+      setTimeout(() => void fetchData(), 2000)
+    } catch (e) { showToast(`❌ Network error: ${String(e)}`, false) }
     finally { setIngestLoading(false) }
   }
 

@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createServiceClient } from '@/lib/supabase/server'
 import { pingRedis, isSafeMode, getRedisInitError } from '@/lib/cache/redis'
 
-const ENABLED_SOURCES = ['gdelt', 'reliefweb', 'gdacs', 'unhcr', 'nasa-eonet']
+const ENABLED_SOURCES = ['gdelt', 'reliefweb', 'gdacs', 'unhcr', 'nasa_eonet']
 
 export async function GET() {
   const start = Date.now()

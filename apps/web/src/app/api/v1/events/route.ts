@@ -44,18 +44,18 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
 
   let query = supabase
     .from('events')
-    .select('id,source,event_type,title,description,region,country_code,location,severity,status,occurred_at,ingested_at,provenance_raw,provenance_inferred')
+    .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,provenance_raw,provenance_inferred')
     .not('status', 'eq', 'clustered')
     .order('occurred_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
-  // Apply history limit based on plan
-  if (user?.org_id) {
-    const limits = await getOrgPlanLimits(user.org_id)
-    if (limits.historyDays !== -1) {
-      const cutoff = new Date(Date.now() - limits.historyDays * 24 * 60 * 60 * 1000).toISOString()
-      query = query.gte('occurred_at', cutoff)
-    }
+  // Apply history limit based on plan (no org = 30d default)
+  const historyDays = user?.org_id
+    ? (await getOrgPlanLimits(user.org_id)).historyDays
+    : 30
+  if (historyDays !== -1) {
+    const cutoff = new Date(Date.now() - historyDays * 24 * 60 * 60 * 1000).toISOString()
+    query = query.gte('occurred_at', cutoff)
   }
 
   if (countryCode) query = query.eq('country_code', countryCode)
