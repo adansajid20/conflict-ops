@@ -20,6 +20,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/public/(.*)',
   '/api/health(.*)',
   '/api/inngest(.*)',
+  '/api/v1/admin/run-ingest(.*)',
 ])
 
 export default clerkMiddleware((auth, req) => {
