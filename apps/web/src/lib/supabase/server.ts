@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
 export function createClient() {
@@ -26,14 +27,19 @@ export function createClient() {
   )
 }
 
+/**
+ * Service client — uses @supabase/supabase-js directly with service_role key.
+ * This correctly sets Authorization: Bearer <service_role_key> and bypasses RLS.
+ * Do NOT use @supabase/ssr for service role — it doesn't set the Auth header properly.
+ */
 export function createServiceClient() {
-  return createServerClient(
+  return createSupabaseClient(
     process.env['NEXT_PUBLIC_SUPABASE_URL']!,
     process.env['SUPABASE_SERVICE_ROLE_KEY']!,
     {
-      cookies: {
-        getAll() { return [] },
-        setAll() {},
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
       },
     }
   )
