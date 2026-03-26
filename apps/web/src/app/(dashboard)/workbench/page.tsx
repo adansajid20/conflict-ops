@@ -1,77 +1,105 @@
-export const dynamic = 'force-dynamic'
-import { auth } from '@clerk/nextjs/server'
-import { redirect } from 'next/navigation'
-import { createServiceClient } from '@/lib/supabase/server'
-import { getOrgPlanLimits } from '@/lib/plan-limits'
-import nextDynamic from 'next/dynamic'
+'use client'
 
-const MonteCarloEngine = nextDynamic(
-  () => import('@/components/workbench/MonteCarloEngine').then(m => m.MonteCarloEngine),
-  { ssr: false }
-)
+import { useEffect, useState } from 'react'
+import { BarChart3 } from 'lucide-react'
+import { MonteCarloEngine } from '@/components/workbench/MonteCarloEngine'
+import { ACHMatrix } from '@/components/workbench/ACHMatrix'
+import { SATTools } from '@/components/workbench/SATTools'
 
-const ACHMatrix = nextDynamic(
-  () => import('@/components/workbench/ACHMatrix').then(m => m.ACHMatrix),
-  { ssr: false }
-)
+type ForecastRow = {
+  id: string
+  country_code?: string | null
+  region?: string | null
+  score?: number | null
+  event_count?: number | null
+  updated_at?: string | null
+}
 
-export default async function WorkbenchPage() {
-  const { userId } = await auth()
-  if (!userId) redirect('/sign-in')
+const TABS = ['Monte Carlo', 'ACH Matrix', 'SAT Tools', 'Forecasts'] as const
 
-  const supabase = createServiceClient()
-  const { data: user } = await supabase.from('users').select('org_id').eq('clerk_user_id', userId).single()
+function timeAgo(input?: string | null) {
+  if (!input) return 'unknown'
+  const diff = Math.max(0, Date.now() - new Date(input).getTime())
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
 
-  const limits = user?.org_id ? await getOrgPlanLimits(user.org_id) : null
+export default function WorkbenchPage() {
+  const BarChart3Icon = BarChart3 as any
+  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Monte Carlo')
+  const [forecasts, setForecasts] = useState<ForecastRow[]>([])
+
+  useEffect(() => {
+    if (activeTab !== 'Forecasts') return
+    void fetch('/api/v1/forecasts', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((json: { data?: ForecastRow[] }) => setForecasts(json.data ?? []))
+  }, [activeTab])
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold tracking-widest uppercase mono" style={{ color: 'var(--text-primary)' }}>
-          ANALYSIS WORKBENCH
-        </h1>
-        <p className="text-xs mt-1 mono" style={{ color: 'var(--text-muted)' }}>
-          STRUCTURED ANALYTIC TECHNIQUES — PRO + BUSINESS PLANS
-        </p>
+    <div className="h-full">
+      <div className="border-b px-4" style={{ borderColor: 'var(--border)' }}>
+        {TABS.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className="px-4 py-3 text-sm font-medium"
+            style={{ borderBottom: activeTab === tab ? '2px solid var(--primary)' : '2px solid transparent', color: activeTab === tab ? 'var(--primary)' : 'var(--text-muted)' }}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
-      <div className="flex flex-col gap-6">
-        <MonteCarloEngine planHasScenarios={limits?.scenarios ?? false} />
-        <ACHMatrix planHasACH={limits?.achMatrix ?? false} />
-
-        {/* SAT Suite placeholder */}
-        <div
-          className="rounded border p-6"
-          style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
-        >
-          <div className="text-xs mono tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>
-            SAT SUITE
-          </div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            {['KEY ASSUMPTIONS CHECK', 'RED TEAM MODE', "DEVIL'S ADVOCACY", 'ARGUMENT MAPPING', 'QOIC'].map(technique => (
-              <div
-                key={technique}
-                className="rounded border p-3 text-center text-xs mono cursor-pointer hover:bg-white/5 transition-colors"
-                style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
-              >
-                {technique}
+      <div className="p-6">
+        {activeTab === 'Monte Carlo' && <MonteCarloEngine planHasScenarios />}
+        {activeTab === 'ACH Matrix' && <ACHMatrix planHasACH />}
+        {activeTab === 'SAT Tools' && <SATTools />}
+        {activeTab === 'Forecasts' && (
+          <div className="rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+            {forecasts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 p-10 text-center">
+                <BarChart3Icon size={32} style={{ color: 'var(--text-muted)' }} />
+                <div style={{ color: 'var(--text-primary)' }}>Run ingest to generate forecasts</div>
+                <a href="/admin" className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--primary)', color: '#fff' }}>Go to Admin</a>
               </div>
-            ))}
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left" style={{ color: 'var(--text-muted)' }}>
+                    <th className="px-4 py-3">Region</th>
+                    <th className="px-4 py-3">P50 Score</th>
+                    <th className="px-4 py-3">Events 7d</th>
+                    <th className="px-4 py-3">Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {forecasts.map((row) => {
+                    const pct = Math.round((row.score ?? 0) * 100)
+                    return (
+                      <tr key={row.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                        <td className="px-4 py-3" style={{ color: 'var(--text-primary)' }}>{row.region || row.country_code || 'Unknown'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="h-2 w-40 rounded-full" style={{ background: 'var(--bg-surface-3)' }}>
+                              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct > 70 ? 'var(--sev-critical)' : pct > 40 ? 'var(--sev-medium)' : 'var(--sev-low)' }} />
+                            </div>
+                            <span style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{pct}%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{row.event_count ?? 0}</td>
+                        <td className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>{timeAgo(row.updated_at)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
-        </div>
-
-        {/* Corkboard placeholder */}
-        <div
-          className="rounded border p-6"
-          style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
-        >
-          <div className="text-xs mono tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>
-            CORKBOARD / LINK ANALYSIS
-          </div>
-          <div className="text-xs mono text-center py-8" style={{ color: 'var(--text-muted)' }}>
-            REACT FLOW CANVAS — INITIALIZING...
-          </div>
-        </div>
+        )}
       </div>
     </div>
   )

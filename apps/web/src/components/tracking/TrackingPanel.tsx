@@ -1,216 +1,71 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import dynamic from 'next/dynamic'
+import { useEffect, useMemo, useState } from 'react'
+import { Flame, Plane, Ship } from 'lucide-react'
+const TrackingMap = dynamic(() => import('./TrackingMap'), { ssr: false })
 
-type TrackingStats = {
-  vessels: number
-  flights: number
-  thermal_anomalies: number
-  dark_vessels: number
-  emergency_squawks: number
-  last_updated: string
-}
+type Vessel = { mmsi?: number; ship_name?: string | null; ship_type?: number; latitude: number; longitude: number; speed?: number; flag?: string | null; last_seen?: string | null; demo?: boolean }
+type Flight = { icao24?: string; callsign?: string | null; latitude: number; longitude: number; altitude?: number; speed?: number; is_military?: boolean; last_seen?: string | null; demo?: boolean }
+type Thermal = { region: string; frp: number; lat: number; lon: number; detected_at: string; demo?: boolean }
 
-type VesselTrack = {
-  mmsi: number
-  ship_name: string | null
-  ship_type: number
-  latitude: number
-  longitude: number
-  speed: number
-  flag: string | null
-  zone_name: string
-  last_seen: string
-}
-
-type FlightTrack = {
-  icao24: string
-  callsign: string | null
-  origin_country: string | null
-  latitude: number
-  longitude: number
-  altitude: number
-  is_military: boolean
-  is_isr: boolean
-  squawk: string | null
-  last_seen: string
-}
-
-const SHIP_TYPE_LABELS: Record<number, string> = {
-  31: 'TUG', 32: 'TUG', 33: 'DREDGER', 34: 'DIVE',
-  35: '★ MILITARY', 36: 'SAILING', 37: 'PLEASURE',
-}
-
-function VesselRow({ vessel }: { vessel: VesselTrack }) {
-  const label = SHIP_TYPE_LABELS[vessel.ship_type] ?? `TYPE ${vessel.ship_type}`
-  const isMilitary = vessel.ship_type === 35
-  const age = Math.round((Date.now() - new Date(vessel.last_seen).getTime()) / 60000)
-
-  return (
-    <div
-      className="p-2 rounded border-l-2 mb-1 text-xs mono"
-      style={{
-        backgroundColor: 'var(--bg-surface)',
-        borderLeftColor: isMilitary ? 'var(--alert-red)' : 'var(--accent-blue)',
-      }}
-    >
-      <div className="flex items-center justify-between">
-        <span style={{ color: isMilitary ? 'var(--alert-red)' : 'var(--text-primary)' }} className="font-bold">
-          {vessel.ship_name || `MMSI ${vessel.mmsi}`}
-        </span>
-        <span style={{ color: 'var(--text-muted)' }}>{vessel.flag ?? '??'} · {label}</span>
-      </div>
-      <div style={{ color: 'var(--text-muted)' }}>
-        {vessel.zone_name} · {vessel.speed}kn · {age}m ago
-      </div>
-    </div>
-  )
-}
-
-function FlightRow({ flight }: { flight: FlightTrack }) {
-  const isEmergency = ['7700','7600','7500'].includes(flight.squawk ?? '')
-  const age = Math.round((Date.now() - new Date(flight.last_seen).getTime()) / 60000)
-  const altFt = Math.round((flight.altitude ?? 0) * 3.28084 / 100) * 100
-
-  return (
-    <div
-      className="p-2 rounded border-l-2 mb-1 text-xs mono"
-      style={{
-        backgroundColor: 'var(--bg-surface)',
-        borderLeftColor: isEmergency ? '#FF0000' : flight.is_isr ? 'var(--alert-amber)' : 'var(--primary)',
-      }}
-    >
-      <div className="flex items-center justify-between">
-        <span
-          className="font-bold"
-          style={{ color: isEmergency ? '#FF0000' : flight.is_isr ? 'var(--alert-amber)' : 'var(--text-primary)' }}
-        >
-          {flight.callsign ?? flight.icao24}
-          {isEmergency && ` ⚠ SQK${flight.squawk}`}
-          {flight.is_isr && ' [ISR]'}
-          {flight.is_military && !flight.is_isr && ' [MIL]'}
-        </span>
-        <span style={{ color: 'var(--text-muted)' }}>{flight.origin_country ?? '??'}</span>
-      </div>
-      <div style={{ color: 'var(--text-muted)' }}>
-        {altFt.toLocaleString()}ft · {age}m ago
-      </div>
-    </div>
-  )
+function timeAgo(input?: string | null) {
+  if (!input) return 'unknown'
+  const diff = Math.max(0, Date.now() - new Date(input).getTime())
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
 }
 
 export function TrackingPanel() {
-  const [stats, setStats] = useState<TrackingStats | null>(null)
-  const [vessels, setVessels] = useState<VesselTrack[]>([])
-  const [flights, setFlights] = useState<FlightTrack[]>([])
+  const ShipIcon = Ship as any
+  const PlaneIcon = Plane as any
+  const FlameIcon = Flame as any
+  const [vessels, setVessels] = useState<Vessel[]>([])
+  const [flights, setFlights] = useState<Flight[]>([])
+  const [thermals, setThermals] = useState<Thermal[]>([])
   const [activeTab, setActiveTab] = useState<'vessels' | 'flights' | 'thermal'>('vessels')
-  const [loading, setLoading] = useState(true)
-
-  const fetchData = useCallback(async () => {
-    try {
-      const [statsRes, vesselsRes, flightsRes] = await Promise.all([
-        fetch('/api/v1/tracking/stats'),
-        fetch('/api/v1/tracking/vessels?limit=50'),
-        fetch('/api/v1/tracking/flights?limit=50'),
-      ])
-
-      const [statsJson, vesselsJson, flightsJson] = await Promise.all([
-        statsRes.json() as Promise<{ data?: TrackingStats }>,
-        vesselsRes.json() as Promise<{ data?: VesselTrack[] }>,
-        flightsRes.json() as Promise<{ data?: FlightTrack[] }>,
-      ])
-
-      if (statsJson.data) setStats(statsJson.data)
-      if (vesselsJson.data) setVessels(vesselsJson.data)
-      if (flightsJson.data) setFlights(flightsJson.data)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const [layerToggles, setLayerToggles] = useState({ vessels: true, flights: true, thermal: true })
 
   useEffect(() => {
-    void fetchData()
-    const interval = setInterval(() => void fetchData(), 120_000) // refresh every 2min
-    return () => clearInterval(interval)
-  }, [fetchData])
+    void Promise.all([fetch('/api/v1/tracking/vessels'), fetch('/api/v1/tracking/flights')]).then(async ([vRes, fRes]) => {
+      const vJson = await vRes.json() as { data?: Vessel[]; meta?: { demo?: boolean } }
+      const fJson = await fRes.json() as { data?: Flight[]; meta?: { demo?: boolean } }
+      setVessels((vJson.data ?? []).map((item) => ({ ...item, demo: vJson.meta?.demo })))
+      setFlights((fJson.data ?? []).map((item) => ({ ...item, demo: fJson.meta?.demo })))
+      setThermals([
+        { region: 'Levant', frp: 42, lat: 33.1, lon: 35.2, detected_at: new Date().toISOString(), demo: true },
+        { region: 'Sahel', frp: 31, lat: 14.6, lon: 20.7, detected_at: new Date().toISOString(), demo: true },
+      ])
+    })
+  }, [])
+
+  const showDemoBanner = useMemo(() => [...vessels, ...flights, ...thermals].some((item) => item.demo), [flights, thermals, vessels])
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div
-        className="px-4 py-3 border-b shrink-0"
-        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-bold mono tracking-widest" style={{ color: 'var(--text-primary)' }}>
-            MARITIME / AIR PICTURE
-          </h2>
-          <div className="text-xs mono" style={{ color: 'var(--text-muted)' }}>LIVE · 30MIN REFRESH</div>
+    <div className="grid h-full gap-4 xl:grid-cols-[1.7fr_1fr]">
+      <div className="overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--border)' }}>
+          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Operational Tracking Layer</div>
+          <div className="flex gap-2 text-xs">
+            {(['vessels', 'flights', 'thermal'] as const).map((layer) => <button key={layer} onClick={() => setLayerToggles((prev) => ({ ...prev, [layer]: !prev[layer] }))} className="rounded-full border px-2 py-1 capitalize" style={{ borderColor: 'var(--border)', color: layerToggles[layer] ? 'var(--primary)' : 'var(--text-muted)' }}>{layer}</button>)}
+          </div>
         </div>
-
-        {/* Stats row */}
-        {stats && (
-          <div className="grid grid-cols-5 gap-2 text-center">
-            {[
-              { label: 'VESSELS', value: stats.vessels, color: 'var(--accent-blue)' },
-              { label: 'FLIGHTS', value: stats.flights, color: 'var(--primary)' },
-              { label: 'THERMAL', value: stats.thermal_anomalies, color: 'var(--alert-amber)' },
-              { label: 'DARK', value: stats.dark_vessels, color: 'var(--text-muted)' },
-              { label: 'EMERG', value: stats.emergency_squawks, color: 'var(--alert-red)' },
-            ].map(s => (
-              <div key={s.label} className="rounded border p-1" style={{ borderColor: 'var(--border)' }}>
-                <div className="text-lg font-bold mono" style={{ color: s.color }}>{s.value}</div>
-                <div className="text-xs mono" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
+        <TrackingMap vessels={vessels} flights={flights} thermals={thermals} layerToggles={layerToggles} />
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
-        {(['vessels', 'flights', 'thermal'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className="flex-1 py-2 text-xs mono tracking-wider"
-            style={{
-              color: activeTab === tab ? 'var(--primary)' : 'var(--text-muted)',
-              borderBottom: activeTab === tab ? '2px solid var(--primary)' : '2px solid transparent',
-            }}
-          >
-            {tab.toUpperCase()}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-3">
-        {loading ? (
-          <div className="text-xs mono text-center py-8" style={{ color: 'var(--text-muted)' }}>
-            LOADING TRACKING DATA...
-          </div>
-        ) : activeTab === 'vessels' ? (
-          vessels.length === 0 ? (
-            <div className="text-xs mono text-center py-8" style={{ color: 'var(--text-muted)' }}>
-              NO VESSELS TRACKED — SET AISSTREAM_API_KEY TO ENABLE
-            </div>
-          ) : (
-            vessels.map(v => <VesselRow key={v.mmsi} vessel={v} />)
-          )
-        ) : activeTab === 'flights' ? (
-          flights.length === 0 ? (
-            <div className="text-xs mono text-center py-8" style={{ color: 'var(--text-muted)' }}>
-              NO FLIGHTS TRACKED — OPENSKY CREDENTIALS OPTIONAL
-            </div>
-          ) : (
-            flights.map(f => <FlightRow key={f.icao24} flight={f} />)
-          )
-        ) : (
-          <div className="text-xs mono text-center py-8" style={{ color: 'var(--text-muted)' }}>
-            THERMAL ANOMALY MAP — SET NASA_FIRMS_API_KEY TO ENABLE
-          </div>
-        )}
+      <div className="overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+        {showDemoBanner && <div className="border-b px-4 py-3 text-sm" style={{ borderColor: 'rgba(234,179,8,0.24)', color: '#FACC15', background: 'rgba(234,179,8,0.08)' }}>Live tracking requires AIS/ADS-B API keys. Showing demo data.</div>}
+        <div className="flex border-b" style={{ borderColor: 'var(--border)' }}>
+          {(['vessels', 'flights', 'thermal'] as const).map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className="flex-1 px-3 py-3 text-sm capitalize" style={{ color: activeTab === tab ? 'var(--primary)' : 'var(--text-muted)', borderBottom: activeTab === tab ? '2px solid var(--primary)' : '2px solid transparent' }}>{tab}</button>)}
+        </div>
+        <div className="max-h-[620px] overflow-auto p-4">
+          {activeTab === 'vessels' && <div className="space-y-2">{vessels.map((v, i) => <div key={`${v.mmsi}-${i}`} className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}><div className="mb-1 flex items-center gap-2"><ShipIcon size={14} style={{ color: v.ship_type === 35 ? 'var(--sev-critical)' : 'var(--primary)' }} /><span style={{ color: 'var(--text-primary)' }}>{v.ship_name || `MMSI ${v.mmsi}`}</span></div><div style={{ color: 'var(--text-secondary)', fontFamily: 'JetBrains Mono, monospace' }}>{v.mmsi} · {v.flag || '--'} · {v.latitude.toFixed(2)}, {v.longitude.toFixed(2)} · {v.speed || 0}kn · {timeAgo(v.last_seen)}</div></div>)}</div>}
+          {activeTab === 'flights' && <div className="space-y-2">{flights.map((f, i) => <div key={`${f.icao24}-${i}`} className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}><div className="mb-1 flex items-center gap-2"><PlaneIcon size={14} style={{ color: f.is_military ? 'var(--sev-critical)' : 'var(--primary)' }} /><span style={{ color: 'var(--text-primary)' }}>{f.callsign || f.icao24}</span></div><div style={{ color: 'var(--text-secondary)', fontFamily: 'JetBrains Mono, monospace' }}>{f.icao24} · alt {Math.round((f.altitude || 0) * 3.28084)}ft · speed {f.speed || 0} · {timeAgo(f.last_seen)}</div></div>)}</div>}
+          {activeTab === 'thermal' && <div className="space-y-2">{thermals.map((t, i) => <div key={`${t.region}-${i}`} className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}><div className="mb-1 flex items-center gap-2"><FlameIcon size={14} style={{ color: 'var(--sev-high)' }} /><span style={{ color: 'var(--text-primary)' }}>{t.region}</span></div><div style={{ color: 'var(--text-secondary)', fontFamily: 'JetBrains Mono, monospace' }}>FRP {t.frp} · {t.lat.toFixed(2)}, {t.lon.toFixed(2)} · {timeAgo(t.detected_at)}</div></div>)}</div>}
+        </div>
       </div>
     </div>
   )

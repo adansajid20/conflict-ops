@@ -1,26 +1,169 @@
-export const dynamic = 'force-dynamic'
-import { AlertPanel } from '@/components/alerts/AlertPanel'
-import { PIRBuilder } from '@/components/pir/PIRBuilder'
+'use client'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Plus, ShieldCheck, Trash2, X } from 'lucide-react'
+
+type AlertItem = { id: string; title: string; description?: string | null; severity?: number | string | null; created_at: string; read?: boolean | null }
+type PIR = { id: string; name: string; conditions?: Array<Record<string, unknown>>; active?: boolean; last_triggered_at?: string | null; priority?: number }
+type Condition = { keyword: string; region: string; severity: string }
+
+function timeAgo(input?: string | null) {
+  if (!input) return 'unknown'
+  const diff = Math.max(0, Date.now() - new Date(input).getTime())
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+function severityUi(value?: number | string | null) {
+  const sev = Number(value ?? 0)
+  if (sev >= 4) return { label: 'Critical', color: 'var(--sev-critical)' }
+  if (sev >= 3) return { label: 'High', color: 'var(--sev-high)' }
+  if (sev >= 2) return { label: 'Medium', color: 'var(--sev-medium)' }
+  return { label: 'Low', color: 'var(--sev-low)' }
+}
+
+function SeverityBadge({ severity }: { severity?: number | string | null }) {
+  const ui = severityUi(severity)
+  return <span className="rounded-full px-2 py-1 text-[11px] font-medium" style={{ background: `${ui.color}22`, color: ui.color }}>{ui.label}</span>
+}
 
 export default function AlertsPage() {
+  const ShieldCheckIcon = ShieldCheck as any
+  const CheckCircle2Icon = CheckCircle2 as any
+  const XIcon = X as any
+  const ChevronUpIcon = ChevronUp as any
+  const ChevronDownIcon = ChevronDown as any
+  const Trash2Icon = Trash2 as any
+  const PlusIcon = Plus as any
+  const [alerts, setAlerts] = useState<AlertItem[]>([])
+  const [pirs, setPirs] = useState<PIR[]>([])
+  const [activeFilter, setActiveFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'unread'>('all')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [pirForm, setPirForm] = useState<{ name: string; conditions: Condition[] }>({ name: '', conditions: [{ keyword: '', region: '', severity: 'all' }] })
+
+  const load = useCallback(async () => {
+    const [alertsRes, pirRes] = await Promise.all([fetch('/api/v1/alerts?limit=100', { cache: 'no-store' }), fetch('/api/v1/pir', { cache: 'no-store' })])
+    const alertsJson = await alertsRes.json() as { data?: AlertItem[] }
+    const pirJson = await pirRes.json() as { data?: PIR[] }
+    setAlerts(alertsJson.data ?? [])
+    setPirs(pirJson.data ?? [])
+  }, [])
+
+  useEffect(() => { void load() }, [load])
+
+  const filteredAlerts = useMemo(() => alerts.filter((a) => {
+    const sev = severityUi(a.severity).label.toLowerCase()
+    if (activeFilter === 'unread') return !a.read
+    if (activeFilter === 'all') return true
+    return sev === activeFilter
+  }), [activeFilter, alerts])
+
+  const unreadCount = alerts.filter((a) => !a.read).length
+
+  const markRead = async (id: string) => {
+    await fetch('/api/v1/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertIds: [id], read: true }) })
+    await load()
+  }
+  const markAllRead = async () => {
+    await fetch('/api/v1/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertIds: alerts.filter((a) => !a.read).map((a) => a.id), read: true }) })
+    await load()
+  }
+  const dismiss = async (id: string) => {
+    await fetch(`/api/v1/alerts/${id}`, { method: 'DELETE' }).catch(() => null)
+    setAlerts((prev) => prev.filter((a) => a.id !== id))
+  }
+  const addCondition = () => setPirForm((prev) => ({ ...prev, conditions: [...prev.conditions, { keyword: '', region: '', severity: 'all' }] }))
+  const savePir = async () => {
+    const conditions = pirForm.conditions.flatMap((condition) => {
+      const rows: Array<{ type: 'keyword' | 'country' | 'severity_gte'; value: string | number }> = []
+      if (condition.keyword) rows.push({ type: 'keyword', value: condition.keyword })
+      if (condition.region) rows.push({ type: 'country', value: condition.region })
+      if (condition.severity !== 'all') rows.push({ type: 'severity_gte', value: condition.severity === 'critical' ? 4 : condition.severity === 'high' ? 3 : 2 })
+      return rows
+    })
+    await fetch('/api/v1/pir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: pirForm.name, conditions, alert_channels: ['in_app'], priority: 2 }) })
+    setPirForm({ name: '', conditions: [{ keyword: '', region: '', severity: 'all' }] })
+    await load()
+  }
+  const deletePir = async (id: string) => { await fetch(`/api/v1/pir?id=${id}`, { method: 'DELETE' }); await load() }
+
   return (
-    <div className="h-full flex flex-col lg:flex-row gap-0">
-      {/* Left: Alerts feed */}
-      <div className="flex-1 min-h-0 border-r" style={{ borderColor: 'var(--border)' }}>
-        <AlertPanel />
+    <div className="flex h-full flex-col lg:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col border-r" style={{ borderColor: 'var(--border)' }}>
+        <div className="border-b px-4 py-4" style={{ borderColor: 'var(--border)' }}>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h1 className="text-[18px] font-semibold" style={{ color: 'var(--text-primary)' }}>Active Alerts</h1>
+              <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: 'var(--sev-critical-dim)', color: 'var(--sev-critical)' }}>{unreadCount} unread</span>
+            </div>
+            <button onClick={markAllRead} className="text-xs" style={{ color: 'var(--text-muted)' }}>Mark all read</button>
+          </div>
+          <div className="flex gap-4 text-sm">
+            {(['all', 'critical', 'high', 'medium', 'unread'] as const).map((tab) => <button key={tab} onClick={() => setActiveFilter(tab)} className="border-b-2 pb-2 capitalize" style={{ borderColor: activeFilter === tab ? 'var(--primary)' : 'transparent', color: activeFilter === tab ? 'var(--primary)' : 'var(--text-muted)' }}>{tab}</button>)}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {filteredAlerts.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center px-8 text-center">
+              <ShieldCheckIcon size={48} style={{ color: 'var(--text-muted)' }} />
+              <div className="mt-4 text-base font-medium" style={{ color: 'var(--text-primary)' }}>No active alerts</div>
+              <div className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>Quiet board. Either you’re safe or the filters are too picky.</div>
+            </div>
+          ) : filteredAlerts.map((a) => (
+            <div key={a.id} className="cursor-pointer border-b px-4 py-3 hover:bg-white/5" style={{ borderColor: 'var(--border)' }} onClick={() => setExpandedId((prev) => prev === a.id ? null : a.id)}>
+              <div className="flex items-center gap-3">
+                <SeverityBadge severity={a.severity} />
+                <span className="flex-1 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{a.title}</span>
+                <span className="text-xs" style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>{timeAgo(a.created_at)}</span>
+                <button onClick={(e) => { e.stopPropagation(); void markRead(a.id) }}><CheckCircle2Icon size={14} /></button>
+                <button onClick={(e) => { e.stopPropagation(); void dismiss(a.id) }}><XIcon size={14} /></button>
+                {expandedId === a.id ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
+              </div>
+              {expandedId === a.id && <div className="mt-2 pl-2 text-sm" style={{ color: 'var(--text-secondary)' }}>{a.description || 'No analyst note attached.'}</div>}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Right: PIR builder + list */}
-      <div className="w-full lg:w-96 shrink-0 overflow-y-auto p-4">
+      <div className="w-full shrink-0 overflow-y-auto p-4 lg:w-96">
         <div className="mb-4">
-          <h2 className="text-sm font-bold mono tracking-widest mb-1" style={{ color: 'var(--text-primary)' }}>
-            PRIORITY INTELLIGENCE REQUIREMENTS
-          </h2>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Define conditions. Get alerted when events match — all conditions must be true.
-          </p>
+          <div className="mb-3 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Intelligence Requirements</div>
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+            <input value={pirForm.name} onChange={(e) => setPirForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="PIR name" className="mb-3 w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }} />
+            {pirForm.conditions.map((condition, index) => (
+              <div key={index} className="mb-3 grid grid-cols-[1fr_110px_110px_36px] gap-2">
+                <input value={condition.keyword} onChange={(e) => setPirForm((prev) => ({ ...prev, conditions: prev.conditions.map((item, i) => i === index ? { ...item, keyword: e.target.value } : item) }))} placeholder="keyword" className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }} />
+                <select value={condition.region} onChange={(e) => setPirForm((prev) => ({ ...prev, conditions: prev.conditions.map((item, i) => i === index ? { ...item, region: e.target.value } : item) }))} className="rounded-lg border px-2 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }}><option value="">Region</option><option value="UA">Ukraine</option><option value="IL">Israel</option><option value="SD">Sudan</option><option value="TW">Taiwan</option></select>
+                <select value={condition.severity} onChange={(e) => setPirForm((prev) => ({ ...prev, conditions: prev.conditions.map((item, i) => i === index ? { ...item, severity: e.target.value } : item) }))} className="rounded-lg border px-2 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }}><option value="all">Severity</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option></select>
+                <button onClick={() => setPirForm((prev) => ({ ...prev, conditions: prev.conditions.filter((_, i) => i !== index) }))} className="rounded-lg border" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}><Trash2Icon size={14} className="mx-auto" /></button>
+              </div>
+            ))}
+            <button onClick={addCondition} className="mb-3 inline-flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}><PlusIcon size={14} /> Add condition</button>
+            <button onClick={() => void savePir()} className="w-full rounded-lg px-3 py-2 text-sm font-medium" style={{ background: 'var(--primary)', color: '#fff' }}>Save PIR</button>
+          </div>
         </div>
-        <PIRBuilder />
+
+        <div>
+          {pirs.map((pir) => (
+            <div key={pir.id} className="mb-3 rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+              <div className="mb-1 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{pir.name}</div>
+                  <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>{(pir.conditions ?? []).map((c) => `${String(c.type)}:${String(c.value)}`).join(' · ') || 'No conditions summary'}</div>
+                </div>
+                <button onClick={() => void deletePir(pir.id)} style={{ color: 'var(--text-muted)' }}><Trash2Icon size={14} /></button>
+              </div>
+              <div className="mt-3 flex items-center justify-between text-xs">
+                <span className="rounded-full px-2 py-1" style={{ background: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}>Last triggered {pir.last_triggered_at ? timeAgo(pir.last_triggered_at) : 'never'}</span>
+                <span style={{ color: pir.active ? 'var(--sev-low)' : 'var(--text-muted)' }}>{pir.active ? 'Enabled' : 'Disabled'}</span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

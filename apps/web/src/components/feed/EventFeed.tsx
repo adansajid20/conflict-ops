@@ -1,221 +1,182 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { eventToIntelItem, safeTimeAgo, severityColor, type IntelItem } from '@/types/intel-item'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AlertCircle, Download, Search, X } from 'lucide-react'
 import { IntelDrawer } from '@/components/intel/IntelDrawer'
+import { eventToIntelItem } from '@/types/intel-item'
 
-type TimeWindow = '1h' | '6h' | '24h' | '7d' | '30d'
-
-const WINDOWS: { label: string; value: TimeWindow; ms: number }[] = [
-  { label: '1H',  value: '1h',  ms: 3600000 },
-  { label: '6H',  value: '6h',  ms: 21600000 },
-  { label: '24H', value: '24h', ms: 86400000 },
-  { label: '7D',  value: '7d',  ms: 604800000 },
-  { label: '30D', value: '30d', ms: 2592000000 },
-]
-
-function sourceLabel(source: string): string {
-  const map: Record<string, string> = {
-    gdelt: 'GDELT', reliefweb: 'ReliefWeb', gdacs: 'GDACS',
-    unhcr: 'UNHCR', nasa_eonet: 'NASA EONET',
-  }
-  return map[source] ?? source.toUpperCase()
+type FeedEvent = {
+  id: string
+  source: string
+  title: string
+  description?: string | null
+  severity?: number | string | null
+  region?: string | null
+  occurred_at?: string | null
 }
 
-// Drawer is now the shared IntelDrawer component
+const WINDOWS = ['1h', '6h', '24h', '7d', '30d'] as const
+
+function sevColor(severity?: number | string | null) {
+  const value = Number(severity ?? 0)
+  if (value >= 4) return '#EF4444'
+  if (value >= 3) return '#F97316'
+  if (value >= 2) return '#EAB308'
+  if (value >= 1) return '#22C55E'
+  return '#64748B'
+}
+
+function timeAgo(input?: string | null) {
+  if (!input) return 'unknown'
+  const diff = Math.max(0, Date.now() - new Date(input).getTime())
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+function SourceBadge({ source }: { source: string }) {
+  const key = source?.toLowerCase()
+  const palette: Record<string, [string, string, string]> = {
+    gdelt: ['rgba(30,64,175,0.18)', '#60A5FA', 'GDELT'],
+    reliefweb: ['rgba(13,148,136,0.18)', '#2DD4BF', 'ReliefWeb'],
+    gdacs: ['rgba(146,64,14,0.20)', '#FB923C', 'GDACS'],
+    unhcr: ['rgba(49,46,129,0.20)', '#A5B4FC', 'UNHCR'],
+    nasa_eonet: ['rgba(120,53,15,0.20)', '#FBBF24', 'NASA EONET'],
+    'nasa-eonet': ['rgba(120,53,15,0.20)', '#FBBF24', 'NASA EONET'],
+  }
+  const config = palette[key] ?? ['var(--bg-surface-2)', 'var(--text-secondary)', source]
+
+  return <span className="rounded-full px-2 py-1 text-[10px] font-medium" style={{ background: config[0], color: config[1] }}>{config[2]}</span>
+}
 
 export function EventFeed() {
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const [items, setItems] = useState<IntelItem[]>([])
+  const AlertCircleIcon = AlertCircle as any
+  const DownloadIcon = Download as any
+  const SearchIcon = Search as any
+  const XIcon = X as any
+  const [source, setSource] = useState('all')
+  const [severity, setSeverity] = useState('all')
+  const [window, setWindow] = useState<(typeof WINDOWS)[number]>('24h')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
+  const [events, setEvents] = useState<FeedEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedItem, setSelectedItem] = useState<IntelItem | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
+  const [lastRefresh, setLastRefresh] = useState(new Date())
+  const [selected, setSelected] = useState<FeedEvent | null>(null)
+  const [countdown, setCountdown] = useState(60)
 
-  // Persist window in URL (?w=7d) + localStorage fallback
-  const getInitialWindow = (): TimeWindow => {
-    const urlW = searchParams?.get('w') as TimeWindow | null
-    if (urlW && WINDOWS.find(x => x.value === urlW)) return urlW
-    try {
-      const stored = localStorage.getItem('intel_feed_window') as TimeWindow | null
-      if (stored && WINDOWS.find(x => x.value === stored)) return stored
-    } catch { /* ignore */ }
-    return '7d'
-  }
-  const [window_, setWindow] = useState<TimeWindow>(getInitialWindow)
-
-  const fetchEvents = useCallback(async (w: TimeWindow) => {
-    abortRef.current?.abort()
-    abortRef.current = new AbortController()
-    const ms = WINDOWS.find(x => x.value === w)?.ms ?? 86400000
-    const since = new Date(Date.now() - ms).toISOString()
-    try {
-      setError(null)
-      const res = await fetch(`/api/v1/events?limit=100&since=${since}`, {
-        signal: abortRef.current.signal,
-        cache: 'no-store',
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const d = await res.json() as { success: boolean; data?: Record<string, unknown>[] }
-      setItems((d.data ?? []).map(eventToIntelItem))
-    } catch (e) {
-      if (e instanceof Error && e.name === 'AbortError') return
-      setError(String(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
+  const fetchEvents = useCallback(async (reset = false) => {
     setLoading(true)
-    void fetchEvents(window_)
-    const id = setInterval(() => void fetchEvents(window_), 60_000)
-    return () => {
-      clearInterval(id)
-      abortRef.current?.abort()
-    }
-  }, [window_, fetchEvents])
+    const params = new URLSearchParams()
+    if (source !== 'all') params.set('source', source)
+    if (severity !== 'all') params.set('severity', severity === 'critical' ? '4' : severity === 'high' ? '3' : severity === 'medium' ? '2' : '1')
+    params.set('window', window)
+    if (search) params.set('search', search)
+    params.set('limit', '50')
+    params.set('offset', String((reset ? 0 : page) * 50))
+    const msMap = { '1h': 3600000, '6h': 21600000, '24h': 86400000, '7d': 604800000, '30d': 2592000000 }
+    params.set('since', new Date(Date.now() - msMap[window]).toISOString())
+    const res = await fetch(`/api/v1/events?${params.toString()}`, { cache: 'no-store' })
+    const json = await res.json() as { data?: FeedEvent[]; success?: boolean }
+    const incoming = json.data ?? []
+    setEvents(reset ? incoming : [...events, ...incoming])
+    setLastRefresh(new Date())
+    setCountdown(60)
+    setLoading(false)
+  }, [events, page, search, severity, source, window])
+
+  useEffect(() => { setPage(0); void fetchEvents(true) }, [source, severity, window])
+  useEffect(() => {
+    const handle = setTimeout(() => { void fetchEvents(true) }, 250)
+    return () => clearTimeout(handle)
+  }, [search])
+  useEffect(() => {
+    const interval = setInterval(() => setCountdown((v) => (v <= 1 ? 60 : v - 1)), 1000)
+    return () => clearInterval(interval)
+  }, [])
+  useEffect(() => {
+    if (countdown === 60) return
+    if (countdown === 1) void fetchEvents(true)
+  }, [countdown, fetchEvents])
+
+  const drawerItem = useMemo(() => (selected ? eventToIntelItem(selected as never) : null), [selected])
+
+  const exportCsv = () => {
+    const header = ['id', 'source', 'title', 'severity', 'region', 'occurred_at']
+    const rows = events.map((event) => [event.id, event.source, JSON.stringify(event.title ?? ''), event.severity ?? '', event.region ?? '', event.occurred_at ?? ''])
+    const csv = [header.join(','), ...rows.map((row) => row.join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `conflict-ops-feed-${Date.now()}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const clearFilters = () => {
+    setSource('all'); setSeverity('all'); setWindow('24h'); setSearch(''); setPage(0)
+  }
 
   return (
-    <div className="h-full flex flex-col relative">
-      {/* Controls */}
-      <div className="px-4 py-2 border-b flex items-center justify-between shrink-0"
-        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-        <div className="flex items-center gap-1">
-          {WINDOWS.map(w => (
-            <button
-              key={w.value}
-              onClick={() => {
-                setWindow(w.value)
-                setLoading(true)
-                try { localStorage.setItem('intel_feed_window', w.value) } catch { /* ignore */ }
-                const params = new URLSearchParams(searchParams?.toString() ?? '')
-                params.set('w', w.value)
-                router.replace(`?${params.toString()}`, { scroll: false })
-              }}
-              className="px-2 py-1 text-xs mono rounded transition-colors"
-              style={{
-                backgroundColor: window_ === w.value ? 'rgba(0,255,136,0.15)' : 'transparent',
-                color: window_ === w.value ? 'var(--primary)' : 'var(--text-muted)',
-                border: window_ === w.value ? '1px solid rgba(0,255,136,0.3)' : '1px solid transparent',
-              }}
-            >
-              {w.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
-            {items.length} EVENTS
-          </span>
-          <div className="flex items-center gap-1.5">
-            <span className="status-dot green" />
-            <span className="text-xs mono" style={{ color: 'var(--alert-green)' }}>LIVE</span>
+    <div className="relative flex h-full flex-col overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+      <div className="sticky top-0 z-10 border-b px-4 py-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+        <div className="flex flex-wrap items-center gap-3">
+          <select value={source} onChange={(e) => setSource(e.target.value)} className="rounded px-3 py-1.5 text-sm" style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+            <option value="all">All Sources</option><option value="gdelt">GDELT</option><option value="reliefweb">ReliefWeb</option><option value="gdacs">GDACS</option><option value="unhcr">UNHCR</option><option value="nasa_eonet">NASA EONET</option>
+          </select>
+          <select value={severity} onChange={(e) => setSeverity(e.target.value)} className="rounded px-3 py-1.5 text-sm" style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+            <option value="all">All</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+          </select>
+          <div className="flex rounded-lg p-1" style={{ background: 'var(--bg-surface-2)' }}>
+            {WINDOWS.map((item) => <button key={item} onClick={() => setWindow(item)} className="rounded-md px-3 py-1.5 text-sm" style={{ background: item === window ? 'var(--primary)' : 'transparent', color: item === window ? '#fff' : 'var(--text-secondary)' }}>{item}</button>)}
           </div>
-          <button
-            onClick={() => { setLoading(true); void fetchEvents(window_) }}
-            className="text-xs mono hover:opacity-70 transition-opacity"
-            style={{ color: 'var(--text-muted)' }}
-          >↺</button>
+          <div className="relative min-w-[220px] flex-1">
+            <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search events..." className="w-full rounded pl-9 pr-3 py-1.5 text-sm" style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+          </div>
+          <div className="flex-1" />
+          <button onClick={exportCsv} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}><DownloadIcon size={14} /> Export CSV</button>
         </div>
       </div>
 
-      {/* Feed */}
       <div className="flex-1 overflow-y-auto">
-        {loading && (
-          <div className="p-4 space-y-2">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="skeleton h-14 rounded" style={{ animationDelay: `${i * 80}ms` }} />
-            ))}
+        {loading ? (
+          <div className="p-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="mb-3 h-16 animate-pulse rounded-lg" style={{ background: 'var(--bg-surface-2)' }} />)}</div>
+        ) : events.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+            <AlertCircleIcon size={32} style={{ color: 'var(--text-muted)' }} />
+            <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>No events match current filters</div>
+            <button onClick={clearFilters} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}><XIcon size={14} /> Clear filters</button>
           </div>
-        )}
-
-        {!loading && error && (
-          <div className="p-6 text-center">
-            <div className="text-sm font-bold mb-2" style={{ color: '#EF4444' }}>FEED ERROR</div>
-            <div className="text-xs mono mb-4" style={{ color: 'var(--text-muted)' }}>{error}</div>
-            <button
-              onClick={() => { setLoading(true); void fetchEvents(window_) }}
-              className="text-xs mono px-3 py-1.5 rounded border hover:opacity-80 transition-opacity"
-              style={{ color: 'var(--primary)', borderColor: 'var(--primary)' }}
-            >
-              RETRY
-            </button>
-          </div>
-        )}
-
-        {!loading && !error && items.length === 0 && (
-          <div className="p-8 text-center">
-            <div className="text-2xl mb-3 opacity-30">◈</div>
-            <div className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>NO EVENTS IN WINDOW</div>
-            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Try expanding the time window or trigger an ingest from the Doctor page.
-            </div>
-          </div>
-        )}
-
-        {!loading && !error && items.length > 0 && (
-          <div>
-            {items.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setSelectedItem(item)}
-                className="w-full text-left border-b px-4 py-3 transition-colors hover:bg-white/5 active:bg-white/10"
-                style={{ borderColor: 'var(--border)', display: 'block' }}
-              >
-                <div className="flex items-start gap-3">
-                  {/* Severity bar */}
-                  <div
-                    className="w-0.5 rounded-full mt-0.5 shrink-0"
-                    style={{
-                      height: 36,
-                      backgroundColor: severityColor(item.severity),
-                      opacity: 0.8,
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    {/* Source + time */}
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs mono font-bold px-1.5 py-0.5 rounded"
-                        style={{
-                          backgroundColor: 'rgba(0,255,136,0.08)',
-                          color: 'var(--primary)',
-                          fontSize: 10,
-                        }}>
-                        {sourceLabel(item.source)}
-                      </span>
-                      {item.country_code && (
-                        <span className="text-xs" style={{ color: 'var(--text-muted)', fontSize: 10 }}>
-                          {item.country_code}
-                        </span>
-                      )}
-                      <span className="text-xs ml-auto shrink-0" style={{ color: 'var(--text-disabled)', fontSize: 10 }}>
-                        {safeTimeAgo(item.occurred_at ?? item.ingested_at)}
-                      </span>
-                    </div>
-                    {/* Title */}
-                    <div className="text-xs leading-snug truncate" style={{ color: 'var(--text-primary)' }}>
-                      {item.title}
-                    </div>
-                  </div>
-                  {/* Arrow */}
-                  <span className="text-xs shrink-0 mt-1" style={{ color: 'var(--text-disabled)' }}>›</span>
+        ) : (
+          events.map((event) => (
+            <div key={event.id} onClick={() => setSelected(event)} className="flex cursor-pointer items-start gap-3 border-b px-4 py-3 transition-colors hover:bg-white/5" style={{ borderColor: 'var(--border)' }}>
+              <div style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: sevColor(event.severity), flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="mb-1 flex items-center gap-2">
+                  <SourceBadge source={event.source} />
+                  <span className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{event.title}</span>
                 </div>
-              </button>
-            ))}
-          </div>
+                <p className="line-clamp-2 text-xs" style={{ color: 'var(--text-secondary)' }}>{event.description || 'No description provided.'}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                {event.region && <span className="rounded px-1.5 py-0.5 text-[10px]" style={{ background: 'var(--bg-surface-2)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{event.region}</span>}
+                <div className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>{timeAgo(event.occurred_at)}</div>
+              </div>
+            </div>
+          ))
         )}
       </div>
 
-      {/* Detail drawer */}
-      <IntelDrawer
-        item={selectedItem}
-        items={items}
-        onClose={() => setSelectedItem(null)}
-        onNavigate={setSelectedItem}
-      />
+      <div className="flex items-center justify-between border-t px-4 py-3 text-sm" style={{ borderColor: 'var(--border)' }}>
+        <button onClick={() => { const next = page + 1; setPage(next); void fetchEvents(false) }} className="rounded-md border px-3 py-1.5" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>Load 50 more</button>
+        <div style={{ color: 'var(--text-muted)' }}>Refreshing in {countdown}s · last {lastRefresh.toLocaleTimeString()}</div>
+      </div>
+
+      <IntelDrawer item={drawerItem} items={drawerItem ? [drawerItem] : []} onClose={() => setSelected(null)} onNavigate={() => undefined} />
     </div>
   )
 }
