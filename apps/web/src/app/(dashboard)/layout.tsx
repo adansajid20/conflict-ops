@@ -1,232 +1,190 @@
 'use client'
 
+import type React from 'react'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { SidebarStatus } from '@/components/layout/SidebarStatus'
+import { useUser } from '@clerk/nextjs'
+import {
+  Activity,
+  Bell,
+  Building2,
+  CreditCard,
+  FlaskConical,
+  Globe,
+  KeyRound,
+  LayoutDashboard,
+  Plane,
+  Radio,
+  ScanSearch,
+  Shield,
+  Stethoscope,
+  Target,
+  TrendingUp,
+  Webhook,
+} from 'lucide-react'
+import { CommandPalette } from '@/components/layout/CommandPalette'
 import { FreshnessBanner } from '@/components/layout/FreshnessBanner'
-import { safeTimeAgo } from '@/types/intel-item'
 import { useHealthStatus } from '@/hooks/useHealthStatus'
+import { safeTimeAgo } from '@/types/intel-item'
 
 export const dynamic = 'force-dynamic'
 
 type NavItem = {
   href: string
   label: string
-  icon: string
-  section: 'core' | 'labs' | 'admin'
-  beta?: boolean
+  section: 'intelligence' | 'analysis' | 'workspace' | 'settings'
+  icon: unknown
 }
 
 const NAV_ITEMS: NavItem[] = [
-  // INTELLIGENCE — always visible
-  { href: '/overview',          label: 'OVERVIEW',    icon: '◈', section: 'core' },
-  { href: '/feed',              label: 'INTEL FEED',  icon: '▤', section: 'core' },
-  { href: '/map',               label: 'MAP',         icon: '⊞', section: 'core' },
-  { href: '/alerts',            label: 'ALERTS',      icon: '⚠', section: 'core' },
-  // LABS — collapsible, beta
-  { href: '/missions',          label: 'MISSIONS',    icon: '◉', section: 'labs', beta: true },
-  { href: '/workbench',         label: 'WORKBENCH',   icon: '⊡', section: 'labs', beta: true },
-  { href: '/tracking',          label: 'TRACKING',    icon: '⊙', section: 'labs', beta: true },
-  { href: '/markets',           label: 'MARKETS',     icon: '◷', section: 'labs', beta: true },
-  { href: '/geoverify',         label: 'GEOVERIFY',   icon: '⊛', section: 'labs', beta: true },
-  { href: '/travel',            label: 'TRAVEL RISK', icon: '⊲', section: 'labs', beta: true },
-  // ADMIN — collapsible
-  { href: '/admin',             label: 'DOCTOR',      icon: '⊗', section: 'admin' },
-  { href: '/settings/org',      label: 'ORG',         icon: '⊕', section: 'admin' },
-  { href: '/settings/api',      label: 'API KEYS',    icon: '⊢', section: 'admin' },
-  { href: '/settings/webhooks', label: 'WEBHOOKS',    icon: '⇢', section: 'admin' },
-  { href: '/settings/billing',  label: 'BILLING',     icon: '○', section: 'admin' },
+  { href: '/overview', label: 'Overview', section: 'intelligence', icon: LayoutDashboard },
+  { href: '/feed', label: 'Intel Feed', section: 'intelligence', icon: Activity },
+  { href: '/map', label: 'Map', section: 'intelligence', icon: Globe },
+  { href: '/alerts', label: 'Alerts', section: 'intelligence', icon: Bell },
+  { href: '/missions', label: 'Missions', section: 'analysis', icon: Target },
+  { href: '/workbench', label: 'Workbench', section: 'analysis', icon: FlaskConical },
+  { href: '/tracking', label: 'Tracking', section: 'workspace', icon: Radio },
+  { href: '/markets', label: 'Markets', section: 'workspace', icon: TrendingUp },
+  { href: '/geoverify', label: 'Geoverify', section: 'workspace', icon: ScanSearch },
+  { href: '/travel', label: 'Travel Risk', section: 'workspace', icon: Plane },
+  { href: '/admin', label: 'Doctor/Admin', section: 'settings', icon: Stethoscope },
+  { href: '/settings/org', label: 'Org', section: 'settings', icon: Building2 },
+  { href: '/settings/api', label: 'API Keys', section: 'settings', icon: KeyRound },
+  { href: '/settings/webhooks', label: 'Webhooks', section: 'settings', icon: Webhook },
+  { href: '/settings/billing', label: 'Billing', section: 'settings', icon: CreditCard },
 ]
 
-function NavSection({
-  title,
-  items,
-  currentPath,
-  collapsible = false,
-  defaultOpen = true,
-  storageKey,
-  badge,
-}: {
-  title: string
-  items: NavItem[]
-  currentPath: string
-  collapsible?: boolean
-  defaultOpen?: boolean
-  storageKey?: string
-  badge?: string
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-
-  useEffect(() => {
-    if (!storageKey) return
-    try {
-      const stored = localStorage.getItem(storageKey)
-      if (stored !== null) setOpen(stored === 'true')
-    } catch { /* ignore */ }
-  }, [storageKey])
-
-  const toggle = () => {
-    const next = !open
-    setOpen(next)
-    if (storageKey) {
-      try { localStorage.setItem(storageKey, String(next)) } catch { /* ignore */ }
-    }
-  }
-
+function Section({ title, items, pathname, unreadAlerts = 0 }: { title: string; items: NavItem[]; pathname: string; unreadAlerts?: number }) {
   return (
-    <div className="mb-1">
-      <div
-        className={`flex items-center justify-between px-3 pt-3 pb-1 ${collapsible ? 'cursor-pointer hover:opacity-80' : ''}`}
-        onClick={collapsible ? toggle : undefined}
-      >
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs mono tracking-widest" style={{ color: 'var(--border)', fontSize: 9 }}>
-            {title}
-          </span>
-          {badge && (
-            <span className="text-xs px-1 rounded" style={{ backgroundColor: 'rgba(139,92,246,0.2)', color: '#A78BFA', fontSize: 8 }}>
-              {badge}
-            </span>
-          )}
-        </div>
-        {collapsible && (
-          <span className="text-xs" style={{ color: 'var(--border)' }}>{open ? '▾' : '▸'}</span>
-        )}
+    <div className="mb-5">
+      <div className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
+        {title}
       </div>
-
-      {open && items.map(item => {
-        const isActive = currentPath === item.href || currentPath.startsWith(item.href + '/')
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="flex items-center gap-2.5 px-3 py-1.5 rounded text-xs font-mono tracking-wider transition-colors hover:bg-white/5"
-            style={{
-              color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
-              backgroundColor: isActive ? 'rgba(0,255,136,0.08)' : 'transparent',
-              textDecoration: 'none',
-            }}
-          >
-            <span style={{ color: isActive ? 'var(--primary)' : 'var(--text-muted)', width: 14, textAlign: 'center', fontSize: 12 }}>
-              {item.icon}
-            </span>
-            <span>{item.label}</span>
-            {item.beta && (
-              <sup style={{ color: '#A78BFA', fontSize: 8, marginLeft: 'auto' }}>β</sup>
-            )}
-          </Link>
-        )
-      })}
+      <div className="space-y-1">
+        {items.map((item) => {
+          const Icon = item.icon as React.ElementType
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+          return (
+            <Link key={item.href} href={item.href} className={`nav-item ${active ? 'active' : ''}`}>
+              <Icon className="h-4 w-4" style={{ color: active ? 'var(--primary-text)' : 'var(--text-muted)' }} />
+              <span>{item.label}</span>
+              {item.href === '/alerts' && unreadAlerts > 0 ? (
+                <span className="ml-auto rounded-full px-2 py-0.5 text-[11px] mono" style={{ background: 'var(--sev-critical-dim)', color: 'var(--sev-critical)' }}>
+                  {unreadAlerts}
+                </span>
+              ) : null}
+            </Link>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
 function StatusBar() {
   const { health } = useHealthStatus(120_000)
-  const [time, setTime] = useState('')
+  const [utcTime, setUtcTime] = useState('')
 
   useEffect(() => {
-    const tick = () => setTime(new Date().toISOString().substring(11, 19))
+    const tick = () => setUtcTime(new Date().toISOString().slice(11, 19))
     tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
+    const timer = setInterval(tick, 1000)
+    return () => clearInterval(timer)
   }, [])
 
-  const sourcesOk = health?.enabledSources?.filter(s => s.ok).length ?? 0
-  const sourcesTotal = health?.enabledSources?.length ?? 5
+  const liveFeeds = health?.sources?.live ?? health?.enabledSources?.filter((source) => source.ok).length ?? 0
+  const totalFeeds = health?.sources?.enabled ?? health?.enabledSources?.length ?? 5
+  const totalEvents = health?.events?.total ?? health?.eventCount ?? 0
+  const lastIngestAt = health?.ingest?.last_success_at ?? health?.lastIngestAt ?? null
 
   return (
-    <div
-      className="h-6 border-t flex items-center px-4 gap-4 text-xs mono shrink-0"
-      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)', color: 'var(--text-muted)', fontSize: 10 }}
-    >
-      <span>TIME: <span style={{ color: 'var(--text-primary)' }}>{time}Z</span></span>
-      <span>FEEDS: <span style={{ color: sourcesOk > 0 ? 'var(--alert-green)' : 'var(--alert-amber)' }}>
-        {health ? `${sourcesOk}/${sourcesTotal}` : '—'}
-      </span></span>
-      <span>EVENTS: <span style={{ color: 'var(--text-primary)' }}>{health?.eventCount ?? '—'}</span></span>
-      <span>INGEST: <span style={{ color: 'var(--text-muted)' }}>{health ? safeTimeAgo(health.lastIngestAt) : '—'}</span></span>
+    <div className="flex h-7 items-center gap-6 border-t px-4 text-[11px]" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+      <div>UTC <span className="mono" style={{ color: 'var(--text-primary)' }}>{utcTime}</span></div>
+      <div>FEEDS <span className="mono" style={{ color: liveFeeds > 0 ? 'var(--sev-low)' : 'var(--sev-medium)' }}>{liveFeeds}/{totalFeeds}</span></div>
+      <div>EVENTS <span className="mono" style={{ color: 'var(--text-primary)' }}>{totalEvents}</span></div>
+      <div>INGEST <span className="mono" style={{ color: 'var(--text-primary)' }}>{safeTimeAgo(lastIngestAt)}</span></div>
     </div>
   )
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ''
+  const { user } = useUser()
+  const { health } = useHealthStatus(60_000)
+  const [unreadAlerts, setUnreadAlerts] = useState(0)
 
-  // Trigger user provisioning on mount (non-blocking)
   useEffect(() => {
-    fetch('/api/v1/me').catch(() => { /* best effort */ })
-  }, [])
+    fetch('/api/v1/me').catch(() => undefined)
+    fetch('/api/v1/alerts?limit=5&unread=true', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((json: { data?: unknown[] }) => setUnreadAlerts(json.data?.length ?? 0))
+      .catch(() => setUnreadAlerts(0))
+  }, [pathname])
 
-  const coreItems = NAV_ITEMS.filter(i => i.section === 'core')
-  const labsItems = NAV_ITEMS.filter(i => i.section === 'labs')
-  const adminItems = NAV_ITEMS.filter(i => i.section === 'admin')
+  const sections = {
+    intelligence: NAV_ITEMS.filter((item) => item.section === 'intelligence'),
+    analysis: NAV_ITEMS.filter((item) => item.section === 'analysis'),
+    workspace: NAV_ITEMS.filter((item) => item.section === 'workspace'),
+    settings: NAV_ITEMS.filter((item) => item.section === 'settings'),
+  }
+
+  const initials = user?.fullName
+    ?.split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() ?? 'CO'
+
+  const liveFeeds = health?.sources?.live ?? health?.enabledSources?.filter((source) => source.ok).length ?? 0
 
   return (
-    <div className="h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
-      {/* Classification Banner */}
-      <div className="classification-banner flex items-center justify-between shrink-0">
-        <span>CONFLICT OPS // UNCLASSIFIED // OPERATOR USE ONLY</span>
-        <span className="mono text-xs">
-          {new Date().toISOString().replace('T', ' ').substring(0, 19)}Z
-        </span>
-      </div>
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-52 flex flex-col border-r shrink-0"
-          style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-          {/* Logo */}
-          <div className="p-4 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
-            <Link href="/overview" style={{ textDecoration: 'none' }}>
-              <div className="text-base font-bold tracking-widest uppercase font-mono" style={{ color: 'var(--primary)' }}>
-                CONFLICT OPS
+    <div className="flex h-screen flex-col" style={{ background: 'var(--bg-base)' }}>
+      <CommandPalette />
+      <div className="flex min-h-0 flex-1">
+        <aside className="flex w-[240px] shrink-0 flex-col border-r" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+          <div className="border-b px-4 py-5" style={{ borderColor: 'var(--border)' }}>
+            <Link href="/overview" className="flex items-start gap-3" style={{ textDecoration: 'none' }}>
+              <div className="rounded-lg border p-2" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
+                {(() => { const ShieldIcon = Shield as React.ElementType; return <ShieldIcon className="h-4 w-4" style={{ color: 'var(--primary-text)' }} /> })()}
               </div>
-              <div className="text-xs mt-0.5 font-mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>
-                INTELLIGENCE PLATFORM
+              <div>
+                <div className="text-sm font-semibold tracking-[0.04em]" style={{ color: 'var(--text-primary)' }}>CONFLICT OPS</div>
+                <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Intelligence Platform</div>
               </div>
             </Link>
           </div>
 
-          {/* Nav */}
-          <nav className="flex-1 p-1 overflow-y-auto">
-            <NavSection
-              title="INTELLIGENCE"
-              items={coreItems}
-              currentPath={pathname ?? ''}
-            />
-            <NavSection
-              title="LABS"
-              items={labsItems}
-              currentPath={pathname ?? ''}
-              collapsible
-              defaultOpen={false}
-              storageKey="nav_labs_open"
-              badge="β"
-            />
-            <NavSection
-              title="ADMIN"
-              items={adminItems}
-              currentPath={pathname ?? ''}
-              collapsible
-              defaultOpen={false}
-              storageKey="nav_admin_open"
-            />
-          </nav>
+          <div className="flex-1 overflow-y-auto px-2 py-4">
+            <Section title="Intelligence" items={sections.intelligence} pathname={pathname} unreadAlerts={unreadAlerts} />
+            <Section title="Analysis" items={sections.analysis} pathname={pathname} />
+            <Section title="Workspace" items={sections.workspace} pathname={pathname} />
+            <Section title="Settings" items={sections.settings} pathname={pathname} />
+          </div>
 
-          <SidebarStatus />
+          <div className="border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}>
+            <div className="mb-3 flex items-center gap-3 rounded-lg border p-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
+              <div className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: 'var(--bg-active)', color: 'var(--primary-text)' }}>
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{user?.fullName ?? 'Operator'}</div>
+                <div className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>{user?.primaryEmailAddress?.emailAddress ?? 'Signed in'}</div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              <span>Platform status</span>
+              <span className="mono" style={{ color: liveFeeds > 0 ? 'var(--sev-low)' : 'var(--sev-medium)' }}>{liveFeeds}/5 live</span>
+            </div>
+            <div className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>Press <span className="mono">⌘K</span> or <span className="mono">Ctrl+K</span> for command palette.</div>
+          </div>
         </aside>
 
-        {/* Main */}
-        <main className="flex-1 overflow-auto flex flex-col min-w-0">
+        <div className="flex min-w-0 flex-1 flex-col">
           <FreshnessBanner />
-          <div className="flex-1">
-            {children}
-          </div>
-        </main>
+          <main className="min-h-0 flex-1 overflow-auto">{children}</main>
+        </div>
       </div>
-
       <StatusBar />
     </div>
   )
