@@ -10,7 +10,7 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 
-const UNHCR_API = 'https://data.unhcr.org/population/get/timeseries'
+const UNHCR_API = 'https://api.unhcr.org/v1/population/get/timeseries'
 
 const WATCH_COUNTRIES = [
   { code: 'UKR', name: 'Ukraine', region: 'Eastern Europe' },
@@ -39,7 +39,7 @@ export async function ingestUNHCR(): Promise<{ stored: number; skipped: number }
     try {
       // Get latest displacement figures
       const res = await fetch(
-        `${UNHCR_API}?population_group=refugees,asylum_seekers,idps&year=2024,2025&iso3=${country.code}`,
+        `${UNHCR_API}?population_group=refugees,asylum_seekers,idps&year=2023,2024,2025,2026&iso3=${country.code}`,
         {
           headers: { 'User-Agent': 'ConflictOps/1.0 (conflictradar.co)' },
           signal: AbortSignal.timeout(10000),

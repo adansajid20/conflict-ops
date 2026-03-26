@@ -1,6 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["iad1"],
+  "crons": [
+    {
+      "path": "/api/cron/ingest",
+      "schedule": "*/15 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

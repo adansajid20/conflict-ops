@@ -11,7 +11,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 
 const GDACS_RSS = 'https://www.gdacs.org/xml/rss_conflict.xml'
-const GDACS_API = 'https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS?eventtype=EQ,TC,FL,CE&alertlevel=Orange,Red&limit=50'
+const GDACS_API = 'https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS?eventtype=EQ,TC,FL,CE&limit=50'
 
 type GDACSEvent = {
   eventid: number

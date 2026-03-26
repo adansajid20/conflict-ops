@@ -1,0 +1,14 @@
+name: Ingest Cron
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger ingest
+        run: |
+          curl -s -X POST https://conflictradar.co/api/v1/admin/run-ingest \
+            -H "x-internal-secret: ${{ secrets.INTERNAL_SECRET }}" \
+            --max-time 60
