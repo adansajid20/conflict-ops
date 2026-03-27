@@ -1,50 +1,33 @@
 /**
  * ReliefWeb Ingest — UN OCHA
- * Source: reliefweb.int — FREE, public RSS feeds
+ * Source: reliefweb.int — FREE, via rss2json.com proxy (reliefweb.int blocks cloud IPs via Cloudflare)
  * Attribution: "Powered by ReliefWeb (reliefweb.int)"
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
 
+// rss2json proxies reliefweb RSS to bypass Cloudflare bot protection on cloud IPs
+const RSS2JSON_BASE = 'https://api.rss2json.com/v1/api.json?rss_url='
 const REPORTS_RSS = 'https://reliefweb.int/updates/rss.xml'
 const DISASTERS_RSS = 'https://reliefweb.int/disasters/rss.xml'
 
-function decodeHtml(input: string): string {
+function stripTags(input: string): string {
   return input
     .replace(/<!\[CDATA\[|\]\]>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
-function stripTags(input: string): string {
-  return decodeHtml(input).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
-/** Extract text content of a tag (handles CDATA, attributes on the opening tag) */
-function extractTag(block: string, tag: string): string | null {
-  const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'))
-  return m?.[1] != null ? decodeHtml(m[1]).trim() : null
-}
-
-/** Pull all <item> blocks out of RSS XML */
-function extractItems(xml: string): string[] {
-  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((m) => m[1] ?? '')
-}
-
-function extractCountry(descriptionHtml: string): string | null {
-  // Description HTML is entity-encoded so decode first
-  const decoded = decodeHtml(descriptionHtml)
-  const m = decoded.match(/Country:\s*([^<\n]+)/i)
+function extractCountry(html: string): string | null {
+  // rss2json returns decoded HTML in description field
+  const m = html.match(/Country:\s*([^<\n]+)/i)
   return m?.[1]?.trim() ?? null
 }
 
-function extractSource(descriptionHtml: string): string | null {
-  const decoded = decodeHtml(descriptionHtml)
-  const m = decoded.match(/Source:\s*([^<\n]+)/i)
+function extractSourceName(html: string): string | null {
+  const m = html.match(/Source:\s*([^<\n]+)/i)
   return m?.[1]?.trim() ?? null
 }
 
@@ -60,7 +43,7 @@ function iso3ToIso2(iso3: string): string {
   return MAP[iso3.toUpperCase()] ?? iso3.slice(0, 2).toUpperCase()
 }
 
-function countryToCode(country: string | null): string | null {
+function countryNameToCode(country: string | null): string | null {
   if (!country) return null
   const MAP: Record<string, string> = {
     ukraine: 'UA', russia: 'RU', syria: 'SY', 'syrian arab republic': 'SY',
@@ -75,13 +58,13 @@ function countryToCode(country: string | null): string | null {
     'south africa': 'ZA', zimbabwe: 'ZW', zambia: 'ZM', angola: 'AO',
     rwanda: 'RW', burundi: 'BI', tanzania: 'TZ', uganda: 'UG',
     egypt: 'EG', tunisia: 'TN', algeria: 'DZ', morocco: 'MA',
+    indonesia: 'ID', philippines: 'PH', bangladesh: 'BD', nepal: 'NP',
   }
   return MAP[country.toLowerCase().trim()] ?? null
 }
 
-function getRegionFromCountry(countryOrIso: string | null): string {
-  if (!countryOrIso) return 'Global'
-  const value = countryOrIso.toUpperCase()
+function getRegionFromCode(iso2: string | null): string {
+  if (!iso2) return 'Global'
   const REGIONS: Record<string, string> = {
     UA: 'Eastern Europe', RU: 'Eastern Europe',
     SY: 'Middle East', IQ: 'Middle East', IR: 'Middle East', YE: 'Middle East',
@@ -89,20 +72,39 @@ function getRegionFromCountry(countryOrIso: string | null): string {
     SD: 'East Africa', SS: 'East Africa', ET: 'East Africa', SO: 'East Africa',
     KE: 'East Africa', RW: 'East Africa', BI: 'East Africa', TZ: 'East Africa', UG: 'East Africa',
     CD: 'Central Africa', CF: 'Central Africa', TD: 'Central Africa',
-    ML: 'West Africa', NE: 'West Africa', NG: 'West Africa', BF: 'West Africa',
+    ML: 'West Africa', NE: 'West Africa', NG: 'West Africa', BF: 'West Africa', CM: 'West Africa',
     LY: 'North Africa', EG: 'North Africa', TN: 'North Africa', DZ: 'North Africa', MA: 'North Africa',
-    AF: 'South Asia', PK: 'South Asia', MM: 'Southeast Asia', KP: 'East Asia', TW: 'East Asia',
+    AF: 'South Asia', PK: 'South Asia', BD: 'South Asia', NP: 'South Asia',
+    MM: 'Southeast Asia', ID: 'Southeast Asia', PH: 'Southeast Asia',
+    KP: 'East Asia', TW: 'East Asia', CN: 'East Asia',
     MX: 'North America', CO: 'South America', VE: 'South America', HT: 'Caribbean',
     AO: 'Southern Africa', ZW: 'Southern Africa', ZM: 'Southern Africa', MZ: 'Southern Africa',
   }
-  return REGIONS[value] ?? 'Global'
+  return REGIONS[iso2] ?? 'Global'
 }
 
 function severityFromText(text: string): number {
-  const value = text.toLowerCase()
-  if (/war|armed conflict|airstrike|offensive|mass casualty|siege|famine/.test(value)) return 4
-  if (/conflict|violence|displacement|refugee|flood|earthquake|cyclone|outbreak|humanitarian/.test(value)) return 3
+  const v = text.toLowerCase()
+  if (/war|armed conflict|airstrike|offensive|mass casualty|siege|famine/.test(v)) return 4
+  if (/conflict|violence|displacement|refugee|flood|earthquake|cyclone|outbreak|humanitarian/.test(v)) return 3
   return 2
+}
+
+type Rss2JsonItem = {
+  title: string
+  pubDate: string
+  link: string
+  guid: string
+  author: string
+  description: string
+  content: string
+  categories: string[]
+}
+
+type Rss2JsonResponse = {
+  status: string
+  items?: Rss2JsonItem[]
+  message?: string
 }
 
 export async function ingestReliefWeb(): Promise<{ stored: number; skipped: number; error?: string }> {
@@ -116,60 +118,60 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
   ]
 
   for (const [feedUrl, kind] of feeds) {
-    let xml: string
+    const proxyUrl = `${RSS2JSON_BASE}${encodeURIComponent(feedUrl)}`
+
+    let items: Rss2JsonItem[] = []
     try {
-      const res = await fetch(feedUrl, {
-        headers: {
-          'User-Agent': 'ConflictOps/1.0 (conflictradar.co)',
-          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-        },
+      const res = await fetch(proxyUrl, {
+        headers: { 'Accept': 'application/json' },
         cache: 'no-store',
         signal: AbortSignal.timeout(20000),
       })
       if (!res.ok) {
-        const msg = `HTTP ${res.status} from ${feedUrl}`
-        console.error(`[reliefweb] ${msg}`)
-        fetchErrors.push(msg)
+        fetchErrors.push(`rss2json HTTP ${res.status} for ${feedUrl}`)
         continue
       }
-      xml = await res.text()
-      // Detect Cloudflare challenge / non-RSS response
-      if (!xml.includes('<item>')) {
-        const msg = `No <item> in response from ${feedUrl} — body preview: ${xml.slice(0, 150).replace(/\s+/g, ' ')}`
-        console.error(`[reliefweb] ${msg}`)
-        fetchErrors.push(msg)
+      const json = await res.json() as Rss2JsonResponse
+      if (json.status !== 'ok') {
+        fetchErrors.push(`rss2json error: ${json.message ?? json.status} for ${feedUrl}`)
         continue
       }
+      items = json.items ?? []
     } catch (err) {
-      const msg = `${String(err)} fetching ${feedUrl}`
-      console.error(`[reliefweb] ${msg}`)
-      fetchErrors.push(msg)
+      fetchErrors.push(`${String(err)} for ${feedUrl}`)
       continue
     }
 
-    const items = extractItems(xml)
     const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000
 
     for (const item of items) {
-      const title = stripTags(extractTag(item, 'title') ?? '')
-      const link = stripTags(extractTag(item, 'link') ?? '')
-      const guid = stripTags(extractTag(item, 'guid') ?? link)
-      const descriptionHtml = extractTag(item, 'description') ?? ''
-      const description = stripTags(descriptionHtml)
-      const pubDate = stripTags(extractTag(item, 'pubDate') ?? '')
+      const title = item.title?.trim() ?? ''
+      const link = item.link?.trim() ?? ''
+      const guid = item.guid?.trim() || link
 
-      const occurredAt = pubDate ? new Date(pubDate).toISOString() : new Date().toISOString()
+      // pubDate from rss2json: "2026-03-27 19:33:31" (UTC, space separator)
+      let occurredAt = new Date().toISOString()
+      if (item.pubDate) {
+        try {
+          occurredAt = new Date(item.pubDate.replace(' ', 'T') + 'Z').toISOString()
+        } catch { /* keep default */ }
+      }
       if (new Date(occurredAt).getTime() < cutoff) continue
 
-      const countryName = extractCountry(descriptionHtml)
-      const countryCode = countryToCode(countryName)
-      const sourceName = extractSource(descriptionHtml)
+      // Country: prefer first category (reliefweb puts country first), fallback to description parse
+      const categoryCountry = item.categories?.[0] ?? null
+      const descCountry = extractCountry(item.description ?? '')
+      const countryName = categoryCountry ?? descCountry
+      const countryCode = countryNameToCode(countryName)
+
+      const description = stripTags(item.description ?? '').slice(0, 1000) || title
+      const sourceName = item.author || extractSourceName(item.description ?? '') || null
       const text = `${title} ${description} ${countryName ?? ''}`
 
       const { error } = await supabase.from('events').upsert(
         {
           source: 'reliefweb',
-          source_id: `rw-${kind}-${guid || link || title}`,
+          source_id: `rw-${kind}-${guid}`,
           event_type:
             kind === 'disaster'
               ? 'natural_disaster'
@@ -177,8 +179,8 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
               ? 'humanitarian'
               : 'report',
           title,
-          description: description.slice(0, 1000) || title,
-          region: getRegionFromCountry(countryCode),
+          description,
+          region: getRegionFromCode(countryCode),
           country_code: countryCode,
           severity: severityFromText(text),
           status: 'pending',
@@ -188,11 +190,10 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
             source: 'ReliefWeb',
             attribution: 'Powered by ReliefWeb (reliefweb.int)',
             url: link,
-            feed: feedUrl,
             publisher: sourceName,
             country: countryName,
           },
-          raw: { title, link, guid, description_snippet: description.slice(0, 200) } as Record<string, unknown>,
+          raw: { title, link, guid, categories: item.categories } as Record<string, unknown>,
         },
         { onConflict: 'source,source_id', ignoreDuplicates: true }
       )
