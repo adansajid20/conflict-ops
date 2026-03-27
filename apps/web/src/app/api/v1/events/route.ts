@@ -13,14 +13,23 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
 
   const url = new URL(req.url)
   const countryCode = url.searchParams.get('country')
+  const source = url.searchParams.get('source')
   const severity = url.searchParams.get('severity')
+  const search = url.searchParams.get('search')
+  const window = url.searchParams.get('window')
   const since = url.searchParams.get('since')
   const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '50'), 200)
   const offset = parseInt(url.searchParams.get('offset') ?? '0')
 
-  const cacheKey = `events:${countryCode ?? 'all'}:${severity ?? 'all'}:${limit}:${offset}`
+  let sinceParam = since
+  if (!sinceParam && window) {
+    const msMap: Record<string, number> = { '1h': 3600000, '6h': 21600000, '24h': 86400000, '7d': 604800000, '30d': 2592000000 }
+    const ms = msMap[window] ?? 86400000
+    sinceParam = new Date(Date.now() - ms).toISOString()
+  }
 
-  // Safe mode: serve cached snapshot
+  const cacheKey = `events:${countryCode ?? 'all'}:${source ?? 'all'}:${severity ?? 'all'}:${search ?? ''}:${limit}:${offset}`
+
   const safe = await isSafeMode()
   if (safe) {
     const cached = await getCachedSnapshot<ConflictEvent[]>(cacheKey)
@@ -35,7 +44,6 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
 
   const supabase = createServiceClient()
 
-  // Get org for plan check
   const { data: user } = await supabase
     .from('users')
     .select('org_id')
@@ -49,7 +57,6 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     .order('occurred_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
-  // Apply history limit based on plan (no org = 30d default)
   const historyDays = user?.org_id
     ? (await getOrgPlanLimits(user.org_id)).historyDays
     : 30
@@ -60,7 +67,9 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
 
   if (countryCode) query = query.eq('country_code', countryCode)
   if (severity) query = query.eq('severity', parseInt(severity))
-  if (since) query = query.gte('occurred_at', since)
+  if (source) query = query.eq('source', source)
+  if (search) query = query.ilike('title', `%${search}%`)
+  if (sinceParam) query = query.gte('occurred_at', sinceParam)
 
   const { data, error } = await query
 
@@ -70,7 +79,6 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
 
   const events = (data ?? []) as unknown as ConflictEvent[]
 
-  // Cache result
   await setCachedSnapshot(cacheKey, events, TTL.FEED)
 
   return NextResponse.json({ success: true, data: events })

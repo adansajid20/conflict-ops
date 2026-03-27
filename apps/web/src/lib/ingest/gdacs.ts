@@ -1,56 +1,66 @@
 /**
  * GDACS Ingest — Global Disaster Alert and Coordination System
- * Source: gdacs.org — FREE, no key required, UN-backed
+ * Source: gdacs.org — FREE, RSS fallback used because JSON endpoint is returning 404
  * Attribution: "Alert data from GDACS (gdacs.org)"
- *
- * Covers: conflicts, complex emergencies, floods, earthquakes
- * that have humanitarian impact — global coverage
- * Updated: every 15 minutes
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
 
-const GDACS_RSS = 'https://www.gdacs.org/xml/rss_conflict.xml'
-const GDACS_API = 'https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS?eventtype=EQ,TC,FL,CE&limit=50'
+const GDACS_RSS = 'https://www.gdacs.org/xml/rss.xml'
 
-type GDACSEvent = {
-  eventid: number
-  eventtype: string
-  eventname: string
-  alertlevel: 'Green' | 'Orange' | 'Red'
-  alertscore: number
-  country: string
-  countrycode: string
-  fromdate: string
-  todate: string
-  description: string
-  url: { report: string }
-  bbox: number[]
-  lat: number
-  lon: number
+function decodeHtml(input: string): string {
+  return input
+    .replace(/<!\[CDATA\[|\]\]>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
 }
 
-function alertLevelToSeverity(level: string, score: number): number {
-  if (level === 'Red' || score >= 1.5) return 5
-  if (level === 'Orange' || score >= 1.0) return 4
-  if (score >= 0.5) return 3
-  return 2
+function stripTags(input: string): string {
+  return decodeHtml(input).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function extractTag(block: string, tag: string): string | null {
+  const match = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'))
+  return match?.[1] ? decodeHtml(match[1]).trim() : null
+}
+
+function alertLevelToSeverity(level: string): number {
+  const value = level.toLowerCase()
+  if (value === 'red') return 5
+  if (value === 'orange') return 4
+  if (value === 'green') return 2
+  return 3
+}
+
+function eventTypeFromTitle(title: string): string {
+  const value = title.toLowerCase()
+  if (value.includes('earthquake') || value.includes('flood') || value.includes('cyclone') || value.includes('storm')) return 'natural_disaster'
+  if (value.includes('drought') || value.includes('epidemic')) return 'humanitarian'
+  return 'natural_disaster'
 }
 
 function countryToRegion(country: string): string {
   const MAPPING: Record<string, string> = {
-    Ukraine: 'Eastern Europe', Russia: 'Eastern Europe',
-    Syria: 'Middle East', Iraq: 'Middle East', Yemen: 'Middle East',
-    Sudan: 'East Africa', Ethiopia: 'East Africa', Somalia: 'East Africa',
-    'South Sudan': 'East Africa', 'DR Congo': 'Central Africa',
-    Mali: 'West Africa', Niger: 'West Africa', Nigeria: 'West Africa',
-    Libya: 'North Africa', Afghanistan: 'South Asia', Myanmar: 'Southeast Asia',
-    Palestine: 'Middle East', Israel: 'Middle East', Lebanon: 'Middle East',
+    indonesia: 'Southeast Asia', ukraine: 'Eastern Europe', russia: 'Eastern Europe',
+    syria: 'Middle East', iraq: 'Middle East', yemen: 'Middle East', sudan: 'East Africa',
+    ethiopia: 'East Africa', somalia: 'East Africa', 'south sudan': 'East Africa',
+    'dr congo': 'Central Africa', mali: 'West Africa', niger: 'West Africa', nigeria: 'West Africa',
+    libya: 'North Africa', afghanistan: 'South Asia', myanmar: 'Southeast Asia', palestine: 'Middle East',
+    israel: 'Middle East', lebanon: 'Middle East', pakistan: 'South Asia', taiwan: 'East Asia',
   }
-  for (const [key, region] of Object.entries(MAPPING)) {
-    if (country.includes(key)) return region
+  const key = country.toLowerCase()
+  for (const [name, region] of Object.entries(MAPPING)) {
+    if (key.includes(name)) return region
   }
   return 'Global'
+}
+
+function extractItems(xml: string): string[] {
+  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((match) => match[1] ?? '')
 }
 
 export async function ingestGDACS(): Promise<{ stored: number; skipped: number }> {
@@ -58,40 +68,49 @@ export async function ingestGDACS(): Promise<{ stored: number; skipped: number }
   let stored = 0, skipped = 0
 
   try {
-    const res = await fetch(GDACS_API, {
-      headers: { 'User-Agent': 'ConflictOps/1.0 (conflictradar.co)', 'Accept': 'application/json' },
+    const res = await fetch(GDACS_RSS, {
+      headers: { 'User-Agent': 'ConflictOps/1.0 (conflictradar.co)', Accept: 'application/rss+xml, application/xml;q=0.9, */*;q=0.8' },
       signal: AbortSignal.timeout(15000),
     })
 
     if (!res.ok) return { stored, skipped }
+    const xml = await res.text()
 
-    const data = await res.json() as { features?: Array<{ properties: GDACSEvent }> }
-
-    for (const feature of (data.features ?? [])) {
-      const e = feature.properties
-      // Accept all event types — EQ, TC, FL, CE
+    for (const item of extractItems(xml)) {
+      const title = stripTags(extractTag(item, 'title') ?? '')
+      const description = stripTags(extractTag(item, 'description') ?? '')
+      const link = stripTags(extractTag(item, 'link') ?? '')
+      const guid = stripTags(extractTag(item, 'guid') ?? link)
+      const pubDate = stripTags(extractTag(item, 'pubDate') ?? '')
+      const alertLevel = stripTags(extractTag(item, 'gdacs:alertlevel') ?? '')
+      const country = stripTags(extractTag(item, 'gdacs:country') ?? '')
+      const point = stripTags(extractTag(item, 'georss:point') ?? '')
+      const [latRaw, lonRaw] = point.split(/\s+/)
+      const lat = Number(latRaw)
+      const lon = Number(lonRaw)
 
       const { error } = await supabase.from('events').upsert({
         source: 'gdacs',
-        source_id: `gdacs-${e.eventid}`,
-        event_type: 'conflict',
-        title: e.eventname || `${e.alertlevel} Complex Emergency — ${e.country}`,
-        description: e.description?.slice(0, 1000) ?? '',
-        region: countryToRegion(e.country),
-        country_code: e.countrycode?.slice(0, 2).toUpperCase() ?? null,
-        severity: alertLevelToSeverity(e.alertlevel, e.alertscore),
+        source_id: `gdacs-${guid || title}`,
+        event_type: eventTypeFromTitle(title),
+        title,
+        description: description.slice(0, 1000) || title,
+        region: countryToRegion(country),
+        country_code: null,
+        severity: alertLevelToSeverity(alertLevel),
         status: 'pending',
-        occurred_at: e.fromdate,
-        location: e.lat && e.lon ? `POINT(${e.lon} ${e.lat})` : null,
+        occurred_at: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+        location: Number.isFinite(lat) && Number.isFinite(lon) ? `POINT(${lon} ${lat})` : null,
         heavy_lane_processed: false,
         provenance_raw: {
           source: 'GDACS',
           attribution: 'Alert data from GDACS (gdacs.org)',
-          alert_level: e.alertlevel,
-          alert_score: e.alertscore,
-          url: e.url?.report,
+          alert_level: alertLevel,
+          url: link,
+          country,
+          feed: GDACS_RSS,
         },
-        raw: e as unknown as Record<string, unknown>,
+        raw: { title, description, link, guid, point } as Record<string, unknown>,
       }, { onConflict: 'source,source_id', ignoreDuplicates: true })
 
       if (!error) stored++; else skipped++

@@ -108,7 +108,12 @@ async function getOverviewData() {
     supabase.from('events').select('id,title,severity,occurred_at,region,country_code,source_country').gte('occurred_at', d7).limit(250),
   ])
 
-  const alertsList = await supabase.from('alerts').select('id,title,severity,created_at,read').eq('read', false).order('created_at', { ascending: false }).limit(5)
+  let alertsList: { data: AlertRow[] | null; error: null } | { data: AlertRow[] | null; error: unknown }
+  try {
+    alertsList = await supabase.from('alerts').select('id,title,severity,created_at,read').eq('read', false).order('created_at', { ascending: false }).limit(5)
+  } catch {
+    alertsList = { data: null, error: null }
+  }
   const healthUrl = `${process.env['NEXT_PUBLIC_APP_URL'] || 'https://conflictradar.co'}/api/health`
   const health = await fetch(healthUrl, { cache: 'no-store' }).then(async (res) => (res.ok ? (await res.json() as HealthResponse) : null)).catch(() => null)
 

@@ -1,49 +1,43 @@
 /**
  * ReliefWeb Ingest — UN OCHA
- * Source: reliefweb.int/api — FREE, no key required
+ * Source: reliefweb.int — FREE, public RSS fallback used because API appname approval is enforced
  * Attribution: "Powered by ReliefWeb (reliefweb.int)"
- *
- * Covers: armed conflicts, humanitarian crises, displacement,
- * natural disasters, political instability — global coverage
- * Updated: near real-time (multiple times daily)
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
 
-const RELIEFWEB_API = 'https://api.reliefweb.int/v1'
-const APP_NAME = 'conflictradar.co'
+const REPORTS_RSS = 'https://reliefweb.int/updates/rss.xml'
+const DISASTERS_RSS = 'https://reliefweb.int/disasters/rss.xml'
 
-type RWReport = {
-  id: number
-  fields: {
-    title: string
-    body?: string
-    date: { created: string }
-    country?: Array<{ name: string; iso3: string }>
-    disaster_type?: Array<{ name: string }>
-    theme?: Array<{ name: string }>
-    source?: Array<{ name: string }>
-    url: string
-    status: string
-  }
+function decodeHtml(input: string): string {
+  return input
+    .replace(/<!\[CDATA\[|\]\]>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
 }
 
-type RWDisaster = {
-  id: number
-  fields: {
-    name: string
-    description?: string
-    date: { created: string }
-    country?: Array<{ name: string; iso3: string }>
-    type?: Array<{ name: string }>
-    status: string
-    url: string
-    glide?: string
-  }
+function stripTags(input: string): string {
+  return decodeHtml(input).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-const CONFLICT_THEMES = ['Conflict and Violence', 'Security', 'Peacekeeping and Peacebuilding', 'Mine Action']
-const CONFLICT_DISASTER_TYPES = ['Complex Emergency', 'Civil Unrest', 'Insecurity', 'Armed Conflict']
+function extractTag(block: string, tag: string): string | null {
+  const match = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'))
+  return match?.[1] ? decodeHtml(match[1]).trim() : null
+}
+
+function extractCountry(description: string): string | null {
+  const match = description.match(/Country:\s*([^<]+)/i)
+  return match?.[1]?.trim() ?? null
+}
+
+function extractSource(description: string): string | null {
+  const match = description.match(/Source:\s*([^<]+)/i)
+  return match?.[1]?.trim() ?? null
+}
 
 function iso3ToIso2(iso3: string): string {
   const MAP: Record<string, string> = {
@@ -51,116 +45,108 @@ function iso3ToIso2(iso3: string): string {
     ETH: 'ET', LBY: 'LY', IRQ: 'IQ', AFG: 'AF', MMR: 'MM', COD: 'CD',
     SOM: 'SO', MLI: 'ML', BFA: 'BF', NER: 'NE', CAF: 'CF', MOZ: 'MZ',
     NGA: 'NG', CMR: 'CM', PSE: 'PS', ISR: 'IL', LBN: 'LB', IRN: 'IR',
-    PAK: 'PK', IND: 'IN', CHN: 'CN', TWN: 'TW', PRK: 'KP',
+    PAK: 'PK', IND: 'IN', CHN: 'CN', TWN: 'TW', PRK: 'KP', COL: 'CO',
+    VEN: 'VE', HTI: 'HT', MEX: 'MX', BRA: 'BR', GRC: 'GR', LKA: 'LK',
   }
   return MAP[iso3.toUpperCase()] ?? iso3.slice(0, 2).toUpperCase()
 }
 
-function getRegionFromCountry(iso3: string): string {
-  const REGIONS: Record<string, string> = {
-    UKR: 'Eastern Europe', RUS: 'Eastern Europe', BLR: 'Eastern Europe',
-    SYR: 'Middle East', IRQ: 'Middle East', IRN: 'Middle East', YEM: 'Middle East',
-    LBN: 'Middle East', ISR: 'Middle East', PSE: 'Middle East', JOR: 'Middle East',
-    SDN: 'East Africa', SSD: 'East Africa', ETH: 'East Africa', SOM: 'East Africa',
-    COD: 'Central Africa', CAF: 'Central Africa', CMR: 'Central Africa',
-    MLI: 'West Africa', NER: 'West Africa', NGA: 'West Africa', BFA: 'West Africa',
-    LBY: 'North Africa', EGY: 'North Africa', TUN: 'North Africa',
-    AFG: 'South Asia', PAK: 'South Asia', IND: 'South Asia',
-    MMR: 'Southeast Asia', PHL: 'Southeast Asia', THA: 'Southeast Asia',
-    CHN: 'East Asia', PRK: 'East Asia', TWN: 'East Asia',
+function countryToCode(country: string | null): string | null {
+  if (!country) return null
+  const MAP: Record<string, string> = {
+    ukraine: 'UA', russia: 'RU', syria: 'SY', yemen: 'YE', sudan: 'SD', 'south sudan': 'SS',
+    ethiopia: 'ET', libya: 'LY', iraq: 'IQ', afghanistan: 'AF', myanmar: 'MM', 'dr congo': 'CD',
+    'democratic republic of the congo': 'CD', somalia: 'SO', mali: 'ML', 'burkina faso': 'BF',
+    niger: 'NE', nigeria: 'NG', 'central african republic': 'CF', mozambique: 'MZ',
+    palestine: 'PS', israel: 'IL', lebanon: 'LB', iran: 'IR', pakistan: 'PK', taiwan: 'TW',
+    mexico: 'MX', colombia: 'CO', venezuela: 'VE', haiti: 'HT', greece: 'GR', brazil: 'BR',
   }
-  return REGIONS[iso3.toUpperCase()] ?? 'Global'
+  const key = country.toLowerCase().trim()
+  return MAP[key] ?? null
 }
 
-function severityFromThemes(themes: string[], disasterTypes: string[]): number {
-  const all = [...themes, ...disasterTypes].map(t => t.toLowerCase())
-  if (all.some(t => t.includes('armed conflict') || t.includes('complex emergency'))) return 4
-  if (all.some(t => t.includes('conflict') || t.includes('insecurity') || t.includes('civil unrest'))) return 3
-  if (all.some(t => t.includes('security') || t.includes('violence'))) return 2
+function getRegionFromCountry(countryOrIso: string | null): string {
+  if (!countryOrIso) return 'Global'
+  const value = countryOrIso.toUpperCase()
+  const REGIONS: Record<string, string> = {
+    UA: 'Eastern Europe', RU: 'Eastern Europe', SY: 'Middle East', IQ: 'Middle East', IR: 'Middle East', YE: 'Middle East',
+    LB: 'Middle East', IL: 'Middle East', PS: 'Middle East', SD: 'East Africa', SS: 'East Africa', ET: 'East Africa', SO: 'East Africa',
+    CD: 'Central Africa', CF: 'Central Africa', ML: 'West Africa', NE: 'West Africa', NG: 'West Africa', BF: 'West Africa',
+    LY: 'North Africa', AF: 'South Asia', PK: 'South Asia', MM: 'Southeast Asia', KP: 'East Asia', TW: 'East Asia',
+    MX: 'North America', CO: 'South America', VE: 'South America', HT: 'Caribbean',
+  }
+  return REGIONS[value] ?? REGIONS[iso3ToIso2(value)] ?? 'Global'
+}
+
+function severityFromText(text: string): number {
+  const value = text.toLowerCase()
+  if (/war|armed conflict|airstrike|offensive|mass casualty|siege|famine/.test(value)) return 4
+  if (/conflict|violence|displacement|refugee|flood|earthquake|cyclone|outbreak|humanitarian/.test(value)) return 3
   return 2
+}
+
+function extractItems(xml: string): string[] {
+  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((match) => match[1] ?? '')
 }
 
 export async function ingestReliefWeb(): Promise<{ stored: number; skipped: number }> {
   const supabase = createServiceClient()
   let stored = 0, skipped = 0
 
-  // Fetch recent reports tagged with conflict/security themes
-  const reportsRes = await fetch(`${RELIEFWEB_API}/reports?appname=${APP_NAME}&filter[operator]=AND&filter[conditions][0][field]=theme.name&filter[conditions][0][value][]=Conflict+and+Violence&filter[conditions][0][value][]=Security&filter[conditions][0][value][]=Mine+Action&filter[conditions][0][value][]=Protection+and+Human+Rights&filter[conditions][0][value][]=Displacement&filter[conditions][0][operator]=OR&filter[conditions][1][field]=date.created&filter[conditions][1][value][from]=${new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()}&fields[include][]=title&fields[include][]=body&fields[include][]=date&fields[include][]=country&fields[include][]=theme&fields[include][]=source&fields[include][]=url&sort[]=date.created:desc&limit=100`, {
-    headers: { 'User-Agent': `ConflictOps/1.0 (${APP_NAME})` },
-    signal: AbortSignal.timeout(15000),
-  }).catch(() => null)
+  for (const [feedUrl, kind] of [[REPORTS_RSS, 'report'], [DISASTERS_RSS, 'disaster']] as const) {
+    try {
+      const res = await fetch(feedUrl, {
+        headers: { 'User-Agent': 'ConflictOps/1.0 (conflictradar.co)' },
+        signal: AbortSignal.timeout(15000),
+      })
+      if (!res.ok) continue
 
-  if (reportsRes?.ok) {
-    const data = await reportsRes.json() as { data?: RWReport[] }
-    for (const item of (data.data ?? [])) {
-      const f = item.fields
-      const country = f.country?.[0]
-      const themes = f.theme?.map(t => t.name) ?? []
-      const severity = severityFromThemes(themes, [])
+      const xml = await res.text()
+      const items = extractItems(xml)
+      const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000
 
-      const { error } = await supabase.from('events').upsert({
-        source: 'reliefweb',
-        source_id: `rw-report-${item.id}`,
-        event_type: themes.some(t => t.includes('Conflict')) ? 'conflict' : 'humanitarian',
-        title: f.title,
-        description: f.body?.slice(0, 1000) ?? f.title,
-        region: country ? getRegionFromCountry(country.iso3) : 'Global',
-        country_code: country ? iso3ToIso2(country.iso3) : null,
-        severity,
-        status: 'pending',
-        occurred_at: f.date.created,
-        heavy_lane_processed: false,
-        provenance_raw: {
-          source: 'ReliefWeb',
-          attribution: 'Powered by ReliefWeb (reliefweb.int)',
-          url: f.url,
-          themes,
-        },
-        raw: item as unknown as Record<string, unknown>,
-      }, { onConflict: 'source,source_id', ignoreDuplicates: true })
+      for (const item of items) {
+        const title = stripTags(extractTag(item, 'title') ?? '')
+        const link = stripTags(extractTag(item, 'link') ?? '')
+        const guid = stripTags(extractTag(item, 'guid') ?? link)
+        const descriptionHtml = extractTag(item, 'description') ?? ''
+        const description = stripTags(descriptionHtml)
+        const pubDate = stripTags(extractTag(item, 'pubDate') ?? '')
+        const occurredAt = pubDate ? new Date(pubDate).toISOString() : new Date().toISOString()
+        if (new Date(occurredAt).getTime() < cutoff) continue
 
-      if (!error) stored++; else skipped++
-    }
-  }
+        const countryName = extractCountry(descriptionHtml)
+        const countryCode = countryToCode(countryName)
+        const sourceName = extractSource(descriptionHtml)
+        const text = `${title} ${description} ${countryName ?? ''} ${sourceName ?? ''}`
 
-  // Fetch active disasters
-  const disastersRes = await fetch(`${RELIEFWEB_API}/disasters?appname=${APP_NAME}&filter[field]=status&filter[value]=alert&fields[include][]=name&fields[include][]=description&fields[include][]=date&fields[include][]=country&fields[include][]=type&fields[include][]=url&fields[include][]=glide&sort[]=date.created:desc&limit=30`, {
-    headers: { 'User-Agent': `ConflictOps/1.0 (${APP_NAME})` },
-    signal: AbortSignal.timeout(15000),
-  }).catch(() => null)
+        const { error } = await supabase.from('events').upsert({
+          source: 'reliefweb',
+          source_id: `rw-${kind}-${guid || link || title}`,
+          event_type: kind === 'disaster' ? 'natural_disaster' : /conflict|violence|displacement|refugee|humanitarian/i.test(text) ? 'humanitarian' : 'report',
+          title,
+          description: description.slice(0, 1000) || title,
+          region: getRegionFromCountry(countryCode),
+          country_code: countryCode,
+          severity: severityFromText(text),
+          status: 'pending',
+          occurred_at: occurredAt,
+          heavy_lane_processed: false,
+          provenance_raw: {
+            source: 'ReliefWeb',
+            attribution: 'Powered by ReliefWeb (reliefweb.int)',
+            url: link,
+            feed: feedUrl,
+            publisher: sourceName,
+            country: countryName,
+          },
+          raw: { title, link, guid, description_html: descriptionHtml } as Record<string, unknown>,
+        }, { onConflict: 'source,source_id', ignoreDuplicates: true })
 
-  if (disastersRes?.ok) {
-    const data = await disastersRes.json() as { data?: RWDisaster[] }
-    for (const item of (data.data ?? [])) {
-      const f = item.fields
-      const country = f.country?.[0]
-      const types = f.type?.map(t => t.name) ?? []
-      const isConflict = types.some(t => CONFLICT_DISASTER_TYPES.some(c => t.includes(c)))
-      if (!isConflict) continue
-
-      const { error } = await supabase.from('events').upsert({
-        source: 'reliefweb',
-        source_id: `rw-disaster-${item.id}`,
-        event_type: 'conflict',
-        title: f.name,
-        description: f.description?.slice(0, 1000) ?? f.name,
-        region: country ? getRegionFromCountry(country.iso3) : 'Global',
-        country_code: country ? iso3ToIso2(country.iso3) : null,
-        severity: 4,
-        status: 'pending',
-        occurred_at: f.date.created,
-        heavy_lane_processed: false,
-        provenance_raw: {
-          source: 'ReliefWeb GLIDE',
-          attribution: 'Powered by ReliefWeb (reliefweb.int)',
-          url: f.url,
-          glide: f.glide,
-          types,
-        },
-        raw: item as unknown as Record<string, unknown>,
-      }, { onConflict: 'source,source_id', ignoreDuplicates: true })
-
-      if (!error) stored++; else skipped++
+        if (!error) stored++; else skipped++
+      }
+    } catch {
+      // best effort
     }
   }
 
