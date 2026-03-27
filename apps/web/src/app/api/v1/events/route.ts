@@ -52,7 +52,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
 
   let query = supabase
     .from('events')
-    .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,provenance_raw,provenance_inferred')
+    .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,provenance_raw,provenance_inferred,location::text')
     .not('status', 'eq', 'clustered')
     .order('occurred_at', { ascending: false })
     .range(offset, offset + limit - 1)

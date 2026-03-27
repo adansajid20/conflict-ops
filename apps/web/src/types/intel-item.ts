@@ -11,6 +11,7 @@ export type IntelItem = {
   ingested_at: string
   description: string | null
   url: string | null
+  location?: string | null
 }
 
 /** Extract source URL from provenance_raw for any source format */
@@ -66,6 +67,7 @@ export function eventToIntelItem(e: Record<string, unknown>): IntelItem {
     ingested_at: String(e.ingested_at ?? new Date().toISOString()),
     description: desc,
     url: extractUrl(raw),
+    location: (e.location as string) ?? null,
   }
 }
 
