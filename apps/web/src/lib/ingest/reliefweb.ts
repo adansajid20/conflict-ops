@@ -108,6 +108,7 @@ function severityFromText(text: string): number {
 export async function ingestReliefWeb(): Promise<{ stored: number; skipped: number; error?: string }> {
   const supabase = createServiceClient()
   let stored = 0, skipped = 0
+  const fetchErrors: string[] = []
 
   const feeds: Array<[string, 'report' | 'disaster']> = [
     [REPORTS_RSS, 'report'],
@@ -122,15 +123,20 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
           'User-Agent': 'ConflictOps/1.0 (conflictradar.co)',
           'Accept': 'application/rss+xml, application/xml, text/xml, */*',
         },
+        cache: 'no-store',
         signal: AbortSignal.timeout(20000),
       })
       if (!res.ok) {
-        console.error(`[reliefweb] feed ${feedUrl} HTTP ${res.status}`)
+        const msg = `HTTP ${res.status} from ${feedUrl}`
+        console.error(`[reliefweb] ${msg}`)
+        fetchErrors.push(msg)
         continue
       }
       xml = await res.text()
     } catch (err) {
-      console.error(`[reliefweb] fetch error for ${feedUrl}:`, err)
+      const msg = `${String(err)} fetching ${feedUrl}`
+      console.error(`[reliefweb] ${msg}`)
+      fetchErrors.push(msg)
       continue
     }
 
@@ -189,5 +195,5 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
     }
   }
 
-  return { stored, skipped }
+  return { stored, skipped, error: fetchErrors.length > 0 ? fetchErrors.join(' | ') : undefined }
 }
