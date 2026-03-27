@@ -96,7 +96,73 @@ export async function ingestGDELT(): Promise<IngestResult> {
   } catch (err) {
     console.error('[gdelt-ingest] fetch error:', err)
     result.errors++
-    return result
+    // Don't return — fall through to Google News RSS fallback
+  }
+
+  // Fallback: if GDELT returned nothing, pull from Google News RSS
+  if (articles.length === 0) {
+    const GNEWS_URLS = [
+      'https://news.google.com/rss/search?q=war+conflict+military+attack+when:1d&hl=en-US&gl=US&ceid=US:en',
+      'https://news.google.com/rss/search?q=humanitarian+crisis+refugee+displacement+when:1d&hl=en-US&gl=US&ceid=US:en',
+    ]
+
+    for (const rssUrl of GNEWS_URLS) {
+      try {
+        const res = await fetch(rssUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ConflictOps/1.0)' },
+          signal: AbortSignal.timeout(15000),
+        })
+        if (!res.ok) continue
+
+        const xml = await res.text()
+        const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((m) => m[1] ?? '')
+
+        for (const item of items) {
+          // title may be CDATA-wrapped
+          const titleRaw = item.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/)?.[1]?.trim() ?? ''
+          const title = titleRaw.replace(/<!\[CDATA\[|\]\]>/g, '').trim()
+          const link = item.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim() ?? ''
+          const pubDate = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1]?.trim() ?? ''
+          const sourceEl = item.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1]?.trim() ?? ''
+
+          // Convert pubDate to GDELT seendate format: 20240322T120000Z
+          let seendate = ''
+          try {
+            const dt = new Date(pubDate || Date.now())
+            const iso = dt.toISOString()
+            seendate = iso.slice(0, 4) + iso.slice(5, 7) + iso.slice(8, 10) + 'T' +
+              iso.slice(11, 13) + iso.slice(14, 16) + '00Z'
+          } catch {
+            const iso = new Date().toISOString()
+            seendate = iso.slice(0, 4) + iso.slice(5, 7) + iso.slice(8, 10) + 'T' +
+              iso.slice(11, 13) + iso.slice(14, 16) + '00Z'
+          }
+
+          let domain = 'news.google.com'
+          try { domain = new URL(link).hostname } catch { /* keep default */ }
+
+          if (title) {
+            articles.push({
+              url: link,
+              url_mobile: link,
+              title,
+              seendate,
+              socialimage: '',
+              domain,
+              language: 'English',
+              sourcecountry: sourceEl,
+            })
+          }
+        }
+      } catch (err) {
+        console.error('[gdelt-ingest] gnews fallback error:', err)
+      }
+    }
+
+    result.fetched = articles.length
+    if (articles.length > 0) {
+      console.log(`[gdelt-ingest] Google News fallback: ${articles.length} articles`)
+    }
   }
 
   // Log raw ingest
