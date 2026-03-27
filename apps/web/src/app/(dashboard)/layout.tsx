@@ -77,7 +77,7 @@ function NavLink({ item, pathname, unreadAlerts = 0 }: { item: NavItem; pathname
         className="nav-item"
         style={{ opacity: 0.4, cursor: 'not-allowed', position: 'relative' }}
         title={`${item.label} — coming soon`}
-        onClick={e => e.preventDefault()}
+        onClick={(e: React.MouseEvent) => e.preventDefault()}
       >
         <Icon className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
         <span>{item.label}</span>
