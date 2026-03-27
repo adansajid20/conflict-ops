@@ -2,6 +2,7 @@
 
 import type React from 'react'
 import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
@@ -66,7 +67,8 @@ function Section({ title, items, pathname, unreadAlerts = 0 }: { title: string; 
           const Icon = item.icon as React.ElementType
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
           return (
-            <Link key={item.href} href={item.href} className={`nav-item ${active ? 'active' : ''}`}>
+            <Link key={item.href} href={item.href} className={`nav-item transition-colors duration-150 ${active ? 'active' : ''}`} style={{ position: 'relative' }}>
+              {active ? <motion.span layoutId="nav-active" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, background: 'var(--primary)', borderRadius: '0 2px 2px 0' }} transition={{ type: 'spring', stiffness: 400, damping: 35 }} /> : null}
               <Icon className="h-4 w-4" style={{ color: active ? 'var(--primary-text)' : 'var(--text-muted)' }} />
               <span>{item.label}</span>
               {item.href === '/alerts' && unreadAlerts > 0 ? (
@@ -102,7 +104,7 @@ function StatusBar() {
     <div className="flex h-7 items-center gap-6 border-t px-4 text-[11px]" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
       <div>UTC <span className="mono" style={{ color: 'var(--text-primary)' }}>{utcTime}</span></div>
       <div>FEEDS <span className="mono" style={{ color: liveFeeds > 0 ? 'var(--sev-low)' : 'var(--sev-medium)' }}>{liveFeeds}/{totalFeeds}</span></div>
-      <div>EVENTS <span className="mono" style={{ color: 'var(--text-primary)' }}>{totalEvents}</span></div>
+      <div>EVENTS <motion.span key={health?.eventCount ?? totalEvents} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="mono" style={{ color: 'var(--text-primary)' }}>{totalEvents}</motion.span></div>
       <div>INGEST <span className="mono" style={{ color: 'var(--text-primary)' }}>{safeTimeAgo(lastIngestAt)}</span></div>
     </div>
   )
@@ -174,7 +176,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <div className="flex items-center justify-between text-[11px]" style={{ color: 'var(--text-muted)' }}>
               <span>Platform status</span>
-              <span className="mono" style={{ color: liveFeeds > 0 ? 'var(--sev-low)' : 'var(--sev-medium)' }}>{liveFeeds}/5 live</span>
+              <span className="mono" style={{ color: liveFeeds > 0 ? 'var(--sev-low)' : 'var(--sev-medium)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>{liveFeeds > 0 ? <span className="live-dot" /> : <span className="h-2 w-2 rounded-full" style={{ background: 'var(--sev-medium)' }} />} {liveFeeds}/5 live</span>
             </div>
             <div className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>Press <span className="mono">⌘K</span> or <span className="mono">Ctrl+K</span> for command palette.</div>
           </div>

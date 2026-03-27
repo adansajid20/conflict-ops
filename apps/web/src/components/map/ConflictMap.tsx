@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import { eventToIntelItem, safeTimeAgo, severityColor, type IntelItem } from '@/types/intel-item'
 import { IntelDrawer } from '@/components/intel/IntelDrawer'
 
@@ -103,6 +104,7 @@ export function ConflictMap({ className = '' }: { className?: string }) {
 
   const [allEvents, setAllEvents] = useState<RawEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [mapLoaded, setMapLoaded] = useState(false)
   const [selectedItem, setSelectedItem] = useState<IntelItem | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showList, setShowList] = useState(false)
@@ -151,6 +153,7 @@ export function ConflictMap({ className = '' }: { className?: string }) {
       mapRef.current = map
 
       map.on('load', () => {
+        setMapLoaded(true)
         map.addSource('events', { type: 'geojson', data: buildGeoJSON([]), cluster: true, clusterMaxZoom: 8, clusterRadius: 50 })
 
         map.addLayer({ id: 'clusters', type: 'circle', source: 'events', filter: ['has', 'point_count'],
@@ -288,6 +291,7 @@ export function ConflictMap({ className = '' }: { className?: string }) {
       {/* Map area */}
       <div className="relative flex-1 min-w-0">
         <div ref={mapContainer} className={`w-full h-full ${className}`} />
+        {!mapLoaded && <motion.div initial={{ opacity: 1 }} animate={{ opacity: mapLoaded ? 0 : 1 }} exit={{ opacity: 0 }} style={{ position:'absolute', inset:0, background:'var(--bg-base)', zIndex:10, display:'flex', alignItems:'center', justifyContent:'center' }}><div style={{ color:'var(--text-muted)', fontSize:14 }}>Loading map...</div></motion.div>}
 
         {/* Top bar */}
         <div className="absolute top-3 left-3 right-3 flex items-center gap-2 pointer-events-none">

@@ -2,9 +2,9 @@ export const dynamic = 'force-dynamic'
 
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { Activity, AlertTriangle, Globe2, ShieldAlert, TrendingUp, Triangle } from 'lucide-react'
+import { TrendingUp, Triangle } from 'lucide-react'
 import { createServiceClient } from '@/lib/supabase/server'
-import { DashboardStatCard } from '@/components/dashboard/StatCard'
+import { OverviewStatCards } from '@/components/dashboard/OverviewStatCards'
 
 type HealthResponse = {
   enabledSources?: Array<{ name: string; ok: boolean; last_seen_at: string | null; events_24h?: number }>
@@ -149,17 +149,12 @@ export default async function OverviewPage() {
   const { stats, matrix, sources, recentEvents, alerts } = await getOverviewData()
   const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC'
 
-  const ActivityIcon = Activity as any
-  const Globe2Icon = Globe2 as any
-  const AlertTriangleIcon = AlertTriangle as any
-  const ShieldAlertIcon = ShieldAlert as any
-
   const statCards = [
-    { label: 'Events 24h', value: stats.events24h, icon: ActivityIcon, color: 'var(--primary)', sparkData: [12, 15, 13, 16, 20, 18, stats.events24h] },
-    { label: 'Events 7d', value: stats.events7d, icon: Globe2Icon, color: '#38BDF8', sparkData: [48, 52, 61, 58, 66, 70, stats.events7d] },
-    { label: 'Active Alerts', value: stats.activeAlerts, icon: AlertTriangleIcon, color: 'var(--sev-high)', sparkData: [2, 3, 4, 2, 5, 4, stats.activeAlerts] },
-    { label: 'Hot Regions', value: stats.activeRegions, icon: ShieldAlertIcon, color: 'var(--sev-critical)', sparkData: [1, 2, 3, 3, 4, 5, stats.activeRegions] },
-  ]
+    { label: 'Events 24h', value: stats.events24h, icon: 'activity', color: 'var(--primary)', sparkData: [12, 15, 13, 16, 20, 18, stats.events24h] },
+    { label: 'Events 7d', value: stats.events7d, icon: 'globe2', color: '#38BDF8', sparkData: [48, 52, 61, 58, 66, 70, stats.events7d] },
+    { label: 'Active Alerts', value: stats.activeAlerts, icon: 'alert-triangle', color: 'var(--sev-high)', sparkData: [2, 3, 4, 2, 5, 4, stats.activeAlerts] },
+    { label: 'Hot Regions', value: stats.activeRegions, icon: 'shield-alert', color: 'var(--sev-critical)', sparkData: [1, 2, 3, 3, 4, 5, stats.activeRegions] },
+  ] as const
 
   return (
     <div className="mx-auto max-w-[1400px] p-6">
@@ -171,16 +166,14 @@ export default async function OverviewPage() {
         <div className="flex flex-wrap items-center gap-3">
           {sources.slice(0, 5).map((source) => (
             <div key={source.name} className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12px]" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: source.ok ? 'var(--sev-low)' : 'var(--sev-critical)' }} />
+              {source.ok ? <span className="live-dot" /> : <span className="h-2.5 w-2.5 rounded-full" style={{ background: 'var(--sev-critical)' }} />}
               <span style={{ color: 'var(--text-secondary)' }}>{source.name}</span>
             </div>
           ))}
         </div>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {statCards.map((card) => <DashboardStatCard key={card.label} {...card} />)}
-      </div>
+      <OverviewStatCards cards={[...statCards]} />
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[3fr_2fr]">
         <section className="rounded-lg border" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
@@ -188,8 +181,8 @@ export default async function OverviewPage() {
             <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Regional Threat Matrix</h2>
           </div>
           <div className="p-3">
-            {matrix.map((row) => (
-              <div key={row.region} className="mb-2 grid grid-cols-[1.8fr_.8fr_.6fr_.6fr] items-center gap-3 rounded-md border-l-4 px-4 py-3" style={{ borderLeftColor: severityColor(row.maxSeverity), background: 'var(--bg-surface-2)', borderColor: 'var(--border)' }}>
+            {matrix.map((row, index) => (
+              <div key={row.region} className={`mb-2 grid grid-cols-[1.8fr_.8fr_.6fr_.6fr] items-center gap-3 rounded-md border-l-4 px-4 py-3 animate-fadeInUp stagger-${Math.min(index + 1, 6)}`} style={{ borderLeftColor: severityColor(row.maxSeverity), background: 'var(--bg-surface-2)', borderColor: 'var(--border)' }}>
                 <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{row.region}</div>
                 <div>
                   <span className="rounded-full px-2 py-1 text-[11px] font-medium" style={{ background: `${severityColor(row.maxSeverity)}22`, color: severityColor(row.maxSeverity) }}>{severityLabel(row.maxSeverity)}</span>
@@ -212,7 +205,7 @@ export default async function OverviewPage() {
             {sources.slice(0, 5).map((source) => (
               <div key={source.name} className="mb-3 flex items-center justify-between rounded-lg border px-3 py-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
                 <div className="flex items-center gap-3">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: source.ok ? 'var(--sev-low)' : 'var(--sev-critical)' }} />
+                  {source.ok ? <span className="live-dot" /> : <span className="h-2.5 w-2.5 rounded-full" style={{ background: 'var(--sev-critical)' }} />}
                   <div>
                     <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{source.name}</div>
                     <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{hoursAgo(source.last_seen_at)}</div>

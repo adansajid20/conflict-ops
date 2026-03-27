@@ -44,17 +44,17 @@ export function SATTools() {
         const Icon = tool.icon as any
         const isOpen = openTool === tool.id
         return (
-          <div key={tool.id} className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+          <div key={tool.id} className="rounded-lg border p-4 interactive-card" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
             <div className="mb-3 flex items-center justify-between">
               <div className="rounded-lg p-2" style={{ background: 'var(--primary-dim)' }}><Icon size={24} style={{ color: 'var(--primary)' }} /></div>
-              <button onClick={() => setOpenTool(isOpen ? null : tool.id)} className="rounded-md border px-3 py-1.5 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>Open</button>
+              <button onClick={() => setOpenTool(isOpen ? null : tool.id)} className="rounded-md border px-3 py-1.5 text-sm btn-ghost" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>Open</button>
             </div>
             <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{tool.label}</div>
             <div className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>{tool.desc}</div>
             {isOpen && (
               <div className="mt-4">
                 <textarea value={inputText} onChange={(e) => setInputText(e.target.value)} rows={6} className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }} placeholder="Paste scenario, assumptions, or evidence stack..." />
-                <button onClick={() => void analyze(tool.id)} disabled={loading || !inputText.trim()} className="mt-3 rounded-lg px-3 py-2 text-sm font-medium" style={{ background: 'var(--primary)', color: '#fff' }}>{loading ? 'Analyzing...' : 'Analyze'}</button>
+                <button onClick={() => void analyze(tool.id)} disabled={loading || !inputText.trim()} className="mt-3 rounded-lg px-3 py-2 text-sm font-medium btn-primary" style={{ background: 'var(--primary)', color: '#fff' }}>{loading ? 'Analyzing...' : 'Analyze'}</button>
                 {outputText && (
                   <div className="mt-4 rounded-lg border p-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
                     <div className="mb-2 flex items-center justify-between">
