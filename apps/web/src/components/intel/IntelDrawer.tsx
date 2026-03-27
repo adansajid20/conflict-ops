@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { safeTimeAgo, severityLabel, severityColor, type IntelItem } from '@/types/intel-item'
-import { safeAbsoluteTime, getFreshness, type FreshnessLevel } from '@/lib/utils/time'
+import { safeAbsoluteTime, getFreshness, safeRelativeTime, type FreshnessLevel } from '@/lib/utils/time'
 
 const SOURCE_RELIABILITY: Record<string, { label: string; score: string }> = {
   gdelt: { label: 'GDELT', score: 'B — Automated news aggregation' },
@@ -11,12 +11,12 @@ const SOURCE_RELIABILITY: Record<string, { label: string; score: string }> = {
   reliefweb: { label: 'ReliefWeb / OCHA', score: 'A — UN OCHA humanitarian reporting' },
   unhcr: { label: 'UNHCR', score: 'A — UN refugee agency official data' },
   nasa_eonet: { label: 'NASA EONET', score: 'A — NASA Earth Observatory' },
+  news_rss: { label: 'News RSS', score: 'B — Curated international wire services' },
 }
 
 function parseCoords(location: unknown): { lat: number; lng: number } | null {
   if (!location) return null
   if (typeof location === 'string') {
-    // Handle EWKT: SRID=4326;POINT(lng lat)
     const wkt = location.includes(';') ? (location.split(';')[1] ?? '') : location
     const m = wkt.match(/POINT\(([-.0-9]+)\s+([-.0-9]+)\)/)
     if (!m) return null
@@ -103,6 +103,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
   })
   const [related, setRelated] = useState<RelatedEvent[]>([])
   const [relatedOpen, setRelatedOpen] = useState(false)
+  const [copyFeedback, setCopyFeedback] = useState(false)
 
   const currentIndex = item ? items.findIndex(i => i.id === item.id) : -1
 
@@ -146,12 +147,34 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
   if (!item) return null
 
   const coords = parseCoords(item.location)
-  const reliability = SOURCE_RELIABILITY[item.source] ?? { label: item.source.toUpperCase(), score: 'C — Unrated source' }
+  const reliability = SOURCE_RELIABILITY[item.source] ?? {
+    label: item.source.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    score: 'Unrated source',
+  }
   const freshness = getFreshness(item.ingested_at)
 
   const handleViewOnMap = () => {
     if (!coords) return
     router.push(`/tracking?lat=${coords.lat}&lng=${coords.lng}&eventId=${item.id}`)
+  }
+
+  const handleCopyLink = async () => {
+    const url = `${window.location.origin}${window.location.pathname}?eventId=${item.id}`
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopyFeedback(true)
+      setTimeout(() => setCopyFeedback(false), 2000)
+    } catch {
+      // Fallback
+      const ta = document.createElement('textarea')
+      ta.value = url
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      setCopyFeedback(true)
+      setTimeout(() => setCopyFeedback(false), 2000)
+    }
   }
 
   const handleCreateAlert = async () => {
@@ -172,6 +195,9 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
       setAlertForm(f => ({ ...f, saving: false, result: 'Error creating alert' }))
     }
   }
+
+  // Location display — show Unknown if both null after geo cleanup
+  const locationDisplay = [item.country_code, item.region].filter(Boolean).join(' / ') || 'Unknown'
 
   return (
     <>
@@ -239,9 +265,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
             <div className="space-y-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
               <div className="grid grid-cols-[100px_1fr] gap-1">
                 <span style={{ color: 'var(--text-muted)' }}>Location</span>
-                <span style={{ color: 'var(--text-primary)' }}>
-                  {[item.country_code, item.region].filter(Boolean).join(' / ') || '—'}
-                </span>
+                <span style={{ color: 'var(--text-primary)' }}>{locationDisplay}</span>
               </div>
               <div className="grid grid-cols-[100px_1fr] gap-1">
                 <span style={{ color: 'var(--text-muted)' }}>Coordinates</span>
@@ -262,10 +286,6 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
               <div className="grid grid-cols-[100px_1fr] gap-1">
                 <span style={{ color: 'var(--text-muted)' }}>Source</span>
                 <span style={{ color: 'var(--text-primary)' }}>{reliability.label}</span>
-              </div>
-              <div className="grid grid-cols-[100px_1fr] gap-1">
-                <span style={{ color: 'var(--text-muted)' }}>Reliability</span>
-                <span style={{ color: 'var(--text-secondary)' }}>{reliability.score}</span>
               </div>
               <div className="grid grid-cols-[100px_1fr] gap-1 items-center">
                 <span style={{ color: 'var(--text-muted)' }}>Corroboration</span>
@@ -298,6 +318,12 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
                 </span>
               </div>
               <div className="grid grid-cols-[100px_1fr] gap-1">
+                <span style={{ color: 'var(--text-muted)' }}>Age</span>
+                <span className="mono" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  {safeRelativeTime(item.occurred_at)}
+                </span>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] gap-1">
                 <span style={{ color: 'var(--text-muted)' }}>Ingested</span>
                 <span className="mono" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
                   {safeTimeAgo(item.ingested_at)}
@@ -313,33 +339,29 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
           {/* DESCRIPTION */}
           <div>
             <SectionHeader label="DESCRIPTION" />
-            {item.description ? (
-              <p className="text-sm" style={{ color: 'var(--text-primary)', lineHeight: 1.65 }}>
-                {item.description}
-              </p>
-            ) : (
-              <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>
-                No details available for this event.
-              </p>
-            )}
+            <p className="text-sm" style={{ color: 'var(--text-primary)', lineHeight: 1.65 }}>
+              {item.description ?? item.title}
+            </p>
           </div>
 
           {/* EVIDENCE */}
           {item.url && (
             <div>
               <SectionHeader label="EVIDENCE" />
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs mono break-all hover:underline flex items-start gap-1"
-                style={{ color: 'var(--primary)', fontFamily: 'JetBrains Mono, monospace' }}
-              >
-                <span className="shrink-0 mt-0.5">↗</span>
-                <span>{(item.url?.length ?? 0) > 120 ? item.url!.slice(0, 120) + '…' : item.url}</span>
-              </a>
-              <div className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Source: {reliability.label} · {(reliability.score.split('—')[0] ?? reliability.score).trim()} rated
+              <div className="flex items-center justify-between rounded-lg px-3 py-2"
+                style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border)' }}>
+                <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                  {reliability.label}
+                </span>
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-medium hover:underline flex items-center gap-1"
+                  style={{ color: 'var(--primary)' }}
+                >
+                  Read full article <span>↗</span>
+                </a>
               </div>
             </div>
           )}
@@ -365,6 +387,20 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
                 🗺 {coords ? 'View on Map' : 'No coordinates'}
               </button>
 
+              {/* Copy Link */}
+              <button
+                onClick={() => void handleCopyLink()}
+                className="px-3 py-2 rounded-lg text-xs font-medium border transition-colors"
+                style={{
+                  background: copyFeedback ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.05)',
+                  borderColor: copyFeedback ? 'rgba(34,197,94,0.4)' : 'var(--border)',
+                  color: copyFeedback ? '#22C55E' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                }}
+              >
+                {copyFeedback ? '✓ Copied!' : '🔗 Copy Link'}
+              </button>
+
               {/* Create Alert */}
               <button
                 onClick={() => {
@@ -376,7 +412,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
                     result: null,
                   }))
                 }}
-                className="px-3 py-2 rounded-lg text-xs font-medium border transition-colors"
+                className="px-3 py-2 rounded-lg text-xs font-medium border transition-colors col-span-2"
                 style={{
                   background: 'rgba(239,68,68,0.08)',
                   borderColor: 'rgba(239,68,68,0.3)',
@@ -385,20 +421,6 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
                 }}
               >
                 ★ Create Alert
-              </button>
-
-              {/* Add to Tracking — Coming soon */}
-              <button disabled className="px-3 py-2 rounded-lg text-xs font-medium border"
-                style={{ background: 'var(--bg-surface-2)', borderColor: 'var(--border)', color: 'var(--text-muted)', cursor: 'not-allowed', opacity: 0.45 }}>
-                + Add to Tracking
-                <span className="ml-1 text-[9px] opacity-60">soon</span>
-              </button>
-
-              {/* Add to Mission — Coming soon */}
-              <button disabled className="px-3 py-2 rounded-lg text-xs font-medium border"
-                style={{ background: 'var(--bg-surface-2)', borderColor: 'var(--border)', color: 'var(--text-muted)', cursor: 'not-allowed', opacity: 0.45 }}>
-                ◎ Add to Mission
-                <span className="ml-1 text-[9px] opacity-60">soon</span>
               </button>
             </div>
 
@@ -472,7 +494,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
                       style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border)' }}>
                       <span className="shrink-0 text-[10px] mono px-1.5 py-0.5 rounded"
                         style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
-                        {r.source.toUpperCase()}
+                        {r.source.replace(/_/g, ' ').toUpperCase()}
                       </span>
                       <span className="flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{r.title}</span>
                       <span className="shrink-0 mono" style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
@@ -485,14 +507,13 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
             </div>
           )}
 
-          {/* Footer metadata */}
-          <div className="text-[10px] mono pt-3 border-t space-y-1"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-disabled)', fontFamily: 'JetBrains Mono, monospace' }}>
-            <div>ID: {item.id}</div>
-            {items.length > 1 && (
-              <div>{currentIndex + 1} / {items.length} · ↑↓ navigate · Esc close</div>
-            )}
-          </div>
+          {/* Footer metadata — navigation hints only, no raw IDs */}
+          {items.length > 1 && (
+            <div className="text-[10px] mono pt-3 border-t"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-disabled)', fontFamily: 'JetBrains Mono, monospace' }}>
+              {currentIndex + 1} / {items.length} · ↑↓ navigate · Esc close
+            </div>
+          )}
         </div>
       </div>
     </>

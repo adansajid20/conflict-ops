@@ -25,46 +25,80 @@ type FeedEvent = {
   _confidence?: 'confirmed' | 'corroborated' | 'unverified'
 }
 
-const WINDOWS = ['1h', '6h', '24h', '7d', '30d'] as const
+const TIME_WINDOWS = ['1h', '6h', '24h', '7d', '30d'] as const
+type TimeWindow = (typeof TIME_WINDOWS)[number]
+
+const CATEGORIES = [
+  { value: 'all', label: 'All', types: [] as string[] },
+  { value: 'conflict', label: 'Conflict', types: ['airstrike', 'armed_conflict', 'terrorism'] },
+  { value: 'crisis', label: 'Crisis', types: ['political_crisis', 'civil_unrest', 'wmd_threat'] },
+  { value: 'humanitarian', label: 'Humanitarian', types: ['humanitarian', 'displacement'] },
+  { value: 'disaster', label: 'Disaster', types: ['natural_disaster'] },
+  { value: 'diplomatic', label: 'Diplomatic', types: ['economic'] },
+]
+
+const SEV_FILTERS = [
+  { label: 'All', value: 0 },
+  { label: '2+', value: 2 },
+  { label: '3+', value: 3 },
+  { label: '4', value: 4 },
+]
 
 function sevColor(severity?: number | string | null) {
   const value = Number(severity ?? 0)
   if (value >= 4) return '#EF4444'
   if (value >= 3) return '#F97316'
-  if (value >= 2) return '#EAB308'
-  if (value >= 1) return '#22C55E'
+  if (value >= 2) return '#F59E0B'
+  if (value >= 1) return '#3b82f6'
   return '#64748B'
 }
 
-function SourceBadge({ source }: { source: string }) {
-  const key = source?.toLowerCase()
-  const palette: Record<string, [string, string, string]> = {
-    gdelt: ['rgba(30,64,175,0.18)', '#60A5FA', 'GDELT'],
-    reliefweb: ['rgba(13,148,136,0.18)', '#2DD4BF', 'ReliefWeb'],
-    gdacs: ['rgba(146,64,14,0.20)', '#FB923C', 'GDACS'],
-    unhcr: ['rgba(49,46,129,0.20)', '#A5B4FC', 'UNHCR'],
-    nasa_eonet: ['rgba(120,53,15,0.20)', '#FBBF24', 'NASA EONET'],
-    'nasa-eonet': ['rgba(120,53,15,0.20)', '#FBBF24', 'NASA EONET'],
-  }
-  const config = palette[key] ?? ['var(--bg-surface-2)', 'var(--text-secondary)', source]
-  return (
-    <span className="rounded-full px-2 py-1 text-[10px] font-medium"
-      style={{ background: config[0], color: config[1] }}>
-      {config[2]}
-    </span>
-  )
+function sevLabel(severity?: number | string | null) {
+  const value = Number(severity ?? 0)
+  if (value >= 4) return 'CRITICAL'
+  if (value >= 3) return 'HIGH'
+  if (value >= 2) return 'MEDIUM'
+  if (value >= 1) return 'LOW'
+  return null
+}
+
+const PILL_ACTIVE: React.CSSProperties = {
+  background: '#2563EB',
+  color: '#fff',
+  border: '1px solid #2563EB',
+  borderRadius: '9999px',
+  padding: '3px 10px',
+  fontSize: '11px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  lineHeight: '1.4',
+  whiteSpace: 'nowrap',
+}
+
+const PILL_INACTIVE: React.CSSProperties = {
+  background: 'transparent',
+  color: 'var(--text-secondary)',
+  border: '1px solid var(--border)',
+  borderRadius: '9999px',
+  padding: '3px 10px',
+  fontSize: '11px',
+  fontWeight: 500,
+  cursor: 'pointer',
+  lineHeight: '1.4',
+  whiteSpace: 'nowrap',
 }
 
 export function EventFeed() {
-  const AlertCircleIcon = AlertCircle as any
-  const DownloadIcon = Download as any
-  const SearchIcon = Search as any
-  const XIcon = X as any
+  const AlertCircleIcon = AlertCircle as React.ElementType
+  const DownloadIcon = Download as React.ElementType
+  const SearchIcon = Search as React.ElementType
+  const XIcon = X as React.ElementType
 
-  const [source, setSource] = useState('all')
-  const [severity, setSeverity] = useState('all')
-  const [window, setWindow] = useState<(typeof WINDOWS)[number]>('24h')
-  const [search, setSearch] = useState('')
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>('24h')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [severityFilter, setSeverityFilter] = useState<number>(0)
+  const [searchQuery, setSearchQuery] = useState<string>('')
+
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [events, setEvents] = useState<FeedEvent[]>([])
   const [loading, setLoading] = useState(true)
@@ -77,40 +111,30 @@ export function EventFeed() {
   const fetchEvents = useCallback(async (reset = false, cursor?: string) => {
     setLoading(true)
     const params = new URLSearchParams()
-    if (source !== 'all') params.set('source', source)
-    if (severity !== 'all') params.set('severity', severity === 'critical' ? '4' : severity === 'high' ? '3' : severity === 'medium' ? '2' : '1')
-    params.set('window', window)
-    if (search) params.set('search', search)
-    params.set('limit', '50')
+    params.set('window', timeWindow)
+    params.set('limit', '200')
     if (cursor) params.set('cursor', cursor)
     else params.set('offset', '0')
 
-    const res = await fetch(`/api/v1/events?${params.toString()}`, { cache: 'no-store' })
-    const json = await res.json() as { data?: FeedEvent[]; nextCursor?: string | null }
-    const incoming = json.data ?? []
-    setNextCursor(json.nextCursor ?? null)
-    setEvents(reset ? incoming : prev => [...prev, ...incoming])
-    setLastRefresh(new Date())
-    setCountdown(60)
-    setLoading(false)
-  }, [search, severity, source, window])
+    try {
+      const res = await fetch(`/api/v1/events?${params.toString()}`, { cache: 'no-store' })
+      const json = await res.json() as { data?: FeedEvent[]; nextCursor?: string | null }
+      const incoming = json.data ?? []
+      setNextCursor(json.nextCursor ?? null)
+      setEvents(reset ? incoming : prev => [...prev, ...incoming])
+      setLastRefresh(new Date())
+      setCountdown(60)
+    } finally {
+      setLoading(false)
+    }
+  }, [timeWindow])
 
-  // Reset + refetch when filters change (except search which is debounced)
+  // Reset + refetch when time window changes
   useEffect(() => {
     setNextCursor(null)
     void fetchEvents(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, severity, window])
-
-  // Debounce search
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      setNextCursor(null)
-      void fetchEvents(true)
-    }, 300)
-    return () => clearTimeout(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search])
+  }, [timeWindow])
 
   // Auto-refresh countdown
   useEffect(() => {
@@ -122,6 +146,18 @@ export function EventFeed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countdown])
 
+  // Deep-link: on mount, read ?eventId and auto-open that event's drawer
+  useEffect(() => {
+    if (events.length === 0) return
+    const params = new URLSearchParams(window.location.search)
+    const eventId = params.get('eventId')
+    if (eventId && !selected) {
+      const found = events.find(e => e.id === eventId)
+      if (found) setSelected(found)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events])
+
   // Keyboard navigation: j/k, Enter, Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -130,27 +166,56 @@ export function EventFeed() {
 
       if (e.key === 'j' || (e.key === 'ArrowDown' && !selected)) {
         e.preventDefault()
-        setFocusedIndex(i => Math.min(i + 1, events.length - 1))
+        setFocusedIndex(i => Math.min(i + 1, filteredEvents.length - 1))
       } else if (e.key === 'k' || (e.key === 'ArrowUp' && !selected)) {
         e.preventDefault()
         setFocusedIndex(i => Math.max(i - 1, 0))
       } else if (e.key === 'Enter' && focusedIndex >= 0 && !selected) {
-        const evt = events[focusedIndex]
-        if (evt) setSelected(evt)
+        const evt = filteredEvents[focusedIndex]
+        if (evt) handleEventClick(evt)
       } else if (e.key === 'Escape' && selected) {
         setSelected(null)
+        window.history.pushState({}, '', window.location.pathname)
       }
     }
     globalThis.window?.addEventListener('keydown', handler)
     return () => globalThis.window?.removeEventListener('keydown', handler)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events, focusedIndex, selected])
 
+  // Client-side filtering
+  const filteredEvents = useMemo(() => {
+    let result = events
+    if (categoryFilter !== 'all') {
+      const cat = CATEGORIES.find(c => c.value === categoryFilter)
+      if (cat && cat.types.length > 0) {
+        result = result.filter(e => cat.types.includes(e.event_type ?? ''))
+      }
+    }
+    if (severityFilter > 0) {
+      result = result.filter(e => (Number(e.severity) || 0) >= severityFilter)
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter(e => e.title.toLowerCase().includes(q) || (e.description ?? '').toLowerCase().includes(q))
+    }
+    return result
+  }, [events, categoryFilter, severityFilter, searchQuery])
+
+  function handleEventClick(event: FeedEvent) {
+    setSelected(event)
+    window.history.pushState({}, '', `?eventId=${event.id}`)
+  }
+
   const drawerItem = useMemo(() => (selected ? eventToIntelItem(selected as never) : null), [selected])
-  const drawerItems = useMemo(() => events.map(e => eventToIntelItem(e as never)), [events])
+  const drawerItems = useMemo(() => filteredEvents.map(e => eventToIntelItem(e as never)), [filteredEvents])
 
   const exportCsv = () => {
-    const header = ['id', 'source', 'title', 'severity', 'region', 'occurred_at']
-    const rows = events.map(event => [event.id, event.source, JSON.stringify(event.title ?? ''), event.severity ?? '', event.region ?? '', event.occurred_at ?? ''])
+    const header = ['id', 'source', 'title', 'severity', 'country', 'region', 'occurred_at']
+    const rows = filteredEvents.map(event => [
+      event.id, event.source, JSON.stringify(event.title ?? ''), event.severity ?? '',
+      event.country_code ?? '', event.region ?? '', event.occurred_at ?? '',
+    ])
     const csv = [header.join(','), ...rows.map(row => row.join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -160,63 +225,83 @@ export function EventFeed() {
   }
 
   const clearFilters = () => {
-    setSource('all'); setSeverity('all'); setWindow('24h'); setSearch('')
-    setNextCursor(null)
+    setCategoryFilter('all')
+    setSeverityFilter(0)
+    setSearchQuery('')
+    setTimeWindow('24h')
   }
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden rounded-xl border"
       style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-      {/* Toolbar */}
-      <div className="sticky top-0 z-10 border-b px-4 py-3"
+
+      {/* Filter Bar */}
+      <div className="sticky top-0 z-10 border-b px-4 py-3 space-y-2"
         style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-        <div className="flex flex-wrap items-center gap-3">
-          <select value={source} onChange={e => setSource(e.target.value)}
-            className="rounded px-3 py-1.5 text-sm"
-            style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-            <option value="all">All Sources</option>
-            <option value="gdelt">GDELT</option>
-            <option value="reliefweb">ReliefWeb</option>
-            <option value="gdacs">GDACS</option>
-            <option value="unhcr">UNHCR</option>
-            <option value="nasa_eonet">NASA EONET</option>
-          </select>
-          <select value={severity} onChange={e => setSeverity(e.target.value)}
-            className="rounded px-3 py-1.5 text-sm"
-            style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-            <option value="all">All Severity</option>
-            <option value="critical">Critical</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-          <div className="flex rounded-lg p-1" style={{ background: 'var(--bg-surface-2)' }}>
-            {WINDOWS.map(item => (
-              <motion.button whileTap={{ scale: 0.95 }} key={item} onClick={() => setWindow(item)}
-                className="relative rounded-md px-3 py-1.5 text-sm"
-                style={{ color: item === window ? '#fff' : 'var(--text-secondary)' }}>
-                {item === window && (
-                  <motion.span layoutId="time-window-active"
-                    style={{ position: 'absolute', inset: 0, background: 'var(--primary)', borderRadius: 6, zIndex: 0 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 35 }} />
-                )}
-                <span style={{ position: 'relative', zIndex: 1 }}>{item}</span>
-              </motion.button>
-            ))}
+
+        {/* Row 1: Search + Export */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <SearchIcon size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search events…"
+              style={{
+                width: '100%',
+                background: 'var(--bg-surface-2)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
+                borderRadius: '6px',
+                padding: '5px 10px 5px 30px',
+                fontSize: '13px',
+              }}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+                style={{ color: 'var(--text-muted)' }}>
+                <XIcon size={12} />
+              </button>
+            )}
           </div>
-          <div className="relative min-w-[220px] flex-1">
-            <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search events… (j/k to navigate)"
-              className="w-full rounded py-1.5 pl-9 pr-3 text-sm"
-              style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
-          </div>
-          <div className="flex-1" />
           <button onClick={exportCsv}
-            className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm btn-ghost"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-            <DownloadIcon size={14} /> Export CSV
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs btn-ghost shrink-0"
+            style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
+            <DownloadIcon size={12} /> Export
           </button>
+        </div>
+
+        {/* Row 2: Time pills | Category pills | Severity pills */}
+        <div className="flex flex-wrap items-center gap-1.5" style={{ fontSize: '11px' }}>
+          {/* Time window */}
+          {TIME_WINDOWS.map(w => (
+            <button key={w} onClick={() => setTimeWindow(w)}
+              style={timeWindow === w ? PILL_ACTIVE : PILL_INACTIVE}>
+              {w}
+            </button>
+          ))}
+
+          <div style={{ width: '1px', height: '16px', background: 'var(--border)', margin: '0 4px' }} />
+
+          {/* Category */}
+          {CATEGORIES.map(cat => (
+            <button key={cat.value} onClick={() => setCategoryFilter(cat.value)}
+              style={categoryFilter === cat.value ? PILL_ACTIVE : PILL_INACTIVE}>
+              {cat.label}
+            </button>
+          ))}
+
+          <div style={{ width: '1px', height: '16px', background: 'var(--border)', margin: '0 4px' }} />
+
+          {/* Severity */}
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>SEV:</span>
+          {SEV_FILTERS.map(sf => (
+            <button key={sf.value} onClick={() => setSeverityFilter(sf.value)}
+              style={severityFilter === sf.value ? PILL_ACTIVE : PILL_INACTIVE}>
+              {sf.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -224,7 +309,7 @@ export function EventFeed() {
       <div className="flex-1 overflow-y-auto" ref={listRef}>
         {loading && events.length === 0 ? (
           <div className="p-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="mb-3 h-16 rounded-lg skeleton" />)}</div>
-        ) : events.length === 0 ? (
+        ) : filteredEvents.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
             <AlertCircleIcon size={32} style={{ color: 'var(--text-muted)' }} />
             <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>No events match current filters</div>
@@ -236,85 +321,118 @@ export function EventFeed() {
           </div>
         ) : (
           <AnimatePresence initial={false}>
-            {events.map((event, index) => (
-              <motion.div
-                key={event.id}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2, delay: Math.min(index * 0.04, 0.3), ease: 'easeOut' }}
-                onClick={() => { setSelected(event); setFocusedIndex(index) }}
-                tabIndex={0}
-                onFocus={() => setFocusedIndex(index)}
-                onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter') setSelected(event) }}
-                className="flex cursor-pointer items-start gap-3 border-b px-4 py-3 transition-colors hover:bg-white/5 interactive-card outline-none"
-                style={{
-                  borderColor: 'var(--border)',
-                  background: focusedIndex === index ? 'rgba(255,255,255,0.04)' : undefined,
-                  boxShadow: focusedIndex === index ? 'inset 0 0 0 1px rgba(37,99,235,0.3)' : undefined,
-                }}>
-                <div style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: sevColor(event.severity), flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="mb-1 flex items-center gap-2">
-                    <SourceBadge source={event.source} />
-                    <span className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{event.title}</span>
-                  </div>
-                  {/* Corroboration confidence badge */}
-                  {(event._source_count ?? 1) > 1 ? (
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '10px',
-                      fontWeight: 600,
-                      letterSpacing: '0.05em',
-                      textTransform: 'uppercase',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      marginBottom: '4px',
-                      background: event._confidence === 'confirmed' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.15)',
-                      color: event._confidence === 'confirmed' ? '#22c55e' : '#eab308',
-                      border: `1px solid ${event._confidence === 'confirmed' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(234, 179, 8, 0.3)'}`,
-                    }}>
-                      {event._confidence === 'confirmed' ? '✓' : '○'} {event._source_count} source{(event._source_count ?? 1) !== 1 ? 's' : ''}
+            {filteredEvents.map((event, index) => {
+              const isSelected = selected?.id === event.id
+              const isFocused = focusedIndex === index
+              const sColor = sevColor(event.severity)
+              const sLabel = sevLabel(event.severity)
+              const country = event.country_code ?? 'Unknown'
+              const snippet = event.description ?? event.title
+
+              return (
+                <motion.div
+                  key={event.id}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.3), ease: 'easeOut' }}
+                  onClick={() => { handleEventClick(event); setFocusedIndex(index) }}
+                  tabIndex={0}
+                  onFocus={() => setFocusedIndex(index)}
+                  onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter') handleEventClick(event) }}
+                  className="flex cursor-pointer items-start gap-0 border-b px-0 py-3 transition-colors hover:bg-white/5 interactive-card outline-none"
+                  style={{
+                    borderColor: 'var(--border)',
+                    borderLeft: isSelected ? '3px solid #2563EB' : '3px solid transparent',
+                    background: isSelected
+                      ? 'rgba(37,99,235,0.08)'
+                      : isFocused
+                        ? 'rgba(255,255,255,0.04)'
+                        : 'transparent',
+                    boxShadow: isFocused && !isSelected ? 'inset 0 0 0 1px rgba(37,99,235,0.2)' : undefined,
+                    paddingLeft: '13px',
+                    paddingRight: '16px',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* Row 1: Severity badge + Country · Time */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                      {sLabel && (
+                        <span style={{
+                          fontSize: '9px',
+                          fontWeight: 700,
+                          fontFamily: 'JetBrains Mono, monospace',
+                          padding: '1px 5px',
+                          borderRadius: '3px',
+                          background: `${sColor}22`,
+                          color: sColor,
+                          border: `1px solid ${sColor}44`,
+                          letterSpacing: '0.05em',
+                        }}>
+                          {sLabel}
+                        </span>
+                      )}
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                        {country}
+                        {event.region && event.region !== event.country_code ? ` · ${event.region}` : ''}
+                      </span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace', marginLeft: 'auto' }}>
+                        {safeRelativeTime(event.occurred_at)}
+                      </span>
                     </div>
-                  ) : (
+
+                    {/* Row 2: Title */}
                     <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '10px',
+                      fontSize: '13px',
                       fontWeight: 600,
-                      letterSpacing: '0.05em',
-                      textTransform: 'uppercase',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
+                      color: 'var(--text-primary)',
+                      lineHeight: 1.4,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical' as const,
+                      overflow: 'hidden',
                       marginBottom: '4px',
-                      background: 'rgba(148, 163, 184, 0.1)',
-                      color: '#94a3b8',
-                      border: '1px solid rgba(148, 163, 184, 0.2)',
                     }}>
-                      ○ Unverified
+                      {event.title}
                     </div>
-                  )}
-                  <p className="line-clamp-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    {event.description || 'No description provided.'}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  {event.region && (
-                    <span className="rounded px-1.5 py-0.5 text-[10px]"
-                      style={{ background: 'var(--bg-surface-2)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                      {event.region}
-                    </span>
-                  )}
-                  <div className="mt-1 text-[11px]"
-                    style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
-                    {safeRelativeTime(event.occurred_at)}
+
+                    {/* Row 3: Snippet */}
+                    <div style={{
+                      fontSize: '11px',
+                      color: 'var(--text-muted)',
+                      lineHeight: 1.5,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical' as const,
+                      overflow: 'hidden',
+                      marginBottom: (event._source_count ?? 1) > 1 ? '6px' : 0,
+                    }}>
+                      {snippet}
+                    </div>
+
+                    {/* Row 4: Confidence badge (only if multi-source) */}
+                    {(event._source_count ?? 1) > 1 && (
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        letterSpacing: '0.05em',
+                        textTransform: 'uppercase',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        background: event._confidence === 'confirmed' ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)',
+                        color: event._confidence === 'confirmed' ? '#22c55e' : '#eab308',
+                        border: `1px solid ${event._confidence === 'confirmed' ? 'rgba(34,197,94,0.3)' : 'rgba(234,179,8,0.3)'}`,
+                      }}>
+                        {event._confidence === 'confirmed' ? '✓' : '○'} {event._source_count} sources
+                      </div>
+                    )}
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              )
+            })}
           </AnimatePresence>
         )}
       </div>
@@ -326,21 +444,25 @@ export function EventFeed() {
           onClick={() => void fetchEvents(false, nextCursor ?? undefined)}
           disabled={loading || !nextCursor}
           className="rounded-md border px-3 py-1.5 btn-ghost disabled:opacity-40"
-          style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-          {loading ? 'Loading…' : nextCursor ? 'Load more' : 'No more events'}
+          style={{ borderColor: 'var(--border)', color: 'var(--text-primary)', fontSize: '12px' }}>
+          {loading ? 'Loading…' : nextCursor ? 'Load more' : 'All caught up'}
         </button>
-        <div style={{ color: 'var(--text-muted)' }}>
-          {events.length} events · Refreshing in {countdown}s
+        <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+          {filteredEvents.length}/{events.length} events · Refreshing in {countdown}s
         </div>
       </div>
 
       <IntelDrawer
         item={drawerItem}
         items={drawerItems}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          setSelected(null)
+          window.history.pushState({}, '', window.location.pathname)
+        }}
         onNavigate={newItem => {
-          const idx = events.findIndex(e => e.id === newItem.id)
-          if (idx >= 0) { setFocusedIndex(idx); setSelected(events[idx]!) }
+          const evt = events.find(e => e.id === newItem.id)
+          const idx = filteredEvents.findIndex(e => e.id === newItem.id)
+          if (evt) { handleEventClick(evt); setFocusedIndex(idx) }
         }}
       />
     </div>

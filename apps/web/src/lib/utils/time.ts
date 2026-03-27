@@ -1,20 +1,25 @@
 export function safeRelativeTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return 'Unknown time'
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return 'Unknown time'
-  const diffMs = Date.now() - d.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-  const diffH = Math.floor(diffMin / 60)
-  const diffD = Math.floor(diffH / 24)
-  if (diffMin < 1) return 'just now'
-  if (diffMin < 60) return `${diffMin}m ago`
-  if (diffH < 24) return `${diffH}h ago`
-  if (diffD < 7) return `${diffD}d ago`
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: diffD > 365 ? 'numeric' : undefined,
-  })
+  if (!dateStr) return 'Time unknown'
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return 'Time unknown'
+    const diffMs = Date.now() - d.getTime()
+    if (diffMs < 0) return 'Just now' // future-dated events
+    const diffMin = Math.floor(diffMs / 60000)
+    if (diffMin < 1) return 'Just now'
+    if (diffMin < 60) return `${diffMin}m ago`
+    const diffH = Math.floor(diffMin / 60)
+    if (diffH < 24) return `${diffH}h ago`
+    const diffD = Math.floor(diffH / 24)
+    if (diffD < 7) return `${diffD}d ago`
+    return d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: diffD > 365 ? 'numeric' : undefined,
+    })
+  } catch {
+    return 'Time unknown'
+  }
 }
 
 export function safeAbsoluteTime(dateStr: string | null | undefined): string {

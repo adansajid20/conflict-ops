@@ -83,8 +83,48 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
 
   const rawEvents = (data ?? []) as unknown as ConflictEvent[]
 
+  // --- FIX 1: Filter to conflict-relevant events only (guards against pre-gate DB pollution) ---
+  const RELEVANT_TYPES = [
+    'airstrike', 'armed_conflict', 'terrorism', 'political_crisis',
+    'civil_unrest', 'displacement', 'humanitarian', 'wmd_threat',
+    'natural_disaster', 'economic',
+  ]
+  const relevantData = rawEvents.filter(e =>
+    RELEVANT_TYPES.includes((e as unknown as Record<string,unknown>).event_type as string) ||
+    ((e as unknown as Record<string,unknown>).severity as number ?? 0) >= 2 ||
+    (e as unknown as Record<string,unknown>).country_code !== null
+  )
+
+  // --- FIX 2: Snippet fallback — description is never blank or "No description provided" ---
+  const eventsWithSnippet = relevantData.map(e => {
+    const raw = e as unknown as Record<string,unknown>
+    const desc = raw.description as string | null | undefined
+    const title = raw.title as string
+    return {
+      ...raw,
+      description: desc && desc.trim() && desc !== 'No description provided'
+        ? desc
+        : title.length > 80
+          ? `${title.slice(0, 160)}…`
+          : title,
+    } as unknown as ConflictEvent
+  })
+
+  // --- FIX 3: Geo cleanup — remove "UN" and placeholder location strings ---
+  const GEO_PLACEHOLDERS = ['UN', 'United Nations', 'N/A', 'Unknown', 'Global', 'World']
+  const cleanedEvents = eventsWithSnippet.map(e => {
+    const raw = e as unknown as Record<string,unknown>
+    const region = raw.region as string | null
+    const cc = raw.country_code as string | null
+    return {
+      ...raw,
+      region: (region && !GEO_PLACEHOLDERS.includes(region)) ? region : null,
+      country_code: (cc && cc.length === 2 && cc !== 'UN') ? cc : null,
+    } as unknown as ConflictEvent
+  })
+
   // Cluster events to deduplicate cross-source stories and add confidence signals
-  const clustered = clusterEvents(rawEvents as unknown as Array<{
+  const clustered = clusterEvents(cleanedEvents as unknown as Array<{
     title: string
     occurred_at: string
     source: string

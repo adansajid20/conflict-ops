@@ -177,6 +177,38 @@ function parseRSS(xml: string, sourceName: string): RssItem[] {
   return items
 }
 
+// Allowlist of event_types that are conflict/security relevant
+const RELEVANT_EVENT_TYPES = new Set([
+  'airstrike', 'armed_conflict', 'terrorism', 'political_crisis',
+  'civil_unrest', 'displacement', 'humanitarian', 'wmd_threat',
+  'natural_disaster', 'economic',
+])
+
+// Conflict-relevant keyword gate — drops pure entertainment/tech/lifestyle news
+const RELEVANCE_KEYWORDS = [
+  'war', 'conflict', 'attack', 'kill', 'dead', 'wound', 'bomb', 'missile',
+  'strike', 'soldier', 'troop', 'military', 'army', 'navy', 'air force',
+  'refugee', 'displaced', 'evacuation', 'humanitarian', 'aid', 'famine',
+  'coup', 'protest', 'riot', 'uprising', 'rebel', 'militia', 'terrorist',
+  'sanction', 'embargo', 'ceasefire', 'peace', 'treaty', 'diplomacy',
+  'earthquake', 'flood', 'cyclone', 'hurricane', 'wildfire', 'disaster',
+  'nuclear', 'chemical', 'weapon', 'ammunition', 'artillery', 'drone',
+  'border', 'blockade', 'siege', 'hostage', 'captured', 'prisoner',
+  'genocide', 'massacre', 'ethnic', 'occupation', 'annexation',
+  'nato', 'un ', 'united nations', 'security council', 'iaea',
+  'iran', 'russia', 'ukraine', 'gaza', 'israel', 'hamas', 'hezbollah',
+  'sudan', 'myanmar', 'somalia', 'yemen', 'syria', 'iraq', 'afghanistan',
+  'north korea', 'taiwan strait', 'south china sea',
+]
+
+function isConflictRelevant(title: string, description: string, eventType: string): boolean {
+  // Always keep explicitly typed events (scored above 'news')
+  if (RELEVANT_EVENT_TYPES.has(eventType)) return true
+  // For generic 'news' type, require at least one conflict keyword
+  const combined = `${title} ${description}`.toLowerCase()
+  return RELEVANCE_KEYWORDS.some(kw => combined.includes(kw))
+}
+
 function detectEventType(text: string): string {
   const lower = text.toLowerCase()
   if (/airstrike|bombing|missile|rocket|artillery/.test(lower)) return 'airstrike'
@@ -269,6 +301,14 @@ export async function ingestNewsRSS(): Promise<{
       recentFingerprintSet.add(fp)
 
       const fullText = `${item.title} ${item.description}`
+
+      // Conflict relevance gate — drop PS5 pricing, iPhone hacking, etc.
+      const evType = detectEventType(fullText)
+      if (!isConflictRelevant(item.title, item.description, evType)) {
+        skipped++
+        continue
+      }
+
       const severity = scoreSeverity(fullText)
       const loc = detectLocation(fullText)
       const region = loc.region ?? src.region ?? null
@@ -280,7 +320,7 @@ export async function ingestNewsRSS(): Promise<{
       const { error } = await supabase.from('events').upsert({
         source: 'news_rss',
         source_id,
-        event_type: detectEventType(fullText),
+        event_type: evType,
         title: item.title.slice(0, 500),
         description: item.description.slice(0, 2000) || item.title,
         region,
