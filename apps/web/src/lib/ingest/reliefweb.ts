@@ -133,6 +133,13 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
         continue
       }
       xml = await res.text()
+      // Detect Cloudflare challenge / non-RSS response
+      if (!xml.includes('<item>')) {
+        const msg = `No <item> in response from ${feedUrl} — body preview: ${xml.slice(0, 150).replace(/\s+/g, ' ')}`
+        console.error(`[reliefweb] ${msg}`)
+        fetchErrors.push(msg)
+        continue
+      }
     } catch (err) {
       const msg = `${String(err)} fetching ${feedUrl}`
       console.error(`[reliefweb] ${msg}`)
