@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AlertCircle, Download, Search, X } from 'lucide-react'
 import { IntelDrawer } from '@/components/intel/IntelDrawer'
@@ -243,7 +243,7 @@ export function EventFeed() {
                 onClick={() => { setSelected(event); setFocusedIndex(index) }}
                 tabIndex={0}
                 onFocus={() => setFocusedIndex(index)}
-                onKeyDown={e => { if (e.key === 'Enter') setSelected(event) }}
+                onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter') setSelected(event) }}
                 className="flex cursor-pointer items-start gap-3 border-b px-4 py-3 transition-colors hover:bg-white/5 interactive-card outline-none"
                 style={{
                   borderColor: 'var(--border)',
