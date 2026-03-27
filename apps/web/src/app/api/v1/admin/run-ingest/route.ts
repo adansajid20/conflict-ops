@@ -54,6 +54,10 @@ export async function POST(req: Request) {
     const { ingestNewsRSS } = await import('@/lib/ingest/news-rss')
     return ingestNewsRSS()
   })
+  await runSource('usgs', async () => {
+    const { ingestUSGS } = await import('@/lib/ingest/usgs')
+    return ingestUSGS()
+  })
 
   // Touch heartbeat — update ingested_at on most recent event so freshness clock resets to "just now"
   try {

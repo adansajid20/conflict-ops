@@ -63,6 +63,63 @@ const NEWS_SOURCES = [
 
   // === Energy / Resources (for conflict angle) ===
   { name: 'OilPrice.com',             url: 'https://oilprice.com/rss/main',                                                                                  tier: 'B',  region: null },
+
+  // === Additional BBC Regional ===
+  { name: 'BBC Americas',              url: 'https://www.bbc.co.uk/news/world/us_and_canada/rss.xml',          tier: 'A',  region: 'North America' },
+
+  // === DW Additional Regional ===
+  { name: 'DW Asia',                   url: 'https://rss.dw.com/rdf/rss-en-asia',                               tier: 'B+', region: 'Asia' },
+  { name: 'DW Europe',                 url: 'https://rss.dw.com/rdf/rss-en-europe',                             tier: 'B+', region: 'Europe' },
+  { name: 'DW Americas',               url: 'https://rss.dw.com/rdf/rss-en-americas',                           tier: 'B+', region: 'Latin America' },
+
+  // === France 24 Regional ===
+  { name: 'France 24 Africa',          url: 'https://www.france24.com/en/africa/rss',                           tier: 'A',  region: 'Africa' },
+  { name: 'France 24 Middle East',     url: 'https://www.france24.com/en/middle-east/rss',                      tier: 'A',  region: 'Middle East' },
+  { name: 'France 24 Asia-Pacific',    url: 'https://www.france24.com/en/asia-pacific/rss',                     tier: 'A',  region: 'Asia' },
+  { name: 'France 24 Europe',          url: 'https://www.france24.com/en/europe/rss',                           tier: 'A',  region: 'Europe' },
+  { name: 'France 24 Americas',        url: 'https://www.france24.com/en/americas/rss',                         tier: 'A',  region: 'Latin America' },
+
+  // === Official / Institutional ===
+  { name: 'US State Dept',             url: 'https://www.state.gov/feed/',                                      tier: 'A',  region: null },
+  { name: 'State Dept Press',          url: 'https://www.state.gov/press-releases/feed/',                       tier: 'A',  region: null },
+  { name: 'OCHA',                      url: 'https://www.unocha.org/rss.xml',                                   tier: 'A',  region: null },
+  { name: 'IAEA',                      url: 'https://www.iaea.org/feeds/news',                                  tier: 'A',  region: null },
+  { name: 'Amnesty International',     url: 'https://www.amnesty.org/en/feed/',                                 tier: 'A',  region: null },
+  { name: 'PassBlue (UN)',             url: 'https://www.passblue.com/feed/',                                   tier: 'B+', region: null },
+
+  // === MENA Regional ===
+  { name: 'Asharq Al-Awsat',           url: 'https://english.aawsat.com/feed',                                  tier: 'B+', region: 'Middle East' },
+  { name: 'Jerusalem Post',            url: 'https://www.jpost.com/rss/rssfeedsfrontpage.aspx',                 tier: 'B+', region: 'Middle East' },
+  { name: 'Times of Israel',           url: 'https://www.timesofisrael.com/feed/',                              tier: 'B+', region: 'Middle East' },
+  { name: 'Al Bawaba',                 url: 'https://www.albawaba.com/rss.xml',                                 tier: 'B',  region: 'Middle East' },
+  { name: 'Kurdistan 24',              url: 'https://www.kurdistan24.net/en/rss.xml',                           tier: 'B',  region: 'Middle East' },
+
+  // === Africa ===
+  { name: 'Dabanga Sudan',             url: 'https://www.dabangasudan.org/en/feed',                             tier: 'B+', region: 'Africa' },
+  { name: 'Africanews',                url: 'https://www.africanews.com/feed',                                  tier: 'B',  region: 'Africa' },
+
+  // === Asia-Pacific ===
+  { name: 'Channel NewsAsia',          url: 'https://www.channelnewsasia.com/rssfeeds/8395986',                 tier: 'B+', region: 'Asia' },
+
+  // === Defense & Military ===
+  { name: 'The Defense Post',          url: 'https://www.thedefensepost.com/feed/',                             tier: 'B',  region: null },
+  { name: 'Military Times',            url: 'https://www.militarytimes.com/arc/outboundfeeds/rss/',             tier: 'B',  region: null },
+  { name: 'War on the Rocks',          url: 'https://warontherocks.com/feed/',                                  tier: 'B+', region: null },
+
+  // === Think Tanks / Policy Analysis ===
+  { name: 'Carnegie Endowment',        url: 'https://carnegieendowment.org/rss/solr/articles',                  tier: 'B+', region: null },
+  { name: 'Brookings Institution',     url: 'https://www.brookings.edu/feed/',                                  tier: 'B+', region: null },
+  { name: 'Euronews',                  url: 'https://www.euronews.com/rss?level=theme&name=news',               tier: 'B+', region: 'Europe' },
+  { name: 'Politico Europe',           url: 'https://www.politico.eu/rss',                                      tier: 'B+', region: 'Europe' },
+  { name: 'The Independent',           url: 'https://www.independent.co.uk/news/world/rss',                    tier: 'B+', region: null },
+
+  // === State Media (tagged for transparency — included for perspective diversity) ===
+  // These are state-controlled outlets; included to capture events those govts want publicized.
+  // Confidence scores naturally lower (single source) when only state media reports.
+  { name: 'Xinhua (China)',            url: 'https://www.xinhuanet.com/english/rss/worldrss.xml',              tier: 'C',  region: null },
+  { name: 'RT (Russia)',               url: 'https://www.rt.com/rss/news/',                                     tier: 'C',  region: null },
+  { name: 'PressTV (Iran)',            url: 'https://www.presstv.ir/RSS',                                       tier: 'C',  region: null },
+  { name: 'Global Times (China)',      url: 'https://www.globaltimes.cn/rss/outbrain.xml',                      tier: 'C',  region: null },
 ] as const
 
 // Keyword → severity scoring
@@ -334,6 +391,7 @@ export async function ingestNewsRSS(): Promise<{
           attribution: `${src.name} (via RSS)`,
           url: item.link,
           tier: src.tier,
+          state_media: src.tier === 'C', // flag state-controlled outlets
         } as Record<string, unknown>,
         raw: {
           title: item.title,

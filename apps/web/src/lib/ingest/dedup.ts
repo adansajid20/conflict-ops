@@ -38,9 +38,12 @@ export const SOURCE_PRIORITY: Record<string, number> = {
   gdacs: 1,      // disaster alerts — most authoritative
   unhcr: 1,      // UN refugee data — authoritative
   nasa_eonet: 1, // NASA events — authoritative
+  usgs: 1,       // seismically confirmed, authoritative
   reliefweb: 2,  // UN humanitarian — high quality
   gdelt: 3,      // news aggregator — good breadth
   news_rss: 4,   // RSS feeds — lowest priority for dedup purposes
+  // state media articles (RT/PressTV/Xinhua) are still news_rss source
+  // but naturally rank lowest since higher-priority sources will cover same events
 }
 
 /**

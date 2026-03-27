@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createServiceClient } from '@/lib/supabase/server'
 import { pingRedis, isSafeMode, getRedisInitError } from '@/lib/cache/redis'
 
-const ENABLED_SOURCES = ['gdelt', 'reliefweb', 'gdacs', 'unhcr', 'nasa_eonet', 'news_rss']
+const ENABLED_SOURCES = ['gdelt', 'reliefweb', 'gdacs', 'unhcr', 'nasa_eonet', 'news_rss', 'usgs']
 const STALE_THRESHOLD_MS = 12 * 3600 * 1000  // 12h = degraded (dedup means ingested_at only refreshes on new events)
 const SOURCE_STALE_MS    = 8 * 3600 * 1000   // 8h per source
 
