@@ -53,7 +53,11 @@ export async function POST(req: Request) {
 
   const totalMs = Date.now() - start
   const totalInserted = Object.values(results).reduce((acc: number, r) => {
-    if (r && typeof r === 'object' && 'inserted' in r) return acc + ((r as Record<string, number>).inserted ?? 0)
+    if (r && typeof r === 'object') {
+      const row = r as Record<string, number>
+      // Sources use different field names: GDELT uses 'inserted', others use 'stored'
+      return acc + (row.inserted ?? row.stored ?? 0)
+    }
     return acc
   }, 0)
 

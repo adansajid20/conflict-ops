@@ -4,8 +4,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { pingRedis, isSafeMode, getRedisInitError } from '@/lib/cache/redis'
 
 const ENABLED_SOURCES = ['gdelt', 'reliefweb', 'gdacs', 'unhcr', 'nasa_eonet']
-const STALE_THRESHOLD_MS = 2 * 3600 * 1000   // 2h = degraded
-const SOURCE_STALE_MS    = 3 * 3600 * 1000   // 3h per source
+const STALE_THRESHOLD_MS = 12 * 3600 * 1000  // 12h = degraded (dedup means ingested_at only refreshes on new events)
+const SOURCE_STALE_MS    = 8 * 3600 * 1000   // 8h per source
 
 export async function GET() {
   const start = Date.now()
@@ -88,7 +88,8 @@ export async function GET() {
   if (missingEnvs.length > 0) errors.push(`missing_env: ${missingEnvs.join(', ')}`)
 
   const ingestAgeMs = lastIngestAt ? Date.now() - new Date(lastIngestAt).getTime() : Infinity
-  const ingestOk = isFinite(ingestAgeMs) && ingestAgeMs < STALE_THRESHOLD_MS
+  // Ingest is OK if: recently ran AND last insert within threshold, OR 50+ events inserted in last 24h (dedup means ingested_at doesn't refresh on duplicates)
+  const ingestOk = (isFinite(ingestAgeMs) && ingestAgeMs < STALE_THRESHOLD_MS) || (inserted24h > 50)
 
   const enabledSources = ENABLED_SOURCES.map(source => {
     const lastSeen = sourcesLastSeen[source] ?? null

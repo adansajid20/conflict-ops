@@ -96,10 +96,13 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
   for (const [feedUrl, kind] of [[REPORTS_RSS, 'report'], [DISASTERS_RSS, 'disaster']] as const) {
     try {
       const res = await fetch(feedUrl, {
-        headers: { 'User-Agent': 'ConflictOps/1.0 (conflictradar.co)' },
-        signal: AbortSignal.timeout(15000),
+        headers: { 'User-Agent': 'ConflictOps/1.0 (conflictradar.co)', 'Accept': 'application/rss+xml, application/xml, text/xml, */*' },
+        signal: AbortSignal.timeout(20000),
       })
-      if (!res.ok) continue
+      if (!res.ok) {
+        console.error(`[reliefweb] feed ${feedUrl} returned HTTP ${res.status}`)
+        continue
+      }
 
       const xml = await res.text()
       const items = extractItems(xml)
