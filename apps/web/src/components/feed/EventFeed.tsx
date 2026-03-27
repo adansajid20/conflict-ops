@@ -20,6 +20,9 @@ type FeedEvent = {
   country_code?: string | null
   provenance_raw?: Record<string, unknown> | null
   location?: string | null
+  _corroborated_by?: string[]
+  _source_count?: number
+  _confidence?: 'confirmed' | 'corroborated' | 'unverified'
 }
 
 const WINDOWS = ['1h', '6h', '24h', '7d', '30d'] as const
@@ -256,6 +259,44 @@ export function EventFeed() {
                     <SourceBadge source={event.source} />
                     <span className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{event.title}</span>
                   </div>
+                  {/* Corroboration confidence badge */}
+                  {(event._source_count ?? 1) > 1 ? (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      marginBottom: '4px',
+                      background: event._confidence === 'confirmed' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.15)',
+                      color: event._confidence === 'confirmed' ? '#22c55e' : '#eab308',
+                      border: `1px solid ${event._confidence === 'confirmed' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(234, 179, 8, 0.3)'}`,
+                    }}>
+                      {event._confidence === 'confirmed' ? '✓' : '○'} {event._source_count} source{(event._source_count ?? 1) !== 1 ? 's' : ''}
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      marginBottom: '4px',
+                      background: 'rgba(148, 163, 184, 0.1)',
+                      color: '#94a3b8',
+                      border: '1px solid rgba(148, 163, 184, 0.2)',
+                    }}>
+                      ○ Unverified
+                    </div>
+                  )}
                   <p className="line-clamp-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
                     {event.description || 'No description provided.'}
                   </p>

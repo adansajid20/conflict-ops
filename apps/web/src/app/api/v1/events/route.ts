@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
 import { isSafeMode, getCachedSnapshot, setCachedSnapshot, TTL } from '@/lib/cache/redis'
+import { clusterEvents } from '@/lib/ingest/dedup'
 import type { ApiResponse, ConflictEvent } from '@conflict-ops/shared'
 
 export async function GET(req: Request): Promise<NextResponse<ApiResponse<ConflictEvent[]>>> {
@@ -80,7 +81,25 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 
-  const events = (data ?? []) as unknown as ConflictEvent[]
+  const rawEvents = (data ?? []) as unknown as ConflictEvent[]
+
+  // Cluster events to deduplicate cross-source stories and add confidence signals
+  const clustered = clusterEvents(rawEvents as unknown as Array<{
+    title: string
+    occurred_at: string
+    source: string
+    event_type: string
+    region: string | null
+    country_code: string | null
+  } & ConflictEvent>)
+
+  // Map back to the expected response format, adding corroboration metadata
+  const events = clustered.map(({ canonical, corroborated_by, source_count, confidence }) => ({
+    ...(canonical as ConflictEvent),
+    _corroborated_by: corroborated_by,
+    _source_count: source_count,
+    _confidence: confidence,
+  }))
 
   await setCachedSnapshot(cacheKey, events, TTL.FEED)
 

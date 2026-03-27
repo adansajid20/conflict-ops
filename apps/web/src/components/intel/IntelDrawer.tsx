@@ -267,6 +267,23 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
                 <span style={{ color: 'var(--text-muted)' }}>Reliability</span>
                 <span style={{ color: 'var(--text-secondary)' }}>{reliability.score}</span>
               </div>
+              <div className="grid grid-cols-[100px_1fr] gap-1 items-center">
+                <span style={{ color: 'var(--text-muted)' }}>Corroboration</span>
+                {(item._source_count ?? 1) > 1 ? (
+                  <span style={{
+                    color: item._confidence === 'confirmed' ? '#22c55e' : '#eab308',
+                    fontWeight: 600,
+                    fontSize: '12px',
+                  }}>
+                    {item._source_count} independent source{(item._source_count ?? 1) !== 1 ? 's' : ''}
+                    {item._confidence === 'confirmed' ? ' — CONFIRMED' : ' — CORROBORATED'}
+                  </span>
+                ) : (
+                  <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                    Single source — treat as unverified
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

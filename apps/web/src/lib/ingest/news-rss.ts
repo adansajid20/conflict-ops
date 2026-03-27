@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { titleFingerprint } from './dedup'
 
 const NEWS_SOURCES = [
   // === TIER A — Wire services & UN (highest reliability) ===
@@ -202,6 +203,17 @@ export async function ingestNewsRSS(): Promise<{
 
   const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000) // 48h lookback window
 
+  // Pre-flight: batch-fetch recent event titles to build a fingerprint set for cross-source dedup
+  const { data: recentTitles } = await supabase
+    .from('events')
+    .select('title')
+    .gte('ingested_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    .limit(2000)
+
+  const recentFingerprintSet = new Set(
+    (recentTitles ?? []).map((e: { title: string }) => titleFingerprint(e.title))
+  )
+
   // Fetch all feeds in parallel with timeout
   const fetchResults = await Promise.allSettled(
     NEWS_SOURCES.map(async (src) => {
@@ -246,6 +258,15 @@ export async function ingestNewsRSS(): Promise<{
       }
 
       if (new Date(occurredAt) < cutoff) continue
+
+      // Cross-source dedup: skip if a similar title was already ingested in the last 24h
+      const fp = titleFingerprint(item.title)
+      if (recentFingerprintSet.has(fp)) {
+        skipped++
+        continue
+      }
+      // Add to set so we don't ingest duplicates within this run either
+      recentFingerprintSet.add(fp)
 
       const fullText = `${item.title} ${item.description}`
       const severity = scoreSeverity(fullText)

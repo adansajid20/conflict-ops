@@ -12,6 +12,9 @@ export type IntelItem = {
   description: string | null
   url: string | null
   location?: string | null
+  _corroborated_by?: string[]
+  _source_count?: number
+  _confidence?: 'confirmed' | 'corroborated' | 'unverified'
 }
 
 /** Extract source URL from provenance_raw for any source format */
@@ -68,6 +71,9 @@ export function eventToIntelItem(e: Record<string, unknown>): IntelItem {
     description: desc,
     url: extractUrl(raw),
     location: (e.location as string) ?? null,
+    _corroborated_by: (e._corroborated_by as string[]) ?? undefined,
+    _source_count: typeof e._source_count === 'number' ? e._source_count : undefined,
+    _confidence: (e._confidence as 'confirmed' | 'corroborated' | 'unverified') ?? undefined,
   }
 }
 
