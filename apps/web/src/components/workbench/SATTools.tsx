@@ -14,28 +14,34 @@ const TOOLS = [
 
 export function SATTools() {
   const [openTool, setOpenTool] = useState<string | null>(null)
-  const [inputText, setInputText] = useState('')
-  const [outputText, setOutputText] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [inputs, setInputs] = useState<Record<string, string>>({})
+  const [outputs, setOutputs] = useState<Record<string, string>>({})
+  const [loadingTool, setLoadingTool] = useState<string | null>(null)
 
-  const analyze = async (tool: string) => {
-    setLoading(true)
-    setOutputText('')
-    const res = await fetch('/api/v1/workbench/sat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool, input: inputText }) })
+  const analyze = async (toolId: string) => {
+    const inputText = inputs[toolId] ?? ''
+    if (!inputText.trim()) return
+    setLoadingTool(toolId)
+    setOutputs((prev) => ({ ...prev, [toolId]: '' }))
+    const res = await fetch('/api/v1/workbench/sat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: toolId, input: inputText }),
+    })
     const reader = res.body?.getReader()
     if (!reader) {
       const text = await res.text()
-      setOutputText(text)
-      setLoading(false)
+      setOutputs((prev) => ({ ...prev, [toolId]: text }))
+      setLoadingTool(null)
       return
     }
     const decoder = new TextDecoder()
     while (true) {
       const chunk = await reader.read()
       if (chunk.done) break
-      setOutputText((prev) => prev + decoder.decode(chunk.value))
+      setOutputs((prev) => ({ ...prev, [toolId]: (prev[toolId] ?? '') + decoder.decode(chunk.value) }))
     }
-    setLoading(false)
+    setLoadingTool(null)
   }
 
   return (
@@ -43,6 +49,9 @@ export function SATTools() {
       {TOOLS.map((tool) => {
         const Icon = tool.icon as any
         const isOpen = openTool === tool.id
+        const inputText = inputs[tool.id] ?? ''
+        const outputText = outputs[tool.id] ?? ''
+        const isLoading = loadingTool === tool.id
         return (
           <div key={tool.id} className="rounded-lg border p-4 interactive-card" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
             <div className="mb-3 flex items-center justify-between">
@@ -53,8 +62,22 @@ export function SATTools() {
             <div className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>{tool.desc}</div>
             {isOpen && (
               <div className="mt-4">
-                <textarea value={inputText} onChange={(e) => setInputText(e.target.value)} rows={6} className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }} placeholder="Paste scenario, assumptions, or evidence stack..." />
-                <button onClick={() => void analyze(tool.id)} disabled={loading || !inputText.trim()} className="mt-3 rounded-lg px-3 py-2 text-sm font-medium btn-primary" style={{ background: 'var(--primary)', color: '#fff' }}>{loading ? 'Analyzing...' : 'Analyze'}</button>
+                <textarea
+                  value={inputText}
+                  onChange={(e) => setInputs((prev) => ({ ...prev, [tool.id]: e.target.value }))}
+                  rows={6}
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                  style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }}
+                  placeholder="Paste scenario, assumptions, or evidence stack..."
+                />
+                <button
+                  onClick={() => void analyze(tool.id)}
+                  disabled={isLoading || !inputText.trim()}
+                  className="mt-3 rounded-lg px-3 py-2 text-sm font-medium btn-primary"
+                  style={{ background: 'var(--primary)', color: '#fff' }}
+                >
+                  {isLoading ? 'Analyzing...' : 'Analyze'}
+                </button>
                 {outputText && (
                   <div className="mt-4 rounded-lg border p-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
                     <div className="mb-2 flex items-center justify-between">

@@ -29,7 +29,7 @@ export async function GET() {
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const orgId = await getOrgId(userId)
-  if (!orgId) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })
+  if (!orgId) return NextResponse.json({ success: true, data: [], meta: { personal_mode: true } })
 
   const supabase = createServiceClient()
   const { data, error } = await supabase
@@ -48,7 +48,7 @@ export async function POST(req: Request): Promise<NextResponse<ApiResponse<unkno
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const orgId = await getOrgId(userId)
-  if (!orgId) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })
+  if (!orgId) return NextResponse.json({ success: false, error: 'A workspace is required to create PIRs. Create one at /settings/org.' }, { status: 403 })
 
   let body: unknown
   try { body = await req.json() } catch { return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 }) }
@@ -81,7 +81,7 @@ export async function DELETE(req: Request): Promise<NextResponse<ApiResponse<nul
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const orgId = await getOrgId(userId)
-  if (!orgId) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })
+  if (!orgId) return NextResponse.json({ success: false, error: 'No workspace found.' }, { status: 403 })
 
   const url = new URL(req.url)
   const pirId = url.searchParams.get('id')

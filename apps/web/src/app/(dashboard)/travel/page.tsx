@@ -8,6 +8,27 @@ type Assessment = { country_code?: string; risk_level?: number; risk_label?: str
 type Brief = { destination: string; risk_level: number; emergency_contacts?: string[]; pre_departure_checklist?: string[]; check_in_schedule?: string; communications_plan?: string; extraction_plan?: string }
 type EventRow = { id: string; title: string; occurred_at?: string | null; source: string }
 
+const COUNTRY_ISO: Record<string, string> = {
+  'Afghanistan': 'AF', 'Algeria': 'DZ', 'Argentina': 'AR', 'Armenia': 'AM',
+  'Australia': 'AU', 'Austria': 'AT', 'Bahrain': 'BH', 'Bangladesh': 'BD',
+  'Belgium': 'BE', 'Brazil': 'BR', 'Bulgaria': 'BG', 'Canada': 'CA',
+  'Chile': 'CL', 'China': 'CN', 'Colombia': 'CO', 'Czech Republic': 'CZ',
+  'Denmark': 'DK', 'Egypt': 'EG', 'Ethiopia': 'ET', 'Finland': 'FI',
+  'France': 'FR', 'Georgia': 'GE', 'Germany': 'DE', 'Ghana': 'GH',
+  'Greece': 'GR', 'Hungary': 'HU', 'India': 'IN', 'Indonesia': 'ID',
+  'Iran': 'IR', 'Iraq': 'IQ', 'Ireland': 'IE', 'Israel': 'IL',
+  'Italy': 'IT', 'Japan': 'JP', 'Jordan': 'JO', 'Kenya': 'KE',
+  'Lebanon': 'LB', 'Libya': 'LY', 'Malaysia': 'MY', 'Mexico': 'MX',
+  'Morocco': 'MA', 'Netherlands': 'NL', 'Nigeria': 'NG', 'Norway': 'NO',
+  'Pakistan': 'PK', 'Philippines': 'PH', 'Poland': 'PL', 'Portugal': 'PT',
+  'Qatar': 'QA', 'Romania': 'RO', 'Russia': 'RU', 'Saudi Arabia': 'SA',
+  'Singapore': 'SG', 'Somalia': 'SO', 'South Africa': 'ZA', 'South Korea': 'KR',
+  'Spain': 'ES', 'Sudan': 'SD', 'Sweden': 'SE', 'Syria': 'SY',
+  'Taiwan': 'TW', 'Thailand': 'TH', 'Tunisia': 'TN', 'Turkey': 'TR',
+  'Ukraine': 'UA', 'United Arab Emirates': 'AE', 'United Kingdom': 'GB',
+  'United States': 'US', 'Venezuela': 'VE', 'Yemen': 'YE',
+}
+
 const COUNTRIES = ['Afghanistan','Algeria','Argentina','Armenia','Australia','Austria','Bahrain','Bangladesh','Belgium','Brazil','Bulgaria','Canada','Chile','China','Colombia','Czech Republic','Denmark','Egypt','Ethiopia','Finland','France','Georgia','Germany','Ghana','Greece','Hungary','India','Indonesia','Iran','Iraq','Ireland','Israel','Italy','Japan','Jordan','Kenya','Lebanon','Libya','Malaysia','Mexico','Morocco','Netherlands','Nigeria','Norway','Pakistan','Philippines','Poland','Portugal','Qatar','Romania','Russia','Saudi Arabia','Singapore','Somalia','South Africa','South Korea','Spain','Sudan','Sweden','Syria','Taiwan','Thailand','Tunisia','Turkey','Ukraine','United Arab Emirates','United Kingdom','United States','Venezuela','Yemen']
 const FLAGS: Record<string, string> = { Ukraine: '🇺🇦', Israel: '🇮🇱', Sudan: '🇸🇩', Taiwan: '🇹🇼', Russia: '🇷🇺', Syria: '🇸🇾', Yemen: '🇾🇪', UnitedStates: '🇺🇸', UnitedKingdom: '🇬🇧' }
 const riskColor = (level: number) => ({ 1: '#22C55E', 2: '#EAB308', 3: '#F97316', 4: '#EF4444', 5: '#7f1d1d' }[level] || '#64748B')
@@ -34,7 +55,7 @@ export default function TravelPage() {
 
   const assessRisk = async (targetCountry: string) => {
     setLoading(true)
-    const code = targetCountry.slice(0, 2).toUpperCase()
+    const code = COUNTRY_ISO[targetCountry] ?? targetCountry.slice(0, 2).toUpperCase()
     const res = await fetch(`/api/v1/travel?country=${code}`, { cache: 'no-store' })
     const json = await res.json() as { data?: Assessment }
     setAssessment(json.data ?? null)

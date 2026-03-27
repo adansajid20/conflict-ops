@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { TrendingUp, Triangle } from 'lucide-react'
+import { ChevronUp, TrendingUp } from 'lucide-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { OverviewStatCards } from '@/components/dashboard/OverviewStatCards'
 
@@ -94,6 +94,16 @@ function inferRegion(event: EventRow) {
   return event.region || 'Global / Multi-Region'
 }
 
+async function getUserOrgId(userId: string) {
+  try {
+    const supabase = createServiceClient()
+    const { data } = await supabase.from('users').select('org_id').eq('clerk_user_id', userId).single()
+    return data?.org_id as string | null
+  } catch {
+    return null
+  }
+}
+
 async function getOverviewData() {
   const supabase = createServiceClient()
   const now = Date.now()
@@ -151,7 +161,11 @@ export default async function OverviewPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const { stats, matrix, sources, recentEvents, alerts } = await getOverviewData()
+  const [{ stats, matrix, sources, recentEvents, alerts }, orgId] = await Promise.all([
+    getOverviewData(),
+    getUserOrgId(userId),
+  ])
+  const personalMode = !orgId
   const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC'
 
   const statCards = [
@@ -178,6 +192,15 @@ export default async function OverviewPage() {
         </div>
       </header>
 
+      {personalMode && (
+        <div className="rounded-xl border px-4 py-3 mb-4" style={{ borderColor: 'var(--border-emphasis)', background: 'var(--primary-dim)' }}>
+          <span className="text-sm font-medium" style={{ color: 'var(--primary-text)' }}>
+            You&apos;re in Personal Mode — alerts, PIRs, and team features require a workspace.
+          </span>
+          <a href="/settings/org" className="ml-2 text-sm underline" style={{ color: 'var(--primary)' }}>Create workspace →</a>
+        </div>
+      )}
+
       <OverviewStatCards cards={[...statCards]} />
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[3fr_2fr]">
@@ -186,6 +209,11 @@ export default async function OverviewPage() {
             <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Regional Threat Matrix</h2>
           </div>
           <div className="p-3">
+            {matrix.length === 0 && (
+              <div className="px-4 py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+                Regional data populates after ingest completes — run an ingest cycle from the <a href="/admin" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Admin page</a>.
+              </div>
+            )}
             {matrix.map((row, index) => (
               <div key={row.region} className={`mb-2 grid grid-cols-[1.8fr_.8fr_.6fr_.6fr] items-center gap-3 rounded-md border-l-4 px-4 py-3 animate-fadeInUp stagger-${Math.min(index + 1, 6)}`} style={{ borderLeftColor: severityColor(row.maxSeverity), background: 'var(--bg-surface-2)', borderColor: 'var(--border)' }}>
                 <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{row.region}</div>
@@ -194,7 +222,7 @@ export default async function OverviewPage() {
                 </div>
                 <div className="text-sm" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{row.count}</div>
                 <div className="flex items-center gap-1 text-sm" style={{ color: row.trend >= 0 ? 'var(--sev-critical)' : 'var(--sev-low)' }}>
-                  {(() => { const TrendIcon = Triangle as any; return <TrendIcon size={12} fill="currentColor" className={row.trend >= 0 ? '' : 'rotate-180'} /> })()}
+                  {(() => { const TrendIcon = ChevronUp as any; return <TrendIcon size={12} className={row.trend >= 0 ? '' : 'rotate-180'} /> })()}
                   <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{Math.abs(row.trend)}</span>
                 </div>
               </div>

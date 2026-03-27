@@ -65,8 +65,11 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     query = query.gte('occurred_at', cutoff)
   }
 
+  const severityMap: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }
+  const severityInt = severity ? (parseInt(severity) || severityMap[severity.toLowerCase()] || null) : null
+
   if (countryCode) query = query.eq('country_code', countryCode)
-  if (severity) query = query.eq('severity', parseInt(severity))
+  if (severityInt) query = query.eq('severity', severityInt)
   if (source) query = query.eq('source', source)
   if (search) query = query.ilike('title', `%${search}%`)
   if (sinceParam) query = query.gte('occurred_at', sinceParam)

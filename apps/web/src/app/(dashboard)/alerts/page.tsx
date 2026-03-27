@@ -27,7 +27,15 @@ export default function AlertsPage() {
   const [pirForm, setPirForm] = useState<{ name: string; conditions: Condition[] }>({ name: '', conditions: [{ keyword: '', region: '', severity: 'all' }] })
   const load = useCallback(async () => { const [alertsRes, pirRes] = await Promise.all([fetch('/api/v1/alerts?limit=100', { cache: 'no-store' }), fetch('/api/v1/pir', { cache: 'no-store' })]); const alertsJson = await alertsRes.json() as { data?: AlertItem[] }; const pirJson = await pirRes.json() as { data?: PIR[] }; setAlerts(alertsJson.data ?? []); setPirs(pirJson.data ?? []) }, [])
   useEffect(() => { void load() }, [load])
-  const filteredAlerts = useMemo(() => alerts.filter((a) => { const sev = severityUi(a.severity).label.toLowerCase(); if (activeFilter === 'unread') return !a.read; if (activeFilter === 'all') return true; return sev === activeFilter }), [activeFilter, alerts])
+  const filteredAlerts = useMemo(() => {
+    const severityMap: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }
+    return alerts.filter((a) => {
+      if (activeFilter === 'all') return true
+      if (activeFilter === 'unread') return !a.read
+      const targetSev = severityMap[activeFilter]
+      return a.severity === targetSev || a.severity === activeFilter || severityUi(a.severity).label.toLowerCase() === activeFilter
+    })
+  }, [activeFilter, alerts])
   const unreadCount = alerts.filter((a) => !a.read).length
   const markRead = async (id: string) => { await fetch('/api/v1/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertIds: [id], read: true }) }); await load() }
   const markAllRead = async () => { await fetch('/api/v1/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertIds: alerts.filter((a) => !a.read).map((a) => a.id), read: true }) }); await load() }
