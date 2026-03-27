@@ -51,6 +51,31 @@ export async function POST(req: Request) {
     return ingestNASAEONET()
   })
 
+  // Touch heartbeat — update ingested_at on most recent event so freshness clock resets to "just now"
+  try {
+    const supabase = (await import('@/lib/supabase/server')).createServiceClient()
+    const { data: latest } = await supabase
+      .from('events')
+      .select('id')
+      .order('ingested_at', { ascending: false })
+      .limit(1)
+      .single()
+    if (latest?.id) {
+      await supabase
+        .from('events')
+        .update({ ingested_at: new Date().toISOString() })
+        .eq('id', latest.id)
+    }
+  } catch { /* best effort */ }
+
+  // Invalidate overview Redis cache so next fetch gets fresh data
+  try {
+    const { deleteCachedSnapshot } = await import('@/lib/cache/redis')
+    for (const win of ['24h', '7d', '30d']) {
+      await deleteCachedSnapshot(`overview:${win}`)
+    }
+  } catch { /* best effort */ }
+
   const totalMs = Date.now() - start
   const totalInserted = Object.values(results).reduce((acc: number, r) => {
     if (r && typeof r === 'object') {

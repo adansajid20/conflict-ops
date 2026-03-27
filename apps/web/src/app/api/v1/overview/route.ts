@@ -63,8 +63,8 @@ function computeFreshness(lastIngestedAt: string | null): {
   if (!lastIngestedAt) return { label: 'Offline', description: 'No recent data', color: 'red' }
   const ageMs = Date.now() - new Date(lastIngestedAt).getTime()
   const ageMin = Math.floor(ageMs / 60000)
-  if (ageMin < 30) return { label: 'Fresh', description: `${ageMin}m ago`, color: 'green' }
-  if (ageMin < 120) return { label: 'Delayed', description: `${ageMin}m ago`, color: 'yellow' }
+  if (ageMin < 60) return { label: 'Fresh', description: `${ageMin}m ago`, color: 'green' }
+  if (ageMin < 240) return { label: 'Delayed', description: `${Math.floor(ageMin / 60)}h ago`, color: 'yellow' }
   if (ageMin < 720) return { label: 'Stale', description: `${Math.floor(ageMin / 60)}h ago`, color: 'orange' }
   return { label: 'Offline', description: `${Math.floor(ageMin / 60)}h ago`, color: 'red' }
 }

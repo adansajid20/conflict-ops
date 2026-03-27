@@ -1,7 +1,7 @@
 name: Ingest Cron
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 jobs:
   ingest:
@@ -11,4 +11,8 @@ jobs:
         run: |
           curl -s -X POST https://conflictradar.co/api/v1/admin/run-ingest \
             -H "x-internal-secret: ${{ secrets.INTERNAL_SECRET }}" \
-            --max-time 60
+            -H "Content-Type: application/json" \
+            --max-time 90 \
+            --retry 2 \
+            --retry-delay 5 \
+            -w "\nHTTP %{http_code}\n"

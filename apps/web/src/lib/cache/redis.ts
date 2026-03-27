@@ -92,6 +92,16 @@ export async function setCachedSnapshot<T>(key: string, data: T, ttlSeconds: num
   }
 }
 
+export async function deleteCachedSnapshot(key: string): Promise<void> {
+  try {
+    const r = getRedis()
+    if (!r) return
+    await r.del(`snapshot:${key}`)
+  } catch {
+    // Non-fatal — cache delete failure is fine
+  }
+}
+
 export async function getSystemFlag(key: string): Promise<{ value: boolean; reason?: string; set_at?: string } | null> {
   try {
     const r = getRedis()

@@ -319,6 +319,27 @@ export function OverviewClient() {
     void fetchOverview(win)
   }, [win, fetchOverview])
 
+  // Trigger ingest every 3 minutes while page is open (rate-limited server-side)
+  useEffect(() => {
+    // Immediate trigger on load (passive — server-side rate limited)
+    fetch('/api/cron/trigger', { method: 'POST' }).catch(() => {})
+
+    const triggerInterval = setInterval(() => {
+      fetch('/api/cron/trigger', { method: 'POST' }).catch(() => {})
+    }, 3 * 60 * 1000)
+
+    return () => clearInterval(triggerInterval)
+  }, [])
+
+  // Auto-refresh overview data every 3 minutes (silent, uses SWR cache)
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      void fetchOverview(win)
+    }, 3 * 60 * 1000)
+
+    return () => clearInterval(refreshInterval)
+  }, [win, fetchOverview])
+
   const handleWindowChange = (w: Window) => {
     if (w === win) return
     setWin(w)
