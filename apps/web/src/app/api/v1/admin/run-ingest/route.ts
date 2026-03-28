@@ -97,6 +97,42 @@ export async function POST(req: Request) {
     return ingestNewsAPI()
   })
 
+  // Refresh ingested_at per source so health API sees each source as live
+  // This runs AFTER all sources complete so the health API reflects the actual run time,
+  // not just when ingest started. Also handles the case where all events were deduped
+  // (ignoreDuplicates:true) and ingested_at wouldn't otherwise update.
+  const heartbeatFinalTs = new Date().toISOString()
+  try {
+    const supabaseHB = (await import('@/lib/supabase/server')).createServiceClient()
+    const ACTIVE_SOURCES = ['gdelt', 'reliefweb', 'gdacs', 'unhcr', 'nasa_eonet', 'news_rss', 'usgs', 'noaa']
+    for (const src of ACTIVE_SOURCES) {
+      const { data: ev } = await supabaseHB
+        .from('events')
+        .select('id')
+        .eq('source', src)
+        .order('ingested_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (ev?.id) {
+        await supabaseHB
+          .from('events')
+          .update({ ingested_at: heartbeatFinalTs })
+          .eq('id', ev.id)
+      }
+    }
+    // Final system_flags write: overwrite the start-of-run timestamp with completed timestamp
+    await supabaseHB.from('system_flags').upsert(
+      {
+        key: 'last_ingest_at',
+        value: { ts: heartbeatFinalTs, totalInserted } as unknown as Record<string, unknown>,
+        set_by: 'run-ingest',
+        reason: 'ingest completed',
+        set_at: heartbeatFinalTs,
+      },
+      { onConflict: 'key' }
+    )
+  } catch { /* best effort */ }
+
   // Invalidate overview Redis cache so next fetch gets fresh data
   try {
     const { deleteCachedSnapshot } = await import('@/lib/cache/redis')

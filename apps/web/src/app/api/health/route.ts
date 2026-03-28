@@ -5,7 +5,7 @@ import { pingRedis, isSafeMode, getRedisInitError } from '@/lib/cache/redis'
 
 const ENABLED_SOURCES = ['gdelt', 'reliefweb', 'gdacs', 'unhcr', 'nasa_eonet', 'news_rss', 'usgs', 'noaa']
 const STALE_THRESHOLD_MS = 12 * 3600 * 1000  // 12h = degraded (dedup means ingested_at only refreshes on new events)
-const SOURCE_STALE_MS    = 8 * 3600 * 1000   // 8h per source
+const SOURCE_STALE_MS    = 25 * 3600 * 1000  // 25h per source (dedup means ingested_at only updates on new events; touch updates it each run)
 
 export async function GET() {
   const start = Date.now()
