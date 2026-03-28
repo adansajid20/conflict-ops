@@ -97,10 +97,27 @@ export async function POST(req: Request) {
     return ingestNewsAPI()
   })
 
-  // Refresh ingested_at per source so health API sees each source as live
-  // This runs AFTER all sources complete so the health API reflects the actual run time,
-  // not just when ingest started. Also handles the case where all events were deduped
-  // (ignoreDuplicates:true) and ingested_at wouldn't otherwise update.
+  // Invalidate overview Redis cache so next fetch gets fresh data
+  try {
+    const { deleteCachedSnapshot } = await import('@/lib/cache/redis')
+    for (const win of ['24h', '7d', '30d']) {
+      await deleteCachedSnapshot(`overview:${win}`)
+    }
+  } catch { /* best effort */ }
+
+  const totalMs = Date.now() - start
+  const totalInserted = Object.values(results).reduce((acc: number, r) => {
+    if (r && typeof r === 'object') {
+      const row = r as Record<string, number>
+      // Sources use different field names: GDELT uses 'inserted', others use 'stored'
+      return acc + (row.inserted ?? row.stored ?? 0)
+    }
+    return acc
+  }, 0)
+
+  // Refresh ingested_at per source so health API sees each source as live.
+  // Runs AFTER all sources complete. Handles the common case where all events are
+  // deduped (ignoreDuplicates:true) so ingested_at wouldn't otherwise update.
   const heartbeatFinalTs = new Date().toISOString()
   try {
     const supabaseHB = (await import('@/lib/supabase/server')).createServiceClient()
@@ -120,7 +137,7 @@ export async function POST(req: Request) {
           .eq('id', ev.id)
       }
     }
-    // Final system_flags write: overwrite the start-of-run timestamp with completed timestamp
+    // Final system_flags write: overwrite start-of-run timestamp with completed timestamp + stats
     await supabaseHB.from('system_flags').upsert(
       {
         key: 'last_ingest_at',
@@ -132,24 +149,6 @@ export async function POST(req: Request) {
       { onConflict: 'key' }
     )
   } catch { /* best effort */ }
-
-  // Invalidate overview Redis cache so next fetch gets fresh data
-  try {
-    const { deleteCachedSnapshot } = await import('@/lib/cache/redis')
-    for (const win of ['24h', '7d', '30d']) {
-      await deleteCachedSnapshot(`overview:${win}`)
-    }
-  } catch { /* best effort */ }
-
-  const totalMs = Date.now() - start
-  const totalInserted = Object.values(results).reduce((acc: number, r) => {
-    if (r && typeof r === 'object') {
-      const row = r as Record<string, number>
-      // Sources use different field names: GDELT uses 'inserted', others use 'stored'
-      return acc + (row.inserted ?? row.stored ?? 0)
-    }
-    return acc
-  }, 0)
 
   return Response.json({
     ok: true,
