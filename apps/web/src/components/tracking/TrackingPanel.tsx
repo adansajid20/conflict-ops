@@ -217,8 +217,11 @@ export function TrackingPanel() {
   // Layer toggles
   const [showEvents, setShowEvents] = useState(true)
   const [showHeatmap, setShowHeatmap] = useState(false)
+  const [showChoropleth, setShowChoropleth] = useState(true)
+  const [showAttackArcs, setShowAttackArcs] = useState(true)
+  const [showISS, setShowISS] = useState(true)
   const [showAircraft, setShowAircraft] = useState(false)
-  const [showShippingLanes, setShowShippingLanes] = useState(true)
+  const [showShippingLanes, setShowShippingLanes] = useState(false)
 
   // Filters
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('7d')
@@ -328,6 +331,9 @@ export function TrackingPanel() {
             showShippingLanes={showShippingLanes}
             showHeatmap={showHeatmap}
             timeWindow={timeWindow}
+            showChoropleth={showChoropleth}
+            showAttackArcs={showAttackArcs}
+            showISS={showISS}
           />
         )}
 
@@ -340,7 +346,7 @@ export function TrackingPanel() {
               thermals={[]}
               intelEvents={filteredEvents}
               layerToggles={layerToggles}
-              onIntelClick={event => setSelectedEvent(event)}
+              onIntelClick={(event: IntelEvent) => setSelectedEvent(event)}
             />
             {filteredEvents.length > 0 && (
               <div className="absolute top-3 left-3 rounded-md px-2 py-1 text-xs mono pointer-events-none"
@@ -381,11 +387,27 @@ export function TrackingPanel() {
               <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Heatmap view</span>
             </label>
             {viewMode === 'globe' && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={showShippingLanes} onChange={e => setShowShippingLanes(e.target.checked)}
-                  className="rounded" style={{ accentColor: 'var(--primary)' }} />
-                <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Shipping Lanes</span>
-              </label>
+              <>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={showChoropleth} onChange={e => setShowChoropleth(e.target.checked)}
+                    className="rounded" style={{ accentColor: 'var(--primary)' }} />
+                  <span className="text-xs" style={{ color: 'var(--text-primary)' }}>🗺 Risk Overlay</span>
+                  <span className="ml-auto text-[9px] mono px-1 py-0.5 rounded"
+                    style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>threat</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={showAttackArcs} onChange={e => setShowAttackArcs(e.target.checked)}
+                    className="rounded" style={{ accentColor: 'var(--primary)' }} />
+                  <span className="text-xs" style={{ color: 'var(--text-primary)' }}>⚔ Attack Vectors</span>
+                  <span className="ml-auto text-[9px] mono px-1 py-0.5 rounded"
+                    style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316' }}>live</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={showShippingLanes} onChange={e => setShowShippingLanes(e.target.checked)}
+                    className="rounded" style={{ accentColor: 'var(--primary)' }} />
+                  <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Shipping Lanes</span>
+                </label>
+              </>
             )}
           </div>
 
@@ -456,6 +478,44 @@ export function TrackingPanel() {
           {/* TRACKING LAYERS */}
           <SectionLabel label="Tracking Layers" />
           <div className="space-y-2 mb-1">
+
+            {/* ── ISS Tracker (free, no key) ── */}
+            {viewMode === 'globe' && (
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">🛸</span>
+                  <span className="text-xs flex-1" style={{ color: 'var(--text-primary)' }}>
+                    ISS Tracker
+                  </span>
+                  <span className="text-[9px] mono px-1 py-0.5 rounded mr-1"
+                    style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
+                    free
+                  </span>
+                  <button
+                    onClick={() => setShowISS(prev => !prev)}
+                    className="w-8 h-4 rounded-full flex items-center transition-colors relative"
+                    style={{
+                      background: showISS ? '#a78bfa' : 'var(--border)',
+                      flexShrink: 0,
+                    }}>
+                    <div
+                      className="w-3 h-3 rounded-full transition-transform"
+                      style={{
+                        background: 'white',
+                        transform: showISS ? 'translateX(18px)' : 'translateX(2px)',
+                      }}
+                    />
+                  </button>
+                </div>
+                {/* ISS status chip */}
+                {showISS && (
+                  <div className="mt-1.5 ml-6 text-[10px] mono rounded px-2 py-1"
+                    style={{ background: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.2)' }}>
+                    🛸 Live position · updating every 5s
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ── Flights (OpenSky — free, functional) ── */}
             <div>
