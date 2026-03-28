@@ -9,13 +9,63 @@ type Thermal = { region: string; frp: number; lat: number; lon: number; detected
 type IntelEvent = {
   id: string; source: string; title: string; severity?: number | null
   region?: string | null; occurred_at?: string | null; location?: string | null
+  country_code?: string | null; description?: string | null
 }
 
-const SEVERITY_COLORS: Record<number, string> = {
-  1: '#3b82f6',
-  2: '#f59e0b',
-  3: '#f97316',
-  4: '#ef4444',
+// Default map view: Middle East + Africa + Eastern Europe visible
+const DEFAULT_CENTER: [number, number] = [30, 20]
+const DEFAULT_ZOOM = 3
+
+// Country centroids for approximating events with only country_code
+const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
+  'US': [37.09, -95.71], 'RU': [61.52, 105.32], 'CN': [35.86, 104.19],
+  'UA': [48.37, 31.16], 'SY': [34.80, 38.99], 'IQ': [33.22, 43.68],
+  'AF': [33.93, 67.71], 'YE': [15.55, 48.52], 'SD': [12.86, 30.22],
+  'SS': [6.88, 31.31], 'ML': [17.57, -3.99], 'NE': [17.61, 8.08],
+  'CF': [6.61, 20.94], 'CD': [-4.04, 21.76], 'SO': [5.15, 46.20],
+  'ET': [9.14, 40.49], 'NG': [9.08, 8.68], 'LY': [26.34, 17.23],
+  'MM': [21.91, 95.96], 'PK': [30.37, 69.35], 'IN': [20.59, 78.96],
+  'IR': [32.43, 53.69], 'IL': [31.05, 34.85], 'PS': [31.95, 35.23],
+  'LB': [33.85, 35.86], 'TR': [38.96, 35.24], 'MX': [23.63, -102.55],
+  'VE': [6.42, -66.59], 'CO': [4.57, -74.29], 'HT': [18.97, -72.29],
+  'BR': [-14.24, -51.93], 'AR': [-38.42, -63.62], 'PE': [-9.19, -75.02],
+  'KE': [-0.02, 37.91], 'TZ': [-6.37, 34.89], 'UG': [1.37, 32.29],
+  'ZW': [-19.02, 29.15], 'ZA': [-30.56, 22.94], 'MZ': [-18.67, 35.53],
+  'AO': [-11.20, 17.87], 'BF': [12.36, -1.56], 'GN': [9.95, -11.24],
+  'CM': [3.85, 11.50], 'TD': [15.45, 18.73], 'ER': [15.18, 39.78],
+  'MR': [21.01, -10.94], 'SN': [14.50, -14.45], 'GH': [7.95, -1.02],
+  'CI': [7.54, -5.55], 'LR': [6.43, -9.43], 'SL': [8.46, -11.78],
+  'MG': [-18.77, 46.87], 'RW': [-1.94, 29.87], 'BI': [-3.38, 29.92],
+  'SA': [23.89, 45.08], 'AZ': [40.14, 47.58], 'AM': [40.07, 45.04],
+  'GE': [42.32, 43.36], 'MD': [47.41, 28.37], 'BY': [53.71, 28.05],
+  'RS': [44.02, 20.91], 'BA': [44.14, 17.68], 'XK': [42.57, 20.90],
+  'MK': [41.61, 21.74], 'AL': [41.15, 20.17], 'LK': [7.87, 80.77],
+  'BD': [23.68, 90.36], 'NP': [28.39, 84.12], 'KH': [12.57, 104.99],
+  'LA': [19.86, 102.50], 'VN': [14.06, 108.28], 'PH': [12.88, 121.77],
+  'ID': [-0.79, 113.92], 'GT': [15.78, -90.23], 'HN': [15.20, -86.24],
+  'SV': [13.79, -88.90], 'NI': [12.86, -85.21], 'EC': [-1.83, -78.18],
+  'BO': [-16.29, -63.59], 'PY': [-23.44, -58.44], 'UY': [-32.52, -55.77],
+  'CL': [-35.68, -71.54], 'KP': [40.34, 127.51], 'TN': [33.89, 9.54],
+  'DZ': [28.03, 1.66], 'MA': [31.79, -7.09], 'EG': [26.82, 30.80],
+  'JO': [30.59, 36.24], 'KZ': [48.02, 66.92], 'UZ': [41.38, 63.97],
+  'TJ': [38.86, 71.28], 'TM': [38.97, 59.56], 'KG': [41.20, 74.77],
+}
+
+function getEventCoords(event: IntelEvent): { lat: number; lng: number } | null {
+  // Try exact coordinates first
+  const coords = parseCoords(event.location)
+  if (coords) return coords
+
+  // Fall back to country centroid
+  if (event.country_code) {
+    const centroid = COUNTRY_CENTROIDS[event.country_code.toUpperCase()]
+    if (centroid) {
+      // Add small jitter to spread clustered country events
+      const jitter = () => (Math.random() - 0.5) * 3
+      return { lat: centroid[0] + jitter(), lng: centroid[1] + jitter() }
+    }
+  }
+  return null
 }
 
 function parseCoords(location: unknown): { lat: number; lng: number } | null {
@@ -44,7 +94,7 @@ interface TrackingMapProps {
   flights: Flight[]
   thermals: Thermal[]
   intelEvents?: IntelEvent[]
-  layerToggles: { vessels: boolean; flights: boolean; thermal: boolean; intel?: boolean }
+  layerToggles: { vessels: boolean; flights: boolean; thermal: boolean; intel?: boolean; heatmap?: boolean }
   onIntelClick?: (event: IntelEvent) => void
 }
 
@@ -64,13 +114,25 @@ export default function TrackingMap({ vessels, flights, thermals, intelEvents = 
       if (!mounted || !containerRef.current || mapRef.current) return
       const maplibre = mod.default
 
-      // Read initial URL params
+      // Restore saved AOI from localStorage or use URL params or default
+      let initialCenter: [number, number] = DEFAULT_CENTER
+      let initialZoom = DEFAULT_ZOOM
+
       const urlLat = searchParams?.get('lat')
       const urlLng = searchParams?.get('lng')
-      const initialCenter: [number, number] = urlLat && urlLng
-        ? [parseFloat(urlLng), parseFloat(urlLat)]
-        : [30, 20]
-      const initialZoom = urlLat ? 6 : 2
+      if (urlLat && urlLng) {
+        initialCenter = [parseFloat(urlLng), parseFloat(urlLat)]
+        initialZoom = 6
+      } else {
+        try {
+          const saved = localStorage.getItem('opmap_aoi')
+          if (saved) {
+            const parsed = JSON.parse(saved) as { center?: [number, number]; zoom?: number }
+            if (parsed.center) initialCenter = parsed.center
+            if (parsed.zoom) initialZoom = parsed.zoom
+          }
+        } catch { /* ignore */ }
+      }
 
       const map = new maplibre.Map({
         container: containerRef.current,
@@ -79,6 +141,14 @@ export default function TrackingMap({ vessels, flights, thermals, intelEvents = 
         zoom: initialZoom,
       })
       map.addControl(new maplibre.NavigationControl(), 'top-right')
+
+      // Save AOI on move end
+      map.on('moveend', () => {
+        try {
+          const c = map.getCenter()
+          localStorage.setItem('opmap_aoi', JSON.stringify({ center: [c.lng, c.lat], zoom: map.getZoom() }))
+        } catch { /* ignore */ }
+      })
 
       map.on('load', () => {
         // Vessel layer
@@ -93,23 +163,72 @@ export default function TrackingMap({ vessels, flights, thermals, intelEvents = 
         map.addSource('thermals', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
         map.addLayer({ id: 'thermals', type: 'circle', source: 'thermals', paint: { 'circle-radius': 7, 'circle-color': '#F97316', 'circle-opacity': 0.75 } })
 
-        // Intel events layer
+        // Intel events layer — severity-sized + colored markers
         map.addSource('intel', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+        map.addLayer({
+          id: 'intel-halo',
+          type: 'circle',
+          source: 'intel',
+          filter: ['==', ['get', 'severity'], 4],
+          paint: {
+            'circle-radius': 18,
+            'circle-color': '#ef4444',
+            'circle-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0.15, 6, 0.08],
+            'circle-stroke-width': 0,
+          },
+        })
         map.addLayer({
           id: 'intel',
           type: 'circle',
           source: 'intel',
           paint: {
-            'circle-radius': 6,
-            'circle-color': ['match', ['get', 'severity'], 1, '#3b82f6', 2, '#f59e0b', 3, '#f97316', 4, '#ef4444', '#3b82f6'] as any,
-            'circle-opacity': 0.85,
+            // Size: 8px base + 4px per severity level
+            'circle-radius': [
+              'match', ['get', 'severity'],
+              1, 8,
+              2, 12,
+              3, 16,
+              4, 20,
+              8
+            ] as any,
+            'circle-color': [
+              'match', ['get', 'severity'],
+              1, '#6B7280',
+              2, '#EAB308',
+              3, '#F97316',
+              4, '#ef4444',
+              '#6B7280'
+            ] as any,
+            'circle-opacity': 0.9,
             'circle-stroke-width': 1.5,
             'circle-stroke-color': '#fff',
-            'circle-stroke-opacity': 0.6,
+            'circle-stroke-opacity': 0.7,
           },
         })
 
-        // Intel label layer
+        // Heatmap layer (hidden by default)
+        map.addLayer({
+          id: 'intel-heatmap',
+          type: 'heatmap',
+          source: 'intel',
+          layout: { visibility: 'none' },
+          paint: {
+            'heatmap-weight': ['interpolate', ['linear'], ['get', 'severity'], 1, 0.2, 4, 1.0],
+            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 9, 3],
+            'heatmap-color': [
+              'interpolate', ['linear'], ['heatmap-density'],
+              0, 'rgba(0,0,255,0)',
+              0.2, '#3b82f6',
+              0.4, '#eab308',
+              0.6, '#f97316',
+              1, '#ef4444'
+            ],
+            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 20, 9, 40],
+            'heatmap-opacity': 0.75,
+          },
+        })
+
+        // Intel labels (visible at zoom 5+)
         map.addLayer({
           id: 'intel-labels',
           type: 'symbol',
@@ -128,9 +247,8 @@ export default function TrackingMap({ vessels, flights, thermals, intelEvents = 
           },
         })
 
-        const popup = new maplibre.Popup({ closeButton: false, closeOnClick: true })
-
         // Tooltips for vessel/flight/thermal
+        const popup = new maplibre.Popup({ closeButton: false, closeOnClick: true })
         for (const layer of ['vessels', 'flights', 'thermals']) {
           map.on('click', layer, (e: any) => {
             const feature = e.features?.[0]
@@ -157,7 +275,7 @@ export default function TrackingMap({ vessels, flights, thermals, intelEvents = 
         map.on('mouseenter', 'intel', () => { map.getCanvas().style.cursor = 'pointer' })
         map.on('mouseleave', 'intel', () => { map.getCanvas().style.cursor = '' })
 
-        // If URL has eventId, open drawer after map loads
+        // If URL has eventId, trigger click after load
         const urlEventId = searchParams?.get('eventId')
         if (urlEventId) {
           setTimeout(() => {
@@ -211,10 +329,10 @@ export default function TrackingMap({ vessels, flights, thermals, intelEvents = 
       })),
     })
 
-    // Build intel GeoJSON
+    // Build intel GeoJSON — use exact coords or country centroid
     const intelFeatures = intelEvents
       .map(e => {
-        const coords = parseCoords(e.location)
+        const coords = getEventCoords(e)
         if (!coords) return null
         return {
           type: 'Feature' as const,
@@ -224,7 +342,7 @@ export default function TrackingMap({ vessels, flights, thermals, intelEvents = 
             title: e.title,
             severity: e.severity ?? 1,
             source: e.source,
-            region: e.region,
+            region: e.region || e.country_code || '',
             occurred_at: e.occurred_at,
             label: e.title.slice(0, 30),
           },
@@ -235,11 +353,25 @@ export default function TrackingMap({ vessels, flights, thermals, intelEvents = 
     intelSource?.setData({ type: 'FeatureCollection', features: intelFeatures })
 
     // Layer visibility
+    const showIntel = layerToggles.intel ?? true
+    const showHeatmap = layerToggles.heatmap ?? false
+
     if (map.getLayer('vessels')) map.setLayoutProperty('vessels', 'visibility', layerToggles.vessels ? 'visible' : 'none')
     if (map.getLayer('flights')) map.setLayoutProperty('flights', 'visibility', layerToggles.flights ? 'visible' : 'none')
     if (map.getLayer('thermals')) map.setLayoutProperty('thermals', 'visibility', layerToggles.thermal ? 'visible' : 'none')
-    if (map.getLayer('intel')) map.setLayoutProperty('intel', 'visibility', (layerToggles.intel ?? true) ? 'visible' : 'none')
-    if (map.getLayer('intel-labels')) map.setLayoutProperty('intel-labels', 'visibility', (layerToggles.intel ?? true) ? 'visible' : 'none')
+
+    if (showHeatmap) {
+      // Show heatmap, hide dot markers
+      if (map.getLayer('intel')) map.setLayoutProperty('intel', 'visibility', 'none')
+      if (map.getLayer('intel-halo')) map.setLayoutProperty('intel-halo', 'visibility', 'none')
+      if (map.getLayer('intel-labels')) map.setLayoutProperty('intel-labels', 'visibility', 'none')
+      if (map.getLayer('intel-heatmap')) map.setLayoutProperty('intel-heatmap', 'visibility', showIntel ? 'visible' : 'none')
+    } else {
+      if (map.getLayer('intel-heatmap')) map.setLayoutProperty('intel-heatmap', 'visibility', 'none')
+      if (map.getLayer('intel')) map.setLayoutProperty('intel', 'visibility', showIntel ? 'visible' : 'none')
+      if (map.getLayer('intel-halo')) map.setLayoutProperty('intel-halo', 'visibility', showIntel ? 'visible' : 'none')
+      if (map.getLayer('intel-labels')) map.setLayoutProperty('intel-labels', 'visibility', showIntel ? 'visible' : 'none')
+    }
   }, [flights, intelEvents, layerToggles, thermals, vessels])
 
   return <div ref={containerRef} className="h-full min-h-[520px] w-full" />
