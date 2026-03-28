@@ -421,7 +421,7 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
           className="sticky bottom-0 px-5 py-4 space-y-2"
           style={{ background: 'var(--bg-surface)', borderTop: '1px solid var(--border)' }}
         >
-          {mapHref ? (
+          {mapHref && (
             <a
               href={mapHref}
               className="flex items-center justify-center gap-2 w-full rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
@@ -429,15 +429,6 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
             >
               <IconMap size={14} /> View on Map
             </a>
-          ) : (
-            <button
-              disabled
-              title="Location unknown"
-              className="flex items-center justify-center gap-2 w-full rounded-lg px-4 py-2.5 text-sm font-medium cursor-not-allowed"
-              style={{ background: 'var(--border)', color: 'var(--text-muted)' }}
-            >
-              <IconMap size={14} /> View on Map
-            </button>
           )}
           <div className="flex gap-2">
             {hasOrg ? (
@@ -450,12 +441,11 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
               </a>
             ) : (
               <button
-                disabled
-                className="flex items-center justify-center gap-1.5 flex-1 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
-                style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}
-                title="Workspace required"
+                title="Workspace required — create a workspace to set alerts"
+                className="flex items-center justify-center gap-1.5 flex-1 rounded-lg px-3 py-2 text-sm"
+                style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'default', opacity: 0.6 }}
               >
-                <IconBell size={13} /> Create Alert
+                🔒 Create Alert
               </button>
             )}
             <button

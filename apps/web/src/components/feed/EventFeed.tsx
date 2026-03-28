@@ -7,6 +7,7 @@ import { IntelDrawer } from '@/components/intel/IntelDrawer'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { eventToIntelItem } from '@/types/intel-item'
 import { safeRelativeTime } from '@/lib/utils/time'
+import { displayLocation, generateSummary } from '@/lib/utils/location'
 
 type FeedEvent = {
   id: string
@@ -337,8 +338,8 @@ export function EventFeed() {
               const isFocused = focusedIndex === index
               const sColor = sevColor(event.severity)
               const sLabel = sevLabel(event.severity)
-              const country = event.country_code ?? 'Unknown'
-              const snippet = event.snippet || event.description || event.title
+              const country = displayLocation(event.country_code, event.region, event.location)
+              const snippet = event.snippet || event.description || generateSummary(event)
 
               return (
                 <motion.div
@@ -386,7 +387,6 @@ export function EventFeed() {
                       )}
                       <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>
                         {country}
-                        {event.region && event.region !== event.country_code ? ` · ${event.region}` : ''}
                       </span>
                       <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace', marginLeft: 'auto' }}>
                         {safeRelativeTime(event.occurred_at)}

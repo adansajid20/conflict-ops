@@ -4,6 +4,7 @@ import { useEffect, useCallback, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { safeTimeAgo, severityLabel, severityColor, type IntelItem } from '@/types/intel-item'
 import { safeAbsoluteTime, getFreshness, safeRelativeTime, type FreshnessLevel } from '@/lib/utils/time'
+import { displayLocation, COUNTRY_NAMES } from '@/lib/utils/location'
 
 const SOURCE_LABELS: Record<string, string> = {
   gdelt: 'GDELT',
@@ -15,6 +16,33 @@ const SOURCE_LABELS: Record<string, string> = {
   acled: 'ACLED',
   noaa: 'NOAA',
   usgs: 'USGS',
+}
+
+const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
+  'US': [37.09, -95.71], 'RU': [61.52, 105.32], 'UA': [48.37, 31.16],
+  'IL': [31.05, 34.85],  'PS': [31.95, 35.23],  'LB': [33.85, 35.86],
+  'SY': [34.80, 38.99],  'IQ': [33.22, 43.68],  'IR': [32.43, 53.69],
+  'YE': [15.55, 48.52],  'SA': [23.89, 45.08],  'AF': [33.93, 67.71],
+  'PK': [30.37, 69.35],  'SD': [12.86, 30.22],  'SS': [6.88, 31.31],
+  'ET': [9.14, 40.49],   'SO': [5.15, 46.20],   'NG': [9.08, 8.68],
+  'ML': [17.57, -3.99],  'LY': [26.34, 17.23],  'MM': [21.91, 95.96],
+  'CN': [35.86, 104.19], 'IN': [20.59, 78.96],  'TR': [38.96, 35.24],
+  'DE': [51.16, 10.45],  'FR': [46.23, 2.21],   'GB': [55.38, -3.44],
+  'MX': [23.63, -102.55],'BR': [-14.24, -51.93],'JP': [36.20, 138.25],
+  'KR': [35.91, 127.77], 'EG': [26.82, 30.80],  'SA': [23.89, 45.08],
+  'AZ': [40.14, 47.58],  'AM': [40.07, 45.04],  'CD': [-4.04, 21.76],
+  'SO': [5.15, 46.20],   'KE': [-0.02, 37.91],  'VE': [6.42, -66.59],
+  'CO': [4.57, -74.29],  'MX': [23.63, -102.55],
+}
+
+function getIntelCoords(item: IntelItem): { lat: number; lng: number; isCentroid: boolean } | null {
+  const exact = parseCoords(item.location)
+  if (exact) return { ...exact, isCentroid: false }
+  if (item.country_code && item.country_code.length === 2 && item.country_code !== 'UN') {
+    const centroid = COUNTRY_CENTROIDS[item.country_code]
+    if (centroid) return { lat: centroid[0], lng: centroid[1], isCentroid: true }
+  }
+  return null
 }
 
 function parseCoords(location: unknown): { lat: number; lng: number } | null {
@@ -149,13 +177,14 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
 
   if (!item) return null
 
-  const coords = parseCoords(item.location)
+  const coordInfo = getIntelCoords(item)
+  const coords = coordInfo
   const sourceLabel = SOURCE_LABELS[item.source] ?? item.source.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
   const freshness = getFreshness(item.ingested_at)
 
   const handleViewOnMap = () => {
-    if (!coords) return
-    router.push(`/tracking?lat=${coords.lat}&lng=${coords.lng}&eventId=${item.id}`)
+    if (!coordInfo) return
+    router.push(`/tracking?lat=${coordInfo.lat}&lng=${coordInfo.lng}&eventId=${item.id}`)
   }
 
   const handleCopyLink = async () => {
@@ -196,8 +225,8 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
     }
   }
 
-  // Location display — show Unknown if both null after geo cleanup
-  const locationDisplay = [item.country_code, item.region].filter(Boolean).join(' / ') || 'Unknown'
+  // Location display — show Unknown if both null after geo cleanup, never show "UN"
+  const locationDisplay = displayLocation(item.country_code, item.region)
 
   return (
     <>
@@ -270,7 +299,11 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
               <div className="grid grid-cols-[100px_1fr] gap-1">
                 <span style={{ color: 'var(--text-muted)' }}>Coordinates</span>
                 <span className="mono" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
-                  {coords ? `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}` : '—'}
+                  {coordInfo && !coordInfo.isCentroid
+                    ? `${coordInfo.lat.toFixed(4)}, ${coordInfo.lng.toFixed(4)}`
+                    : coordInfo?.isCentroid
+                      ? `~${coordInfo.lat.toFixed(2)}, ${coordInfo.lng.toFixed(2)} (approx.)`
+                      : '—'}
                 </span>
               </div>
               <div className="grid grid-cols-[100px_1fr] gap-1">
@@ -370,22 +403,22 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
           <div>
             <SectionHeader label="ACTIONS" />
             <div className="grid grid-cols-2 gap-2">
-              {/* View on Map */}
-              <button
-                onClick={coords ? handleViewOnMap : undefined}
-                disabled={!coords}
-                title={coords ? 'View on map' : 'No coordinates available'}
-                className="px-3 py-2 rounded-lg text-xs font-medium border transition-colors"
-                style={{
-                  background: coords ? 'rgba(37,99,235,0.1)' : 'var(--bg-surface-2)',
-                  borderColor: coords ? 'rgba(37,99,235,0.4)' : 'var(--border)',
-                  color: coords ? '#60A5FA' : 'var(--text-muted)',
-                  cursor: coords ? 'pointer' : 'not-allowed',
-                  opacity: coords ? 1 : 0.5,
-                }}
-              >
-                🗺 {coords ? 'View on Map' : 'No coordinates'}
-              </button>
+              {/* View on Map — hide entirely when no coords and no centroid */}
+              {coordInfo && (
+                <button
+                  onClick={handleViewOnMap}
+                  title={coordInfo.isCentroid ? 'View approximate location on map' : 'View on map'}
+                  className="px-3 py-2 rounded-lg text-xs font-medium border transition-colors"
+                  style={{
+                    background: 'rgba(37,99,235,0.1)',
+                    borderColor: 'rgba(37,99,235,0.4)',
+                    color: '#60A5FA',
+                    cursor: 'pointer',
+                  }}
+                >
+                  🗺 View on Map{coordInfo.isCentroid ? ' (approx.)' : ''}
+                </button>
+              )}
 
               {/* Copy Link */}
               <button
