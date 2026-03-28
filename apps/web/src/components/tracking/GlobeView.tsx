@@ -284,6 +284,7 @@ export default function GlobeView({
   const [aircraft, setAircraft] = useState<Aircraft[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [aircraftError, setAircraftError] = useState<string | null>(null)
+  const [webglError, setWebglError] = useState(false)
   const [countriesGeoJSON, setCountriesGeoJSON] = useState<{ features: unknown[] } | null>(null)
   const [issPosition, setISSPosition] = useState<ISSPosition | null>(null)
   const [issLastUpdate, setISSLastUpdate] = useState<number | null>(null)
@@ -487,7 +488,11 @@ export default function GlobeView({
       setIsLoading(false)
     }
 
-    init().catch(console.error)
+    init().catch((err) => {
+      console.error('[GlobeView] init failed:', err)
+      setWebglError(true)
+      setIsLoading(false)
+    })
 
     return () => {
       destroyed = true
@@ -635,6 +640,29 @@ export default function GlobeView({
   // ── ISS "updated X seconds ago" ─────────────────────────────────────────────
   const issSecondsAgo = issLastUpdate ? Math.round((Date.now() - issLastUpdate) / 1000) : null
 
+  // WebGL not supported — show graceful fallback
+  if (webglError) {
+    return (
+      <div className="w-full h-full bg-black flex flex-col items-center justify-center text-center p-8 space-y-4">
+        <div className="text-4xl">🌍</div>
+        <h2 className="text-base font-semibold text-gray-200">3D globe not available</h2>
+        <p className="text-sm text-gray-400 max-w-sm">
+          Your browser does not support WebGL required for the 3D globe.
+          Switch to the 2D Map view using the button above.
+        </p>
+        <div className="text-xs px-3 py-1.5 rounded-full border border-yellow-500/30 text-yellow-400 bg-yellow-500/10">
+          ⚠ 3D view not supported in this browser
+        </div>
+        {/* Show incident count from events */}
+        {eventPoints.length > 0 && (
+          <p className="text-xs text-gray-500 mt-2">
+            {eventPoints.length} incidents available in 2D map view
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="relative w-full h-full bg-black">
       {/* Loading overlay */}
@@ -649,6 +677,16 @@ export default function GlobeView({
 
       {/* Globe canvas */}
       <div ref={containerRef} className="w-full h-full" />
+
+      {/* No events message — shown after globe loads with no event data */}
+      {!isLoading && eventPoints.length === 0 && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
+          <div className="bg-black/70 border border-gray-700 rounded-xl px-6 py-4 backdrop-blur-sm">
+            <div className="text-gray-400 text-sm">No events to display</div>
+            <div className="text-gray-600 text-xs mt-1">Try a wider time window</div>
+          </div>
+        </div>
+      )}
 
       {/* Aircraft badge */}
       {showAircraft && !aircraftError && aircraft.length > 0 && (
