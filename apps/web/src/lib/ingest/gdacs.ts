@@ -28,12 +28,12 @@ function extractTag(block: string, tag: string): string | null {
   return match?.[1] ? decodeHtml(match[1]).trim() : null
 }
 
-function alertLevelToSeverity(level: string): number {
+function alertLevelToSeverity(level: string): 1 | 2 | 3 | 4 {
   const value = level.toLowerCase()
-  if (value === 'red') return 5
-  if (value === 'orange') return 4
+  if (value === 'red') return 4
+  if (value === 'orange') return 3
   if (value === 'green') return 2
-  return 3
+  return 2
 }
 
 function eventTypeFromTitle(title: string): string {

@@ -33,12 +33,31 @@ interface NOAAAlert {
   geometry: { type: string; coordinates: unknown } | null
 }
 
-// Map NOAA severity to our 1-4 scale
-function mapSeverity(severity: string, event: string): 1 | 2 | 3 | 4 {
+// Map NOAA severity to our 1-4 scale — based on event type first, NWS severity as tiebreaker
+function mapSeverity(nwsSeverity: string, event: string): 1 | 2 | 3 | 4 {
   const e = event.toLowerCase()
-  if (severity === 'Extreme' || e.includes('tornado') || e.includes('hurricane') || e.includes('typhoon') || e.includes('tsunami')) return 4
-  if (severity === 'Severe' || e.includes('cyclone') || e.includes('flash flood')) return 3
-  if (severity === 'Moderate') return 2
+  // Severity 4: life-threatening
+  if (
+    e.includes('tornado warning') || e.includes('hurricane warning') ||
+    e.includes('typhoon') || e.includes('tsunami') ||
+    e.includes('tornado emergency') || e.includes('particularly dangerous')
+  ) return 4
+  // Severity 3: significant
+  if (
+    e.includes('flash flood warning') || e.includes('severe thunderstorm warning') ||
+    e.includes('tropical storm warning') || e.includes('ice storm') ||
+    e.includes('blizzard') || e.includes('winter storm warning') ||
+    e.includes('tornado watch') || e.includes('hurricane watch') ||
+    e.includes('high wind warning') || e.includes('wildfire') ||
+    nwsSeverity === 'Extreme'
+  ) return 3
+  // Severity 2: moderate hazard
+  if (
+    e.includes('flood warning') || e.includes('wind advisory') ||
+    e.includes('red flag') || e.includes('winter storm watch') ||
+    e.includes('freeze warning') || nwsSeverity === 'Severe'
+  ) return 2
+  // Severity 1: minor advisory
   return 1
 }
 
@@ -98,7 +117,7 @@ export async function ingestNOAA(): Promise<{ stored: number; skipped: number; e
         description: description || title,
         region: 'North America',
         country_code: 'US',
-        severity: mapSeverity(p.severity, p.event),
+        severity: mapSeverity(p.severity, p.event),  // nwsSeverity, event
         status: p.messageType === 'Alert' ? 'confirmed' : 'developing',
         occurred_at: p.onset ?? p.effective ?? p.sent,
         heavy_lane_processed: false,

@@ -66,11 +66,16 @@ function categoryToEventType(categoryId: string): string {
   return 'natural_disaster'
 }
 
-function severityFromCategory(categoryId: string, magnitudeValue: number | null): number {
-  if (categoryId === 'wildfires' && magnitudeValue && magnitudeValue > 100) return 4
-  if (categoryId === 'floods') return 3
-  if (categoryId === 'severeStorms') return 3
+function severityFromCategory(categoryId: string, _magnitudeValue: number | null): 1 | 2 | 3 | 4 {
+  // EONET category → severity mapping
+  // Wildfires, Volcanoes, Severe Storms → 3 (significant natural disaster)
+  // Sea and Lake Ice, Earthquakes → 2
+  // Dust and Haze, Snow, Drought, Floods → 1–2
+  if (categoryId === 'wildfires' || categoryId === 'volcanoes' || categoryId === 'severeStorms') return 3
+  if (categoryId === 'seaLakeIce' || categoryId === 'earthquakes') return 2
+  if (categoryId === 'floods') return 2
   if (categoryId === 'drought') return 2
+  if (categoryId === 'dustHaze' || categoryId === 'snow') return 1
   return 2
 }
 

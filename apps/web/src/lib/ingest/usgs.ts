@@ -35,12 +35,12 @@ interface USGSResponse {
   features: USGSFeature[]
 }
 
-// Map USGS alert level to our severity
+// Map USGS alert level and magnitude to our severity (1-4)
 function alertToSeverity(alert: string | null, mag: number, tsunami: number): 1 | 2 | 3 | 4 {
   if (tsunami === 1 || alert === 'red') return 4
-  if (alert === 'orange') return 3
-  if (alert === 'yellow' || mag >= 6.5) return 3
-  if (mag >= 5.5) return 2
+  if (mag >= 7.0 || alert === 'orange') return 4
+  if (mag >= 6.0 || alert === 'yellow') return 3
+  if (mag >= 5.0) return 2
   return 1
 }
 

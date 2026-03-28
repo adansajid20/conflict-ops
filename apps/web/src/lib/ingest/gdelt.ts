@@ -195,15 +195,11 @@ export async function ingestGDELT(): Promise<IngestResult> {
         description_original: null,
         description_lang: article.language,
         region: null,
-        country_code: article.sourcecountry?.substring(0, 2)?.toUpperCase() ?? null,
-        location: (() => {
-          const cc = article.sourcecountry?.substring(0, 2)?.toUpperCase()
-          const base = cc ? COUNTRY_CENTROIDS[cc] : null
-          if (!base) return undefined
-          const [lng, lat] = jitterCoords(base)
-          return `POINT(${lng} ${lat})`
-        })(),
-        severity: 2, // default — heavy lane will update
+        // Don't use sourcecountry for country_code — it's the article's origin country,
+        // not necessarily where the event occurred. Setting null avoids geo misattribution.
+        country_code: null,
+        location: undefined,
+        severity: 2 as const, // capped at 2 — unverified news aggregator
         status: 'pending',
         occurred_at: parseGDELTDate(article.seendate),
         heavy_lane_processed: false,

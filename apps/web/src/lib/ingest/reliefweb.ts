@@ -5,6 +5,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
+import { cleanDescription, humanitarianSeverity } from './utils'
 
 // rss2json proxies reliefweb RSS to bypass Cloudflare bot protection on cloud IPs
 const RSS2JSON_BASE = 'https://api.rss2json.com/v1/api.json?rss_url='
@@ -83,11 +84,9 @@ function getRegionFromCode(iso2: string | null): string {
   return REGIONS[iso2] ?? 'Global'
 }
 
-function severityFromText(text: string): number {
-  const v = text.toLowerCase()
-  if (/war|armed conflict|airstrike|offensive|mass casualty|siege|famine/.test(v)) return 4
-  if (/conflict|violence|displacement|refugee|flood|earthquake|cyclone|outbreak|humanitarian/.test(v)) return 3
-  return 2
+// Thin wrapper — delegates to shared humanitarian severity scorer
+function severityFromText(title: string, description: string): 1 | 2 | 3 | 4 {
+  return humanitarianSeverity(title, description)
 }
 
 type Rss2JsonItem = {
@@ -164,7 +163,7 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
       const countryName = categoryCountry ?? descCountry
       const countryCode = countryNameToCode(countryName)
 
-      const description = stripTags(item.description ?? '').slice(0, 1000) || title
+      const description = cleanDescription(item.description, title)
       const sourceName = item.author || extractSourceName(item.description ?? '') || null
       const text = `${title} ${description} ${countryName ?? ''}`
 
@@ -182,7 +181,7 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
           description,
           region: getRegionFromCode(countryCode),
           country_code: countryCode,
-          severity: severityFromText(text),
+          severity: severityFromText(title, description),
           status: 'pending',
           occurred_at: occurredAt,
           heavy_lane_processed: false,

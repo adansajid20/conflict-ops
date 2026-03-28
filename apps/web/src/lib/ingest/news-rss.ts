@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { titleFingerprint } from './dedup'
+import { cleanDescription, detectEventType } from './utils'
 
 const NEWS_SOURCES = [
   // === TIER A — Wire services & UN (highest reliability) ===
@@ -267,20 +268,7 @@ function isConflictRelevant(title: string, description: string, eventType: strin
   return RELEVANCE_KEYWORDS.some(kw => combined.includes(kw))
 }
 
-function detectEventType(text: string): string {
-  const lower = text.toLowerCase()
-  if (/airstrike|bombing|missile|rocket|artillery/.test(lower)) return 'airstrike'
-  if (/attack|assault|offensive|invasion/.test(lower)) return 'armed_conflict'
-  if (/earthquake|flood|hurricane|wildfire|tsunami|cyclone|volcano/.test(lower)) return 'natural_disaster'
-  if (/refugee|displaced|evacuation|exodus/.test(lower)) return 'displacement'
-  if (/humanitarian|aid|famine|starvation|food crisis/.test(lower)) return 'humanitarian'
-  if (/protest|demonstration|riot|uprising/.test(lower)) return 'civil_unrest'
-  if (/coup|overthrow|junta|military takeover/.test(lower)) return 'political_crisis'
-  if (/sanctions|embargo|tariff/.test(lower)) return 'economic'
-  if (/nuclear|chemical|biological weapon/.test(lower)) return 'wmd_threat'
-  if (/terror|terrorist|extremist/.test(lower)) return 'terrorism'
-  return 'news'
-}
+// detectEventType imported from ./utils — more precise classification
 
 export async function ingestNewsRSS(): Promise<{
   stored: number
@@ -376,7 +364,7 @@ export async function ingestNewsRSS(): Promise<{
       const cleanUrl = item.link.split('?')[0]!.split('#')[0]!
       const source_id = `news_rss:${src.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}:${Buffer.from(cleanUrl).toString('base64').slice(0, 32)}`
 
-      const snippet = (item.description || item.title || '').trim().slice(0, 1000) || item.title.slice(0, 500)
+      const snippet = cleanDescription(item.description, item.title)
 
       toUpsert.push({
         source: 'news_rss',

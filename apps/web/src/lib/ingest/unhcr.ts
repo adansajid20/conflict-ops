@@ -5,6 +5,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
+import { cleanDescription, humanitarianSeverity } from './utils'
 
 const UNHCR_SEARCH_URL = 'https://reliefweb.int/updates?search=UNHCR'
 
@@ -37,11 +38,9 @@ function regionFromCode(code: string | null): string {
   return code ? (regions[code] ?? 'Global') : 'Global'
 }
 
-function severityFromText(text: string): number {
-  const value = text.toLowerCase()
-  if (/emergency|mass displacement|crisis|appeal/.test(value)) return 4
-  if (/displacement|refugee|asylum|protection|humanitarian|situation report/.test(value)) return 3
-  return 2
+// Delegates to shared humanitarian severity scorer
+function severityFromText(title: string, description: string): 1 | 2 | 3 | 4 {
+  return humanitarianSeverity(title, description)
 }
 
 export async function ingestUNHCR(): Promise<{ stored: number; skipped: number }> {
@@ -81,10 +80,10 @@ export async function ingestUNHCR(): Promise<{ stored: number; skipped: number }
         source_id: `unhcr-${link}`,
         event_type: 'humanitarian',
         title,
-        description: summary || title,
+        description: cleanDescription(summary, title),
         region: regionFromCode(countryCode),
         country_code: countryCode,
-        severity: severityFromText(text),
+        severity: severityFromText(title, summary),
         status: 'pending',
         occurred_at: occurredAt,
         heavy_lane_processed: false,
