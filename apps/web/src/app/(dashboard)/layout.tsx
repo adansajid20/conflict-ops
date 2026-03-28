@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
 import {
   Activity,
@@ -23,6 +23,7 @@ import {
   Target,
   TrendingUp,
   Webhook,
+  HeartPulse,
 } from 'lucide-react'
 import { CommandPalette } from '@/components/layout/CommandPalette'
 import { FreshnessBanner } from '@/components/layout/FreshnessBanner'
@@ -45,7 +46,12 @@ const PRIMARY_NAV: NavItem[] = [
   { href: '/feed', label: 'Intel Feed', section: 'primary', icon: Activity },
   { href: '/tracking', label: 'Operational Map', section: 'primary', icon: Radio },
   { href: '/alerts', label: 'Alerts', section: 'primary', icon: Bell },
+]
+
+// Admin nav — only shown when ?admin=1 or NEXT_PUBLIC_ADMIN_MODE=true
+const ADMIN_NAV: NavItem[] = [
   { href: '/admin', label: 'Admin', section: 'primary', icon: Stethoscope },
+  { href: '/admin/doctor', label: 'Doctor', section: 'primary', icon: HeartPulse },
 ]
 
 // Secondary nav — coming soon or deprioritized
@@ -123,12 +129,21 @@ function StatusBar() {
   const totalEvents = health?.events?.total ?? health?.eventCount ?? 0
   const lastIngestAt = health?.ingest?.last_success_at ?? health?.lastIngestAt ?? null
 
+  const adminMode = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).get('admin') === '1' ||
+    process.env['NEXT_PUBLIC_ADMIN_MODE'] === 'true'
+  )
+
   return (
     <div className="flex h-7 items-center gap-6 border-t px-4 text-[11px]"
       style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
       <div>UTC <span className="mono" style={{ color: 'var(--text-primary)' }}>{utcTime}</span></div>
-      <div>FEEDS <span className="mono" style={{ color: liveFeeds > 0 ? 'var(--sev-low)' : 'var(--sev-medium)' }}>{liveFeeds}/{totalFeeds}</span></div>
-      <div>EVENTS <motion.span key={totalEvents} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="mono" style={{ color: 'var(--text-primary)' }}>{totalEvents}</motion.span></div>
+      {adminMode && (
+        <>
+          <div>FEEDS <span className="mono" style={{ color: liveFeeds > 0 ? 'var(--sev-low)' : 'var(--sev-medium)' }}>{liveFeeds}/{totalFeeds}</span></div>
+          <div>EVENTS <motion.span key={totalEvents} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="mono" style={{ color: 'var(--text-primary)' }}>{totalEvents}</motion.span></div>
+        </>
+      )}
       <div>INGEST <span className="mono" style={{ color: 'var(--text-primary)' }}>{safeTimeAgo(lastIngestAt)}</span></div>
     </div>
   )
@@ -136,10 +151,20 @@ function StatusBar() {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? ''
+  const searchParams = useSearchParams()
   const { user } = useUser()
   const { health } = useHealthStatus(60_000)
   const [unreadAlerts, setUnreadAlerts] = useState(0)
   const [moreOpen, setMoreOpen] = useState(false)
+
+  // Admin mode: ?admin=1 OR env var
+  const isAdminMode = useMemo(() => {
+    const envAdmin = process.env['NEXT_PUBLIC_ADMIN_MODE'] === 'true'
+    const paramAdmin = searchParams?.get('admin') === '1'
+    // Also check if we're on an admin route already
+    const onAdminRoute = pathname.startsWith('/admin')
+    return envAdmin || paramAdmin || onAdminRoute
+  }, [searchParams, pathname])
 
   useEffect(() => {
     fetch('/api/v1/me').catch(() => undefined)
@@ -193,6 +218,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {PRIMARY_NAV.map(item => (
                 <NavLink key={item.href} item={item} pathname={pathname} unreadAlerts={unreadAlerts} />
               ))}
+              {isAdminMode && (
+                <>
+                  <div className="px-3 pt-3 pb-1 text-[10px] font-medium uppercase tracking-[0.08em]" style={{ color: 'rgba(139,92,246,0.7)' }}>
+                    Admin
+                  </div>
+                  {ADMIN_NAV.map(item => (
+                    <NavLink key={item.href} item={item} pathname={pathname} />
+                  ))}
+                </>
+              )}
             </div>
 
             {/* More / secondary nav — collapsible */}

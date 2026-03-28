@@ -1,6 +1,13 @@
 'use client'
 
+import Link from 'next/link'
 import { useHealthStatus } from '@/hooks/useHealthStatus'
+
+function isAdminMode() {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('admin') === '1' ||
+    process.env['NEXT_PUBLIC_ADMIN_MODE'] === 'true'
+}
 
 export function FreshnessBanner() {
   const { health } = useHealthStatus(120_000) // poll every 2min
@@ -13,6 +20,7 @@ export function FreshnessBanner() {
     : Infinity
 
   const ingestAgeMin = ingestAgeMs / 60000
+  const adminMode = isAdminMode()
 
   // Fresh (< 30 min): hide banner entirely
   if (ingestAgeMin < 30) return null
@@ -42,6 +50,15 @@ export function FreshnessBanner() {
         >
           Refresh
         </button>
+        {adminMode && (
+          <Link
+            href="/admin/doctor"
+            className="ml-auto text-[10px] hover:opacity-80 transition-opacity"
+            style={{ color: 'rgba(139,92,246,0.8)' }}
+          >
+            Admin →
+          </Link>
+        )}
       </div>
     )
   }
@@ -57,7 +74,7 @@ export function FreshnessBanner() {
         color: '#F87171',
       }}
     >
-      <span>⚠ Updates paused · last update {hours}h ago</span>
+      <span>⚠ Updates delayed · last update {hours}h ago</span>
       <button
         onClick={handleRefresh}
         className="rounded px-2 py-0.5 text-[10px] font-semibold border hover:opacity-80 transition-opacity"
@@ -65,6 +82,15 @@ export function FreshnessBanner() {
       >
         Refresh
       </button>
+      {adminMode && (
+        <Link
+          href="/admin/doctor"
+          className="ml-auto text-[10px] hover:opacity-80 transition-opacity"
+          style={{ color: 'rgba(139,92,246,0.8)' }}
+        >
+          Admin →
+        </Link>
+      )}
     </div>
   )
 }
