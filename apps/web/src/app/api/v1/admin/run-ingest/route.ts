@@ -58,6 +58,18 @@ export async function POST(req: Request) {
     const { ingestUSGS } = await import('@/lib/ingest/usgs')
     return ingestUSGS()
   })
+  await runSource('noaa', async () => {
+    const { ingestNOAA } = await import('@/lib/ingest/noaa')
+    return ingestNOAA()
+  })
+  await runSource('acled', async () => {
+    const { ingestACLED } = await import('@/lib/ingest/acled')
+    return ingestACLED()
+  })
+  await runSource('newsapi', async () => {
+    const { ingestNewsAPI } = await import('@/lib/ingest/newsapi')
+    return ingestNewsAPI()
+  })
 
   // Touch heartbeat — update ingested_at on most recent event so freshness clock resets to "just now"
   try {

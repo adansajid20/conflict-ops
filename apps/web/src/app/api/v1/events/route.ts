@@ -89,7 +89,9 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     'civil_unrest', 'displacement', 'humanitarian', 'wmd_threat',
     'natural_disaster', 'economic',
   ]
+  const AUTHORITATIVE_SOURCES = ['noaa', 'acled', 'usgs', 'gdacs', 'unhcr', 'nasa_eonet', 'reliefweb']
   const relevantData = rawEvents.filter(e =>
+    AUTHORITATIVE_SOURCES.includes((e as unknown as Record<string,unknown>).source as string) || // authoritative sources always pass
     RELEVANT_TYPES.includes((e as unknown as Record<string,unknown>).event_type as string) ||
     ((e as unknown as Record<string,unknown>).severity as number ?? 0) >= 2 ||
     (e as unknown as Record<string,unknown>).country_code !== null

@@ -4,6 +4,7 @@ import { titleFingerprint } from './dedup'
 const NEWS_SOURCES = [
   // === TIER A — Wire services & UN (highest reliability) ===
   { name: 'AP News',                  url: 'https://apnews.com/hub/world-news?format=rss',                                                                   tier: 'A',  region: null },
+  { name: 'WHO News',                 url: 'https://www.who.int/rss-feeds/news-english.xml',                                                                 tier: 'A',  region: null },
   { name: 'UN News',                  url: 'https://news.un.org/feed/subscribe/en/news/all/rss.xml',                                                         tier: 'A',  region: null },
   { name: 'UN Peace & Security',      url: 'https://news.un.org/feed/subscribe/en/news/topic/peace-and-security/rss.xml',                                    tier: 'A',  region: null },
   { name: 'UN Humanitarian',          url: 'https://news.un.org/feed/subscribe/en/news/topic/humanitarian-affairs/rss.xml',                                  tier: 'A',  region: null },
