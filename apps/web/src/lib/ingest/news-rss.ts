@@ -294,16 +294,13 @@ export async function ingestNewsRSS(): Promise<{
 
   const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000) // 48h lookback window
 
-  // Pre-flight: batch-fetch recent event titles to build a fingerprint set for cross-source dedup
-  const { data: recentTitles } = await supabase
-    .from('events')
-    .select('title')
-    .gte('ingested_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-    .limit(2000)
-
-  const recentFingerprintSet = new Set(
-    (recentTitles ?? []).map((e: { title: string }) => titleFingerprint(e.title))
-  )
+  // NOTE: In-memory title fingerprint removed — it was causing false positives.
+  // normalizeTitle() replaces numbers with NUM + sorts words alphabetically, so
+  // "5 killed in Gaza" and "12 killed in Gaza" get identical fingerprints and
+  // the second article was being silently dropped. DB-level dedup (source,source_id)
+  // handles true duplicates reliably. Cross-source duplicate detection via fingerprint
+  // was blocking legitimate new events.
+  const recentFingerprintSet = new Set<string>() // kept as empty — no pre-seeding
 
   // Fetch all feeds in parallel with timeout
   const fetchResults = await Promise.allSettled(
