@@ -4,8 +4,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { pingRedis, isSafeMode, getRedisInitError } from '@/lib/cache/redis'
 
 const ENABLED_SOURCES = ['gdelt', 'reliefweb', 'gdacs', 'unhcr', 'nasa_eonet', 'news_rss', 'usgs', 'noaa']
-const STALE_THRESHOLD_MS = 12 * 3600 * 1000  // 12h = degraded (dedup means ingested_at only refreshes on new events)
-const SOURCE_STALE_MS    = 25 * 3600 * 1000  // 25h per source (dedup means ingested_at only updates on new events; touch updates it each run)
+const STALE_THRESHOLD_MS = 12 * 3600 * 1000  // 12h = degraded
+const SOURCE_STALE_MS    = 72 * 3600 * 1000  // 72h per source — dedup means ingested_at only updates on genuinely new events
 
 export async function GET() {
   const start = Date.now()
@@ -48,6 +48,19 @@ export async function GET() {
     }
     if (!lastIngestAt && lastIngestResult.status === 'fulfilled' && lastIngestResult.value.data) {
       lastIngestAt = lastIngestResult.value.data.ingested_at as string
+    }
+    // Fallback: if last_success_at is >2h old but we have recent 24h inserts,
+    // find the most recent event from the last 72h (wider window catches dedup gaps)
+    if (!lastIngestAt || (Date.now() - new Date(lastIngestAt).getTime() > 2 * 3600_000)) {
+      const supabase2 = createServiceClient()
+      const { data: recent } = await supabase2
+        .from('events')
+        .select('ingested_at')
+        .gte('ingested_at', new Date(Date.now() - 72 * 3600_000).toISOString())
+        .order('ingested_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (recent?.ingested_at) lastIngestAt = recent.ingested_at as string
     }
 
     if (sourceResult.status === 'fulfilled' && sourceResult.value.data) {
@@ -128,9 +141,11 @@ export async function GET() {
     ingest: {
       ok: ingestOk,
       last_success_at: lastIngestAt,
-      last_run_at: lastIngestAt, // same until we track separately
+      last_run_at: lastIngestAt,
       inserted_24h: inserted24h,
       deduped_24h: deduped24h,
+      sources_live: liveSources,
+      sources_total: ENABLED_SOURCES.length,
     },
     sources: {
       enabled: ENABLED_SOURCES.length,
