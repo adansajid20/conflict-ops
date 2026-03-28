@@ -290,6 +290,7 @@ export async function ingestNewsRSS(): Promise<{
 }> {
   const supabase = createServiceClient()
   let stored = 0, skipped = 0, errors = 0, sources_ok = 0
+  const toUpsert: Array<Record<string, unknown>> = []
 
   const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000) // 48h lookback window
 
@@ -375,7 +376,7 @@ export async function ingestNewsRSS(): Promise<{
       const cleanUrl = item.link.split('?')[0]!.split('#')[0]!
       const source_id = `news_rss:${src.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}:${Buffer.from(cleanUrl).toString('base64').slice(0, 32)}`
 
-      const { error } = await supabase.from('events').upsert({
+      toUpsert.push({
         source: 'news_rss',
         source_id,
         event_type: evType,
@@ -392,7 +393,7 @@ export async function ingestNewsRSS(): Promise<{
           attribution: `${src.name} (via RSS)`,
           url: item.link,
           tier: src.tier,
-          state_media: src.tier === 'C', // flag state-controlled outlets
+          state_media: src.tier === 'C',
         } as Record<string, unknown>,
         raw: {
           title: item.title,
@@ -400,9 +401,22 @@ export async function ingestNewsRSS(): Promise<{
           pubDate: item.pubDate,
           sourceName: src.name,
         } as Record<string, unknown>,
-      }, { onConflict: 'source,source_id', ignoreDuplicates: true })
+      })
+    }
+  }
 
-      if (error) { skipped++ } else { stored++ }
+  // Batch-upsert collected items in parallel chunks of 20
+  const BATCH_SIZE = 20
+  for (let i = 0; i < toUpsert.length; i += BATCH_SIZE) {
+    const batch = toUpsert.slice(i, i + BATCH_SIZE)
+    const batchResults = await Promise.allSettled(
+      batch.map(record =>
+        supabase.from('events').upsert(record, { onConflict: 'source,source_id', ignoreDuplicates: true })
+      )
+    )
+    for (const r of batchResults) {
+      if (r.status === 'fulfilled' && !r.value.error) stored++
+      else skipped++
     }
   }
 

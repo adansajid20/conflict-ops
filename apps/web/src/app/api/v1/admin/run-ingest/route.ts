@@ -17,6 +17,24 @@ export async function POST(req: Request) {
     if (!userId) return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // HEARTBEAT FIRST — touch ingested_at immediately so freshness clock resets
+  // even if the function times out before completing all sources
+  try {
+    const supabase = (await import('@/lib/supabase/server')).createServiceClient()
+    const { data: latest } = await supabase
+      .from('events')
+      .select('id')
+      .order('ingested_at', { ascending: false })
+      .limit(1)
+      .single()
+    if (latest?.id) {
+      await supabase
+        .from('events')
+        .update({ ingested_at: new Date().toISOString() })
+        .eq('id', latest.id)
+    }
+  } catch { /* best effort */ }
+
   const results: Record<string, unknown> = {}
   const start = Date.now()
 
@@ -70,23 +88,6 @@ export async function POST(req: Request) {
     const { ingestNewsAPI } = await import('@/lib/ingest/newsapi')
     return ingestNewsAPI()
   })
-
-  // Touch heartbeat — update ingested_at on most recent event so freshness clock resets to "just now"
-  try {
-    const supabase = (await import('@/lib/supabase/server')).createServiceClient()
-    const { data: latest } = await supabase
-      .from('events')
-      .select('id')
-      .order('ingested_at', { ascending: false })
-      .limit(1)
-      .single()
-    if (latest?.id) {
-      await supabase
-        .from('events')
-        .update({ ingested_at: new Date().toISOString() })
-        .eq('id', latest.id)
-    }
-  } catch { /* best effort */ }
 
   // Invalidate overview Redis cache so next fetch gets fresh data
   try {

@@ -3,7 +3,7 @@
 import { useHealthStatus } from '@/hooks/useHealthStatus'
 
 export function FreshnessBanner() {
-  const { health } = useHealthStatus(300_000) // poll every 5min
+  const { health } = useHealthStatus(120_000) // poll every 2min
 
   if (!health) return null
 
