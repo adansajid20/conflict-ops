@@ -224,21 +224,32 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .select('id', { count: 'exact', head: true })
       .eq('read', false),
 
-    // Top stories — fetch more candidates so we can apply NOAA cap
+    // Top stories (conflict/news) — exclude NOAA so severity cap doesn't block them
     supabase
       .from('events')
       .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw')
       .gte('occurred_at', since)
-      .order('severity', { ascending: false })
+      .neq('source', 'noaa')
       .order('occurred_at', { ascending: false })
-      .limit(200),
+      .limit(100),
   ])
 
   const hasOrg = !!(orgRes.data?.org_id)
   const allEvents = (windowEvents.data ?? []) as EventRow[]
-  const storiesCandidates = (topStories.data ?? []) as EventRow[]
+  const conflictCandidates = (topStories.data ?? []) as EventRow[]
 
-  // Build top stories: cap NOAA/natural_disaster at 3, fill rest with conflict events
+  // Fetch NOAA separately so severity ordering doesn't block conflict events
+  const noaaRes = await supabase
+    .from('events')
+    .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw')
+    .gte('occurred_at', since)
+    .eq('source', 'noaa')
+    .order('severity', { ascending: false })
+    .order('occurred_at', { ascending: false })
+    .limit(10)
+  const weatherCandidates = (noaaRes.data ?? []) as EventRow[]
+
+  // Build top stories: cap NOAA at 3, fill rest with conflict events newest-first
   const EVENT_TYPE_PRIORITY: Record<string, number> = {
     armed_conflict:      1,
     airstrike:           1,
@@ -251,14 +262,22 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     natural_disaster:    4,
     news:                5,
   }
-  const weatherCandidates = storiesCandidates.filter(e => e.source === 'noaa' || e.event_type === 'natural_disaster')
-  const conflictCandidates = storiesCandidates.filter(e => e.source !== 'noaa' && e.event_type !== 'natural_disaster')
   const sortedConflict = [...conflictCandidates].sort((a, b) => {
     const pa = EVENT_TYPE_PRIORITY[a.event_type ?? 'news'] ?? 5
     const pb = EVENT_TYPE_PRIORITY[b.event_type ?? 'news'] ?? 5
-    if (pa !== pb) return pa - pb
+    const ta = new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
+    const tb = new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime()
+    // Within same priority tier: newest first
+    // Across tiers: only let priority win if the older item is in a significantly higher tier
+    // (don't let a 16h-old humanitarian report beat a 30min-old armed_conflict)
+    const priorityDiff = pa - pb
+    const ageHrsDiff = (tb - ta) / 3_600_000  // positive = b is newer
+    if (Math.abs(priorityDiff) >= 2 && Math.abs(ageHrsDiff) < 6) return priorityDiff  // clear priority diff AND close in time
+    if (ageHrsDiff > 4) return 1   // b is 4h+ newer → b wins regardless of priority
+    if (ageHrsDiff < -4) return -1 // a is 4h+ newer → a wins
+    if (priorityDiff !== 0) return priorityDiff  // similar age, use priority
     if ((b.severity ?? 1) !== (a.severity ?? 1)) return (b.severity ?? 1) - (a.severity ?? 1)
-    return new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() - new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
+    return tb - ta  // finally: newest first
   })
   const sortedWeather = [...weatherCandidates].sort((a, b) => {
     if ((b.severity ?? 1) !== (a.severity ?? 1)) return (b.severity ?? 1) - (a.severity ?? 1)
