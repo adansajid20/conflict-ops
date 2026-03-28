@@ -110,6 +110,8 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
 
     if (AUTH_SOURCES_SET.has(src)) score += 0.25
     if (ALLOWED_CATEGORIES.has(evType)) score += 0.25
+    // Stronger boost for events already classified as a specific conflict type (not just 'news')
+    if (evType !== 'news' && ALLOWED_CATEGORIES.has(evType)) score += 0.1
     if (CONFLICT_KEYWORDS.test(text)) score += 0.25
     if (sev >= 3) score += 0.1
     if (sev >= 4) score += 0.1
@@ -117,7 +119,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     return Math.min(score, 1.0)
   }
 
-  const MIN_RELEVANCE = 0.55
+  const MIN_RELEVANCE = 0.45
 
   const INTEL_FEED_TYPES = new Set([
     'armed_conflict', 'airstrike', 'military', 'mobilization', 'ceasefire',

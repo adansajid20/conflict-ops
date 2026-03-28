@@ -224,19 +224,53 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .select('id', { count: 'exact', head: true })
       .eq('read', false),
 
-    // Top stories — top 20 by severity then recency
+    // Top stories — fetch more candidates so we can apply NOAA cap
     supabase
       .from('events')
       .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw')
       .gte('occurred_at', since)
       .order('severity', { ascending: false })
       .order('occurred_at', { ascending: false })
-      .limit(20),
+      .limit(200),
   ])
 
   const hasOrg = !!(orgRes.data?.org_id)
   const allEvents = (windowEvents.data ?? []) as EventRow[]
-  const stories = (topStories.data ?? []) as EventRow[]
+  const storiesCandidates = (topStories.data ?? []) as EventRow[]
+
+  // Build top stories: cap NOAA/natural_disaster at 3, fill rest with conflict events
+  const EVENT_TYPE_PRIORITY: Record<string, number> = {
+    armed_conflict:      1,
+    airstrike:           1,
+    terrorism:           1,
+    political_crisis:    2,
+    coup:                2,
+    diplomacy:           2,
+    humanitarian_crisis: 3,
+    civil_unrest:        3,
+    natural_disaster:    4,
+    news:                5,
+  }
+  const weatherCandidates = storiesCandidates.filter(e => e.source === 'noaa' || e.event_type === 'natural_disaster')
+  const conflictCandidates = storiesCandidates.filter(e => e.source !== 'noaa' && e.event_type !== 'natural_disaster')
+  const sortedConflict = [...conflictCandidates].sort((a, b) => {
+    const pa = EVENT_TYPE_PRIORITY[a.event_type ?? 'news'] ?? 5
+    const pb = EVENT_TYPE_PRIORITY[b.event_type ?? 'news'] ?? 5
+    if (pa !== pb) return pa - pb
+    if ((b.severity ?? 1) !== (a.severity ?? 1)) return (b.severity ?? 1) - (a.severity ?? 1)
+    return new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() - new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
+  })
+  const sortedWeather = [...weatherCandidates].sort((a, b) => {
+    if ((b.severity ?? 1) !== (a.severity ?? 1)) return (b.severity ?? 1) - (a.severity ?? 1)
+    return new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() - new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
+  })
+  const NOAA_CAP = 3
+  const weatherSlots = Math.min(sortedWeather.length, NOAA_CAP)
+  const conflictSlots = 20 - weatherSlots
+  const stories: EventRow[] = [
+    ...sortedConflict.slice(0, conflictSlots),
+    ...sortedWeather.slice(0, weatherSlots),
+  ]
 
   const lastIngested = freshRes.data?.ingested_at as string | null
   const freshness = computeFreshness(lastIngested)
