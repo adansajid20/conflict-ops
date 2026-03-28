@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { AnimatePresence } from 'framer-motion'
 import {
@@ -36,22 +36,46 @@ const EVENT_TYPE_PRIORITY: Record<string, number> = {
   news:                5,
 }
 
+// ─── HTML entity decoder ──────────────────────────────────────────────────────
+
+function decodeHtmlEntities(text: string): string {
+  if (!text) return ''
+  return text
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8216;/g, "'")
+    .replace(/&#8220;/g, '"')
+    .replace(/&#8221;/g, '"')
+    .replace(/&#8211;/g, '–')
+    .replace(/&#8212;/g, '—')
+    .replace(/&#8230;/g, '…')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)))
+}
+
 // ─── title formatter ──────────────────────────────────────────────────────────
 
 function formatEventTitle(title: string, source: string | null, maxLen = 80): string {
   if (!title) return 'Untitled event'
 
+  // Decode HTML entities first (e.g. &#8217; → ')
+  const decoded = decodeHtmlEntities(title)
+
   if (source === 'noaa') {
     // Extract alert type (text before "issued" or "in effect")
-    const type = title.split(/\s+issued|\s+in effect/i)[0]?.trim() ?? title
+    const type = decoded.split(/\s+issued|\s+in effect/i)[0]?.trim() ?? decoded
     // Extract NWS location from "by NWS [Location] [STATE]"
-    const locMatch = title.match(/by\s+NWS\s+(.+?)(?:\s*$)/i)
+    const locMatch = decoded.match(/by\s+NWS\s+(.+?)(?:\s*$)/i)
     const loc = locMatch?.[1] ? ` · ${locMatch[1].trim()}` : ''
     const short = type.length > 60 ? type.slice(0, 57) + '…' : type + loc
     return short.length > maxLen ? short.slice(0, maxLen - 1) + '…' : short
   }
 
-  return title.length > maxLen ? title.slice(0, maxLen - 1) + '…' : title
+  return decoded.length > maxLen ? decoded.slice(0, maxLen - 1) + '…' : decoded
 }
 
 // ─── severity / status configs ────────────────────────────────────────────────
@@ -69,6 +93,159 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   disputed:   { label: 'Disputed',   color: '#8b5cf6' },
   corrected:  { label: 'Corrected',  color: '#6b7280' },
   pending:    { label: 'Developing', color: '#f59e0b' },
+}
+
+// ─── category → event_type mapping ──────────────────────────────────────────
+
+const CATEGORY_TYPES: Record<string, string[]> = {
+  Conflict:   ['armed_conflict', 'terrorism', 'civil_unrest', 'protest'],
+  Airstrikes: ['airstrike', 'explosion', 'attack'],
+  Political:  ['political_crisis', 'coup', 'diplomacy', 'sanctions'],
+  Disasters:  ['natural_disaster', 'humanitarian_crisis'],
+  News:       ['news'],
+}
+
+const CATEGORY_LIST = [
+  { key: 'Conflict',   emoji: '⚔️' },
+  { key: 'Airstrikes', emoji: '💥' },
+  { key: 'Political',  emoji: '🏛️' },
+  { key: 'Disasters',  emoji: '🌊' },
+  { key: 'News',       emoji: '📰' },
+]
+
+const SEVERITY_PILLS = [
+  { value: null,  label: 'All',      emoji: null,  activeClass: 'bg-white/10 border-white/30 text-white' },
+  { value: 4,     label: 'Critical', emoji: '🔴',  activeClass: 'bg-red-500/20 border-red-500 text-red-400' },
+  { value: 3,     label: 'High',     emoji: '🟠',  activeClass: 'bg-orange-500/20 border-orange-500 text-orange-400' },
+  { value: 2,     label: 'Medium',   emoji: '🟡',  activeClass: 'bg-yellow-500/20 border-yellow-500 text-yellow-400' },
+  { value: 1,     label: 'Low',      emoji: '⚫',  activeClass: 'bg-gray-500/20 border-gray-500 text-gray-400' },
+] as const
+
+// ─── filter bar ───────────────────────────────────────────────────────────────
+
+function FilterBar({
+  allEvents,
+  severityFilter,
+  setSeverityFilter,
+  categoryFilter,
+  setCategoryFilter,
+  filteredCount,
+  totalCount,
+}: {
+  allEvents: OverviewEvent[]
+  severityFilter: number | null
+  setSeverityFilter: (v: number | null) => void
+  categoryFilter: string | null
+  setCategoryFilter: (v: string | null) => void
+  filteredCount: number
+  totalCount: number
+}) {
+  const isFiltered = severityFilter !== null || categoryFilter !== null
+
+  // Count events per severity (out of full set)
+  const sevCounts = useMemo(() => {
+    const counts: Record<number, number> = { 4: 0, 3: 0, 2: 0, 1: 0 }
+    allEvents.forEach(e => { const s = e.severity ?? 0; if (counts[s] !== undefined) counts[s]++ })
+    return counts
+  }, [allEvents])
+
+  // Count events per category
+  const catCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    CATEGORY_LIST.forEach(c => {
+      counts[c.key] = allEvents.filter(e => CATEGORY_TYPES[c.key]?.includes(e.event_type ?? '')).length
+    })
+    return counts
+  }, [allEvents])
+
+  return (
+    <div
+      className="sticky top-0 z-10 border-b px-5 py-3 space-y-2"
+      style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}
+    >
+      {/* Row 1 — Severity */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-widest mr-1" style={{ color: 'var(--text-muted)' }}>
+          Severity
+        </span>
+        {SEVERITY_PILLS.map(pill => {
+          const isActive = severityFilter === pill.value
+          const count = pill.value !== null ? sevCounts[pill.value] ?? 0 : totalCount
+          return (
+            <button
+              key={String(pill.value)}
+              onClick={() => setSeverityFilter(pill.value)}
+              className={[
+                'px-3 py-1 rounded-full text-xs font-medium border transition-colors',
+                isActive
+                  ? pill.activeClass
+                  : 'bg-transparent border-gray-700 text-gray-400 hover:border-gray-500',
+              ].join(' ')}
+            >
+              {pill.emoji ? `${pill.emoji} ` : ''}{pill.label}
+              <span className="ml-1 opacity-60">({count})</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Row 2 — Category */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-widest mr-1" style={{ color: 'var(--text-muted)' }}>
+          Category
+        </span>
+        <button
+          onClick={() => setCategoryFilter(null)}
+          className={[
+            'px-3 py-1 rounded-full text-xs font-medium border transition-colors',
+            categoryFilter === null
+              ? 'bg-white/10 border-white/30 text-white'
+              : 'bg-transparent border-gray-700 text-gray-400 hover:border-gray-500',
+          ].join(' ')}
+        >
+          All <span className="ml-1 opacity-60">({totalCount})</span>
+        </button>
+        {CATEGORY_LIST.map(cat => {
+          const isActive = categoryFilter === cat.key
+          const count = catCounts[cat.key] ?? 0
+          return (
+            <button
+              key={cat.key}
+              onClick={() => setCategoryFilter(isActive ? null : cat.key)}
+              className={[
+                'px-3 py-1 rounded-full text-xs font-medium border transition-colors',
+                isActive
+                  ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                  : 'bg-transparent border-gray-700 text-gray-400 hover:border-gray-500',
+              ].join(' ')}
+            >
+              {cat.emoji} {cat.key} <span className="ml-1 opacity-60">({count})</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Count + clear */}
+      <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <span>
+          Showing{' '}
+          <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{filteredCount}</span>
+          {' '}of{' '}
+          <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{totalCount}</span>
+          {' '}events
+        </span>
+        {isFiltered && (
+          <button
+            onClick={() => { setSeverityFilter(null); setCategoryFilter(null) }}
+            className="underline hover:no-underline"
+            style={{ color: 'var(--primary)' }}
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+    </div>
+  )
 }
 
 const FRESHNESS_COLORS = {
@@ -361,6 +538,8 @@ export function OverviewClient() {
   const [error, setError] = useState(false)
   const [data, setData] = useState<OverviewData | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<OverviewEvent | null>(null)
+  const [severityFilter, setSeverityFilter] = useState<number | null>(null)
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
 
   // stale-while-revalidate cache: keyed by window
   const cache = useRef<Partial<Record<Window, OverviewData>>>({})
@@ -403,6 +582,18 @@ export function OverviewClient() {
     void fetchOverview(win)
   }, [win, fetchOverview])
 
+  // Auto-refresh: if data is stale (>30min), trigger background ingest on load
+  useEffect(() => {
+    if (!data) return
+    if (data.freshnessStatus !== 'Fresh') {
+      fetch('/api/v1/admin/run-ingest', {
+        method: 'POST',
+        headers: { 'x-internal-secret': 'dev' },
+      }).catch(() => {})
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.freshnessStatus])
+
   // Trigger ingest every 3 minutes while page is open (rate-limited server-side)
   useEffect(() => {
     // Immediate trigger on load (passive — server-side rate limited)
@@ -424,11 +615,28 @@ export function OverviewClient() {
     return () => clearInterval(refreshInterval)
   }, [win, fetchOverview])
 
+  // Reset filters when window changes so stale counts don't persist
   const handleWindowChange = (w: Window) => {
     if (w === win) return
     setWin(w)
     setSelectedEvent(null)
+    setSeverityFilter(null)
+    setCategoryFilter(null)
   }
+
+  // Client-side filtered top stories
+  const filteredStories = useMemo(() => {
+    if (!data) return []
+    let result = data.topStories
+    if (severityFilter !== null) {
+      result = result.filter(e => (e.severity ?? 0) === severityFilter)
+    }
+    if (categoryFilter !== null) {
+      const types = CATEGORY_TYPES[categoryFilter] ?? []
+      result = result.filter(e => types.includes(e.event_type ?? ''))
+    }
+    return result
+  }, [data, severityFilter, categoryFilter])
 
   // ─── header meta ───────────────────────────────────────────────────────────
 
@@ -577,8 +785,17 @@ export function OverviewClient() {
                   {win} window
                 </span>
               </div>
+              <FilterBar
+                allEvents={data.topStories}
+                severityFilter={severityFilter}
+                setSeverityFilter={setSeverityFilter}
+                categoryFilter={categoryFilter}
+                setCategoryFilter={setCategoryFilter}
+                filteredCount={filteredStories.length}
+                totalCount={data.topStories.length}
+              />
               <TopStoriesList
-                events={data.topStories}
+                events={filteredStories}
                 onSelect={setSelectedEvent}
               />
             </section>

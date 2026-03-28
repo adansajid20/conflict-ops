@@ -365,7 +365,10 @@ export async function ingestNewsRSS(): Promise<{
         continue
       }
 
-      const severity = scoreSeverity(fullText)
+      // Cap severity at 2 for unverified news — CRITICAL/HIGH only from GDACS, UNHCR, ACLED etc.
+      const severity = Math.min(scoreSeverity(fullText), 2) as 1 | 2
+      // Don't guess country_code from article text — too error-prone (Spain article → UA)
+      // Region is OK (less specific); country is set only by authoritative ingest sources
       const loc = detectLocation(fullText)
       const region = loc.region ?? src.region ?? null
 
@@ -382,7 +385,7 @@ export async function ingestNewsRSS(): Promise<{
         title: item.title.slice(0, 500),
         description: snippet,
         region,
-        country_code: loc.country_code,
+        country_code: null,  // Don't guess — wrong geo (e.g. Spain article tagged UA) is worse than null
         severity,
         status: 'developing',
         occurred_at: occurredAt,

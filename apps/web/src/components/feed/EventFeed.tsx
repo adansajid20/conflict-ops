@@ -39,10 +39,11 @@ const CATEGORIES = [
 ]
 
 const SEV_FILTERS = [
-  { label: 'All', value: 0 },
-  { label: '2+', value: 2 },
-  { label: '3+', value: 3 },
-  { label: '4', value: 4 },
+  { label: 'All',      value: 0, emoji: null },
+  { label: 'Critical', value: 4, emoji: '🔴' },
+  { label: 'High',     value: 3, emoji: '🟠' },
+  { label: 'Medium',   value: 2, emoji: '🟡' },
+  { label: 'Low',      value: 1, emoji: '⚫' },
 ]
 
 function sevColor(severity?: number | string | null) {
@@ -297,12 +298,20 @@ export function EventFeed() {
 
           {/* Severity */}
           <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>SEV:</span>
-          {SEV_FILTERS.map(sf => (
-            <button key={sf.value} onClick={() => setSeverityFilter(sf.value)}
-              style={severityFilter === sf.value ? PILL_ACTIVE : PILL_INACTIVE}>
-              {sf.label}
-            </button>
-          ))}
+          {SEV_FILTERS.map(sf => {
+            const count = sf.value === 0
+              ? events.length
+              : sf.value === 4
+                ? events.filter(e => Number(e.severity ?? 0) === sf.value).length
+                : events.filter(e => Number(e.severity ?? 0) >= sf.value).length
+            return (
+              <button key={sf.value} onClick={() => setSeverityFilter(sf.value)}
+                style={severityFilter === sf.value ? PILL_ACTIVE : PILL_INACTIVE}>
+                {sf.emoji ? `${sf.emoji} ` : ''}{sf.label}
+                <span style={{ opacity: 0.6, marginLeft: '3px' }}>({count})</span>
+              </button>
+            )
+          })}
         </div>
       </div>
 

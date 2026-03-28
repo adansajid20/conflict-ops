@@ -14,27 +14,27 @@ export function FreshnessBanner() {
 
   const ingestAgeMin = ingestAgeMs / 60000
 
-  // Fresh (< 60 min): hide banner entirely
-  if (ingestAgeMin < 60) return null
+  // Fresh (< 30 min): hide banner entirely
+  if (ingestAgeMin < 30) return null
 
   // Database unavailable
   if (!isFinite(ingestAgeMs) && !lastIngestAt) return null
 
   const handleRefresh = () => window.location.reload()
 
-  // Delayed (60 min – 4h)
-  if (ingestAgeMin < 240) {
+  // Slightly delayed (30 min – 2h): soft message, no alarm
+  if (ingestAgeMin < 120) {
     const minutes = Math.floor(ingestAgeMin)
     return (
       <div
         className="px-4 py-2 text-xs mono flex items-center gap-3"
         style={{
-          backgroundColor: 'rgba(245,158,11,0.08)',
-          borderBottom: '1px solid rgba(245,158,11,0.2)',
+          backgroundColor: 'rgba(245,158,11,0.06)',
+          borderBottom: '1px solid rgba(245,158,11,0.15)',
           color: 'var(--alert-amber)',
         }}
       >
-        <span>⚠ Updates may be delayed — last updated {minutes}m ago</span>
+        <span>Last updated {minutes}m ago</span>
         <button
           onClick={handleRefresh}
           className="rounded px-2 py-0.5 text-[10px] font-semibold border hover:opacity-80 transition-opacity"
@@ -46,7 +46,7 @@ export function FreshnessBanner() {
     )
   }
 
-  // Stale (> 4h)
+  // Paused (> 2h): alarm
   const hours = Math.floor(ingestAgeMin / 60)
   return (
     <div
@@ -57,7 +57,7 @@ export function FreshnessBanner() {
         color: '#F87171',
       }}
     >
-      <span>⚠ Updates paused — last updated {hours}h ago</span>
+      <span>⚠ Updates paused · last update {hours}h ago</span>
       <button
         onClick={handleRefresh}
         className="rounded px-2 py-0.5 text-[10px] font-semibold border hover:opacity-80 transition-opacity"

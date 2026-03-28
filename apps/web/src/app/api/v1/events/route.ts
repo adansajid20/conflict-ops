@@ -103,19 +103,27 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     const src = String(e.source ?? '')
     const evType = String(e.event_type ?? '')
     const title = String(e.title ?? '')
+    const desc = String(e.description ?? '')
     const sev = Number(e.severity ?? 0)
     // Authoritative sources always pass
     if (AUTHORITATIVE_SOURCES_SET.has(src)) return true
-    // High severity always passes
-    if (sev >= 3) return true
+    // For unverified news sources, REQUIRE conflict keywords regardless of severity
+    // (severity is self-reported by ingest and may be wrong)
+    const isNewsSrc = src === 'news_rss' || src === 'gdelt' || src === 'newsapi'
+    if (isNewsSrc) {
+      if (!CONFLICT_KEYWORDS.test(title) && !CONFLICT_KEYWORDS.test(desc)) return false
+    } else {
+      // Non-news: high severity passes
+      if (sev >= 3) return true
+    }
     // Check event type
     if (INTEL_FEED_TYPES.has(evType)) {
       // 'news' type from non-authoritative sources requires keyword match
-      if (evType === 'news') return CONFLICT_KEYWORDS.test(title)
+      if (evType === 'news') return CONFLICT_KEYWORDS.test(title) || CONFLICT_KEYWORDS.test(desc)
       return true
     }
     // Keyword fallback for anything else
-    return CONFLICT_KEYWORDS.test(title)
+    return CONFLICT_KEYWORDS.test(title) || CONFLICT_KEYWORDS.test(desc)
   }
 
   const relevantData = rawEvents.filter(e => passesRelevanceGate(e as unknown as Record<string, unknown>))
