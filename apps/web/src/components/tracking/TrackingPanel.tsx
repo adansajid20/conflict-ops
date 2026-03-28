@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useEffect, useMemo, useState } from 'react'
-import { Flame as FlameIcon, Plane as PlaneIcon, Ship as ShipIcon, ExternalLink as ExternalLinkIcon, X as XIcon } from 'lucide-react'
+import { Flame as FlameIcon, Plane as PlaneIcon, Ship as ShipIcon, ExternalLink as ExternalLinkIcon, X as XIcon, Globe as GlobeIcon, Map as MapIcon } from 'lucide-react'
 
 // Cast icons to avoid React version JSX compatibility errors
 const Flame = FlameIcon as any
@@ -10,11 +10,26 @@ const Plane = PlaneIcon as any
 const Ship = ShipIcon as any
 const ExternalLink = ExternalLinkIcon as any
 const X = XIcon as any
+const GlobeLucide = GlobeIcon as any
+const MapLucide = MapIcon as any
+
 import { IntelDrawer } from '@/components/intel/IntelDrawer'
 import { eventToIntelItem, type IntelItem } from '@/types/intel-item'
 import { safeRelativeTime } from '@/lib/utils/time'
+import type { GlobeIntelEvent } from '@/components/tracking/GlobeView'
 
 const TrackingMap = dynamic(() => import('./TrackingMap'), { ssr: false })
+const GlobeView = dynamic(() => import('./GlobeView'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full bg-black flex items-center justify-center">
+      <div className="text-center space-y-3">
+        <div className="w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-sm text-gray-400">Loading globe...</p>
+      </div>
+    </div>
+  ),
+})
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Vessel = {
@@ -29,34 +44,20 @@ type Flight = {
   last_seen?: string | null; demo?: boolean
 }
 type Thermal = { region: string; frp: number; lat: number; lon: number; detected_at: string; demo?: boolean }
-type IntelEvent = {
-  id: string; source: string; title: string; description?: string | null
-  severity?: number | null; region?: string | null; occurred_at?: string | null
-  ingested_at?: string | null; event_type?: string | null; country_code?: string | null
-  provenance_raw?: Record<string, unknown> | null; location?: string | null
-}
+type IntelEvent = GlobeIntelEvent
 
 type TimeWindow = '24h' | '7d' | '30d'
 type SeverityFilter = 'all' | 'high' | 'critical'
+type ViewMode = 'globe' | 'map'
 
 // ─── Severity helpers ─────────────────────────────────────────────────────────
 const SEV_COLOR: Record<number, string> = {
-  1: '#6B7280',
-  2: '#EAB308',
-  3: '#F97316',
-  4: '#EF4444',
+  1: '#6B7280', 2: '#EAB308', 3: '#F97316', 4: '#EF4444',
 }
 const SEV_LABEL: Record<number, string> = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Critical' }
 
 // ─── Setup card data ──────────────────────────────────────────────────────────
 const SETUP_CARDS = {
-  flights: {
-    icon: '✈',
-    title: 'ADS-B Flight Tracking',
-    desc: 'This premium layer requires an ADS-B Exchange API key.',
-    freeNote: 'Free tier available at:',
-    url: 'adsbexchange.com/api-info',
-  },
   vessels: {
     icon: '⚓',
     title: 'AIS Vessel Tracking',
@@ -72,7 +73,7 @@ const SETUP_CARDS = {
     url: 'firms.modaps.eosdis.nasa.gov/api',
   },
 } as const
-type TrackingLayerKey = keyof typeof SETUP_CARDS
+type SetupCardKey = keyof typeof SETUP_CARDS
 
 function parseCoords(location: unknown): { lat: number; lng: number } | null {
   if (!location) return null
@@ -96,7 +97,7 @@ function parseCoords(location: unknown): { lat: number; lng: number } | null {
 }
 
 // ─── Setup card component ─────────────────────────────────────────────────────
-function SetupCard({ layerKey, onClose }: { layerKey: TrackingLayerKey; onClose: () => void }) {
+function SetupCard({ layerKey, onClose }: { layerKey: SetupCardKey; onClose: () => void }) {
   const card = SETUP_CARDS[layerKey]
   return (
     <div className="rounded-lg border p-4 text-xs mt-2"
@@ -210,9 +211,14 @@ export function TrackingPanel() {
   const [thermals, setThermals] = useState<Thermal[]>([])
   const [allIntelEvents, setAllIntelEvents] = useState<IntelEvent[]>([])
 
+  // View mode
+  const [viewMode, setViewMode] = useState<ViewMode>('globe')
+
   // Layer toggles
   const [showEvents, setShowEvents] = useState(true)
   const [showHeatmap, setShowHeatmap] = useState(false)
+  const [showAircraft, setShowAircraft] = useState(false)
+  const [showShippingLanes, setShowShippingLanes] = useState(true)
 
   // Filters
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('7d')
@@ -221,12 +227,12 @@ export function TrackingPanel() {
   const [countryFilter, setCountryFilter] = useState('')
 
   // UI state
-  const [setupCard, setSetupCard] = useState<TrackingLayerKey | null>(null)
+  const [setupCard, setSetupCard] = useState<SetupCardKey | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<IntelEvent | null>(null)
   const [selectedIntelItem, setSelectedIntelItem] = useState<IntelItem | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Fetch tracking data (vessels/flights — always attempt, no scary errors on failure)
+  // Fetch tracking data
   useEffect(() => {
     void Promise.all([
       fetch('/api/v1/tracking/vessels').then(r => r.json()).catch(() => ({ data: [], meta: { demo: true } })),
@@ -241,13 +247,12 @@ export function TrackingPanel() {
     })
   }, [])
 
-  // Fetch intel events (re-fetch on timeWindow change)
+  // Fetch intel events
   useEffect(() => {
     setLoading(true)
     void fetch(`/api/v1/events?window=${timeWindow}&limit=500`, { cache: 'no-store' })
       .then(r => r.json())
       .then((j: { data?: IntelEvent[] }) => {
-        // Include events that have location OR country_code/region
         const events = (j.data ?? []).filter(e =>
           parseCoords(e.location) !== null || e.country_code || e.region
         )
@@ -257,7 +262,7 @@ export function TrackingPanel() {
       .finally(() => setLoading(false))
   }, [timeWindow])
 
-  // Apply client-side filters
+  // Apply filters
   const filteredEvents = useMemo(() => {
     return allIntelEvents.filter(e => {
       if (severityFilter === 'high' && (e.severity ?? 1) < 3) return false
@@ -275,45 +280,85 @@ export function TrackingPanel() {
 
   const intelItems = useMemo(() => filteredEvents.map(e => eventToIntelItem(e as never)), [filteredEvents])
 
-  // Layer toggles for map
+  // Layer toggles for 2D map
   const layerToggles = {
-    vessels: false, // disabled until API key
-    flights: false, // disabled until API key
-    thermal: false, // disabled until API key
+    vessels: false,
+    flights: false,
+    thermal: false,
     intel: showEvents,
     heatmap: showHeatmap,
   }
 
   return (
     <div className="grid h-full" style={{ gridTemplateColumns: '1fr 320px', gap: 0 }}>
-      {/* ── Map ─────────────────────────────────────────────────────────── */}
+      {/* ── Map / Globe area ──────────────────────────────────────────────── */}
       <div className="overflow-hidden relative" style={{ background: 'var(--bg-base)' }}>
-        <TrackingMap
-          vessels={[]}
-          flights={[]}
-          thermals={[]}
-          intelEvents={filteredEvents}
-          layerToggles={layerToggles}
-          onIntelClick={event => {
-            setSelectedEvent(event)
-          }}
-        />
-        {/* Event count badge */}
-        {filteredEvents.length > 0 && (
-          <div className="absolute top-3 left-3 rounded-md px-2 py-1 text-xs mono pointer-events-none"
-            style={{ background: 'rgba(7,11,17,0.85)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
-            {filteredEvents.length} events · {timeWindow}
-          </div>
+
+        {/* View toggle */}
+        <div className="absolute top-3 right-3 z-20 flex rounded-lg overflow-hidden border"
+          style={{ borderColor: 'var(--border)', background: 'rgba(7,11,17,0.9)' }}>
+          <button
+            onClick={() => setViewMode('globe')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors"
+            style={{
+              color: viewMode === 'globe' ? 'var(--primary-text)' : 'var(--text-muted)',
+              background: viewMode === 'globe' ? 'var(--bg-active)' : 'transparent',
+            }}>
+            <GlobeLucide size={12} />
+            Globe
+          </button>
+          <button
+            onClick={() => setViewMode('map')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors"
+            style={{
+              color: viewMode === 'map' ? 'var(--primary-text)' : 'var(--text-muted)',
+              background: viewMode === 'map' ? 'var(--bg-active)' : 'transparent',
+            }}>
+            <MapLucide size={12} />
+            Map
+          </button>
+        </div>
+
+        {/* Globe view */}
+        {viewMode === 'globe' && (
+          <GlobeView
+            events={showEvents ? filteredEvents : []}
+            onEventClick={event => setSelectedEvent(event)}
+            showAircraft={showAircraft}
+            showShippingLanes={showShippingLanes}
+            showHeatmap={showHeatmap}
+            timeWindow={timeWindow}
+          />
         )}
-        {loading && (
-          <div className="absolute top-3 left-3 rounded-md px-2 py-1 text-xs mono"
-            style={{ background: 'rgba(7,11,17,0.85)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-            Loading…
-          </div>
+
+        {/* 2D map view */}
+        {viewMode === 'map' && (
+          <>
+            <TrackingMap
+              vessels={[]}
+              flights={[]}
+              thermals={[]}
+              intelEvents={filteredEvents}
+              layerToggles={layerToggles}
+              onIntelClick={event => setSelectedEvent(event)}
+            />
+            {filteredEvents.length > 0 && (
+              <div className="absolute top-3 left-3 rounded-md px-2 py-1 text-xs mono pointer-events-none"
+                style={{ background: 'rgba(7,11,17,0.85)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+                {filteredEvents.length} events · {timeWindow}
+              </div>
+            )}
+            {loading && (
+              <div className="absolute top-3 left-3 rounded-md px-2 py-1 text-xs mono"
+                style={{ background: 'rgba(7,11,17,0.85)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                Loading…
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* ── Right Panel ─────────────────────────────────────────────────── */}
+      {/* ── Right Panel ──────────────────────────────────────────────────── */}
       <div className="border-l flex flex-col overflow-hidden"
         style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
         <div className="overflow-y-auto flex-1 px-3 py-3 space-y-0">
@@ -335,6 +380,13 @@ export function TrackingPanel() {
                 className="rounded" style={{ accentColor: 'var(--primary)' }} />
               <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Heatmap view</span>
             </label>
+            {viewMode === 'globe' && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={showShippingLanes} onChange={e => setShowShippingLanes(e.target.checked)}
+                  className="rounded" style={{ accentColor: 'var(--primary)' }} />
+                <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Shipping Lanes</span>
+              </label>
+            )}
           </div>
 
           {/* FILTERS */}
@@ -403,37 +455,90 @@ export function TrackingPanel() {
 
           {/* TRACKING LAYERS */}
           <SectionLabel label="Tracking Layers" />
-          <div className="space-y-1.5 mb-1">
-            {(Object.keys(SETUP_CARDS) as TrackingLayerKey[]).map(key => {
-              const card = SETUP_CARDS[key]
-              return (
-                <div key={key}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">{card.icon}</span>
-                    <span className="text-xs flex-1"
-                      style={{ color: 'var(--text-muted)' }}>
-                      {key === 'flights' ? 'Flight tracking' : key === 'vessels' ? 'Vessel tracking' : 'Thermal anomalies'}
-                    </span>
-                    <button
-                      onClick={() => setSetupCard(prev => prev === key ? null : key)}
-                      className="text-[10px] rounded px-2 py-0.5 border transition-colors"
-                      style={{ borderColor: 'var(--border)', color: 'var(--text-muted)', background: 'transparent' }}
-                      title={`Configure ${card.title} in Settings to enable`}>
-                      Setup
-                    </button>
-                    {/* Disabled toggle */}
-                    <div className="w-8 h-4 rounded-full flex items-center opacity-30 cursor-not-allowed"
-                      style={{ background: 'var(--border)' }}
-                      title={`Configure ${card.title} API key in Settings to enable`}>
-                      <div className="w-3 h-3 rounded-full mx-0.5" style={{ background: 'var(--text-muted)' }} />
-                    </div>
-                  </div>
-                  {setupCard === key && (
-                    <SetupCard layerKey={key} onClose={() => setSetupCard(null)} />
-                  )}
+          <div className="space-y-2 mb-1">
+
+            {/* ── Flights (OpenSky — free, functional) ── */}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">✈</span>
+                <span className="text-xs flex-1" style={{ color: 'var(--text-primary)' }}>
+                  Live Flights
+                </span>
+                {/* Functional toggle */}
+                <button
+                  onClick={() => setShowAircraft(prev => !prev)}
+                  className="w-8 h-4 rounded-full flex items-center transition-colors relative"
+                  style={{
+                    background: showAircraft ? 'var(--primary)' : 'var(--border)',
+                    flexShrink: 0,
+                  }}
+                  title="Toggle live aircraft via OpenSky Network">
+                  <div
+                    className="w-3 h-3 rounded-full transition-transform"
+                    style={{
+                      background: 'white',
+                      transform: showAircraft ? 'translateX(18px)' : 'translateX(2px)',
+                    }}
+                  />
+                </button>
+              </div>
+              <div className="text-[10px] mt-0.5 ml-6" style={{ color: 'var(--text-muted)' }}>
+                Powered by{' '}
+                <a href="https://opensky-network.org" target="_blank" rel="noopener noreferrer"
+                  style={{ color: 'var(--primary-text)', textDecoration: 'none' }}>
+                  OpenSky Network
+                </a>{' '}(free)
+              </div>
+            </div>
+
+            {/* ── Vessels (requires AIS key) ── */}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">⚓</span>
+                <span className="text-xs flex-1" style={{ color: 'var(--text-muted)' }}>
+                  Vessel tracking
+                </span>
+                <button
+                  onClick={() => setSetupCard(prev => prev === 'vessels' ? null : 'vessels')}
+                  className="text-[10px] rounded px-2 py-0.5 border transition-colors"
+                  style={{ borderColor: 'var(--border)', color: 'var(--text-muted)', background: 'transparent' }}>
+                  Setup
+                </button>
+                {/* Disabled toggle */}
+                <div className="w-8 h-4 rounded-full flex items-center opacity-30 cursor-not-allowed"
+                  style={{ background: 'var(--border)' }}>
+                  <div className="w-3 h-3 rounded-full mx-0.5" style={{ background: 'var(--text-muted)' }} />
                 </div>
-              )
-            })}
+              </div>
+              {setupCard === 'vessels' && (
+                <SetupCard layerKey="vessels" onClose={() => setSetupCard(null)} />
+              )}
+            </div>
+
+            {/* ── Thermal (requires FIRMS key) ── */}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">🔥</span>
+                <span className="text-xs flex-1" style={{ color: 'var(--text-muted)' }}>
+                  Thermal anomalies
+                </span>
+                <button
+                  onClick={() => setSetupCard(prev => prev === 'thermal' ? null : 'thermal')}
+                  className="text-[10px] rounded px-2 py-0.5 border transition-colors"
+                  style={{ borderColor: 'var(--border)', color: 'var(--text-muted)', background: 'transparent' }}>
+                  Setup
+                </button>
+                {/* Disabled toggle */}
+                <div className="w-8 h-4 rounded-full flex items-center opacity-30 cursor-not-allowed"
+                  style={{ background: 'var(--border)' }}>
+                  <div className="w-3 h-3 rounded-full mx-0.5" style={{ background: 'var(--text-muted)' }} />
+                </div>
+              </div>
+              {setupCard === 'thermal' && (
+                <SetupCard layerKey="thermal" onClose={() => setSetupCard(null)} />
+              )}
+            </div>
+
           </div>
 
           {/* SELECTED EVENT */}
@@ -446,7 +551,7 @@ export function TrackingPanel() {
           ) : (
             <div className="rounded-lg border border-dashed py-6 text-center text-xs"
               style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
-              <div className="mb-1 text-lg">🗺</div>
+              <div className="mb-1 text-lg">{viewMode === 'globe' ? '🌐' : '🗺'}</div>
               Click a marker to<br />view event details
             </div>
           )}
@@ -454,7 +559,7 @@ export function TrackingPanel() {
         </div>
       </div>
 
-      {/* Intel drawer for full-detail view */}
+      {/* Intel drawer */}
       <IntelDrawer
         item={selectedIntelItem}
         items={intelItems}
