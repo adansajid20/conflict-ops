@@ -9,7 +9,7 @@ export const COUNTRY_NAMES: Record<string, string> = {
   'GB': 'United Kingdom', 'FR': 'France', 'DE': 'Germany',
   'MX': 'Mexico', 'BR': 'Brazil', 'VE': 'Venezuela', 'CO': 'Colombia',
   'JP': 'Japan', 'KR': 'South Korea', 'KP': 'North Korea', 'EG': 'Egypt',
-  'MA': 'Morocco', 'DZ': 'Algeria', 'TN': 'Tunisia', 'LY': 'Libya',
+  'MA': 'Morocco', 'DZ': 'Algeria', 'TN': 'Tunisia',
   'AO': 'Angola', 'CD': 'DR Congo', 'CG': 'Congo', 'CF': 'Central African Rep.',
   'TD': 'Chad', 'ER': 'Eritrea', 'UG': 'Uganda', 'KE': 'Kenya',
   'TZ': 'Tanzania', 'RW': 'Rwanda', 'BI': 'Burundi', 'MZ': 'Mozambique',

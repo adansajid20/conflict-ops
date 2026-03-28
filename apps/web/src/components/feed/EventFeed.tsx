@@ -349,7 +349,10 @@ export function EventFeed() {
               const sColor = sevColor(event.severity)
               const sLabel = sevLabel(event.severity)
               const country = displayLocation(event.country_code, event.region, event.location)
-              const snippet = event.snippet || event.description || generateSummary(event)
+              const snippet = event.snippet || event.description || generateSummary({
+                ...event,
+                severity: typeof event.severity === 'number' ? event.severity : null,
+              })
 
               return (
                 <motion.div
