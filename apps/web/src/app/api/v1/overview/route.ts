@@ -225,12 +225,14 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .eq('read', false),
 
     // Top stories (conflict/news) — exclude NOAA so severity cap doesn't block them
+    // Use ingested_at NOT occurred_at: news articles are published 24-48h ago but ingested NOW
+    // filtering by occurred_at would exclude all news articles from the 24h window
     supabase
       .from('events')
       .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw')
-      .gte('occurred_at', since)
+      .gte('ingested_at', since)
       .neq('source', 'noaa')
-      .order('occurred_at', { ascending: false })
+      .order('ingested_at', { ascending: false })
       .limit(100),
   ])
 
@@ -265,19 +267,19 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   const sortedConflict = [...conflictCandidates].sort((a, b) => {
     const pa = EVENT_TYPE_PRIORITY[a.event_type ?? 'news'] ?? 5
     const pb = EVENT_TYPE_PRIORITY[b.event_type ?? 'news'] ?? 5
-    const ta = new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
-    const tb = new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime()
-    // Within same priority tier: newest first
-    // Across tiers: only let priority win if the older item is in a significantly higher tier
-    // (don't let a 16h-old humanitarian report beat a 30min-old armed_conflict)
+    // Use ingested_at for sort — news articles have old pub dates but were just ingested
+    const ta = new Date(a.ingested_at ?? a.occurred_at ?? 0).getTime()
+    const tb = new Date(b.ingested_at ?? b.occurred_at ?? 0).getTime()
     const priorityDiff = pa - pb
-    const ageHrsDiff = (tb - ta) / 3_600_000  // positive = b is newer
-    if (Math.abs(priorityDiff) >= 2 && Math.abs(ageHrsDiff) < 6) return priorityDiff  // clear priority diff AND close in time
-    if (ageHrsDiff > 4) return 1   // b is 4h+ newer → b wins regardless of priority
-    if (ageHrsDiff < -4) return -1 // a is 4h+ newer → a wins
-    if (priorityDiff !== 0) return priorityDiff  // similar age, use priority
+    const ageHrsDiff = (tb - ta) / 3_600_000  // positive = b ingested more recently
+    // Clear priority difference + ingested within similar timeframe → use priority
+    if (Math.abs(priorityDiff) >= 2 && Math.abs(ageHrsDiff) < 2) return priorityDiff
+    // Ingested 2h+ apart → newer ingestion wins regardless of priority
+    if (ageHrsDiff > 2) return 1
+    if (ageHrsDiff < -2) return -1
+    if (priorityDiff !== 0) return priorityDiff
     if ((b.severity ?? 1) !== (a.severity ?? 1)) return (b.severity ?? 1) - (a.severity ?? 1)
-    return tb - ta  // finally: newest first
+    return tb - ta
   })
   const sortedWeather = [...weatherCandidates].sort((a, b) => {
     if ((b.severity ?? 1) !== (a.severity ?? 1)) return (b.severity ?? 1) - (a.severity ?? 1)
