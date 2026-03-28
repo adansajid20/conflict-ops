@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AlertCircle, Download, Search, X } from 'lucide-react'
 import { IntelDrawer } from '@/components/intel/IntelDrawer'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { eventToIntelItem } from '@/types/intel-item'
 import { safeRelativeTime } from '@/lib/utils/time'
 
@@ -352,6 +353,7 @@ export function EventFeed() {
                   onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter') handleEventClick(event) }}
                   className="flex cursor-pointer items-start gap-0 border-b px-0 py-3 transition-colors hover:bg-white/5 interactive-card outline-none"
                   style={{
+                    pointerEvents: 'auto',
                     borderColor: 'var(--border)',
                     borderLeft: isSelected ? '3px solid #2563EB' : '3px solid transparent',
                     background: isSelected
@@ -462,19 +464,21 @@ export function EventFeed() {
         </div>
       </div>
 
-      <IntelDrawer
-        item={drawerItem}
-        items={drawerItems}
-        onClose={() => {
-          setSelected(null)
-          window.history.pushState({}, '', window.location.pathname)
-        }}
-        onNavigate={newItem => {
-          const evt = events.find(e => e.id === newItem.id)
-          const idx = filteredEvents.findIndex(e => e.id === newItem.id)
-          if (evt) { handleEventClick(evt); setFocusedIndex(idx) }
-        }}
-      />
+      <ErrorBoundary>
+        <IntelDrawer
+          item={drawerItem}
+          items={drawerItems}
+          onClose={() => {
+            setSelected(null)
+            window.history.pushState({}, '', window.location.pathname)
+          }}
+          onNavigate={newItem => {
+            const evt = events.find(e => e.id === newItem.id)
+            const idx = filteredEvents.findIndex(e => e.id === newItem.id)
+            if (evt) { handleEventClick(evt); setFocusedIndex(idx) }
+          }}
+        />
+      </ErrorBoundary>
     </div>
   )
 }
