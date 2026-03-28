@@ -12,6 +12,7 @@ type FeedEvent = {
   source: string
   title: string
   description?: string | null
+  snippet?: string | null
   severity?: number | string | null
   region?: string | null
   occurred_at?: string | null
@@ -327,7 +328,7 @@ export function EventFeed() {
               const sColor = sevColor(event.severity)
               const sLabel = sevLabel(event.severity)
               const country = event.country_code ?? 'Unknown'
-              const snippet = event.description ?? event.title
+              const snippet = event.snippet || event.description || event.title
 
               return (
                 <motion.div

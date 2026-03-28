@@ -43,7 +43,7 @@ type NavItem = {
 const PRIMARY_NAV: NavItem[] = [
   { href: '/overview', label: 'Overview', section: 'primary', icon: LayoutDashboard },
   { href: '/feed', label: 'Intel Feed', section: 'primary', icon: Activity },
-  { href: '/tracking', label: 'Live Map', section: 'primary', icon: Radio },
+  { href: '/tracking', label: 'Operational Map', section: 'primary', icon: Radio },
   { href: '/alerts', label: 'Alerts', section: 'primary', icon: Bell },
   { href: '/admin', label: 'Admin', section: 'primary', icon: Stethoscope },
 ]

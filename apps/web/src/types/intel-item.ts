@@ -10,6 +10,7 @@ export type IntelItem = {
   occurred_at: string | null
   ingested_at: string
   description: string | null
+  snippet?: string | null
   url: string | null
   location?: string | null
   _corroborated_by?: string[]
@@ -57,6 +58,11 @@ function extractDesc(raw: Record<string, unknown>): string | null {
 export function eventToIntelItem(e: Record<string, unknown>): IntelItem {
   const raw = ((e.provenance_raw ?? e.raw ?? {}) as Record<string, unknown>)
   const desc = (e.description as string) ?? extractDesc(raw) ?? null
+  const snippetRaw = (e.snippet as string) ?? null
+  // Ensure description never shows placeholder text
+  const BAD_DESC = new Set(['No description provided', 'N/A', 'null', 'undefined'])
+  const cleanDesc = desc && !BAD_DESC.has(desc.trim()) ? desc : null
+  const displaySnippet = snippetRaw || cleanDesc?.slice(0, 200) || null
   return {
     id: String(e.id ?? ''),
     kind: 'event',
@@ -68,7 +74,8 @@ export function eventToIntelItem(e: Record<string, unknown>): IntelItem {
     event_type: (e.event_type as string) ?? null,
     occurred_at: (e.occurred_at as string) ?? null,
     ingested_at: String(e.ingested_at ?? new Date().toISOString()),
-    description: desc,
+    description: cleanDesc ?? String(e.title ?? 'Untitled'),
+    snippet: displaySnippet,
     url: extractUrl(raw),
     location: (e.location as string) ?? null,
     _corroborated_by: (e._corroborated_by as string[]) ?? undefined,

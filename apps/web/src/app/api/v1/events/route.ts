@@ -83,45 +83,68 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
 
   const rawEvents = (data ?? []) as unknown as ConflictEvent[]
 
-  // --- FIX 1: Filter to conflict-relevant events only (guards against pre-gate DB pollution) ---
-  const RELEVANT_TYPES = [
-    'airstrike', 'armed_conflict', 'terrorism', 'political_crisis',
-    'civil_unrest', 'displacement', 'humanitarian', 'wmd_threat',
-    'natural_disaster', 'economic',
-  ]
-  const AUTHORITATIVE_SOURCES = ['noaa', 'acled', 'usgs', 'gdacs', 'unhcr', 'nasa_eonet', 'reliefweb']
-  const relevantData = rawEvents.filter(e =>
-    AUTHORITATIVE_SOURCES.includes((e as unknown as Record<string,unknown>).source as string) || // authoritative sources always pass
-    RELEVANT_TYPES.includes((e as unknown as Record<string,unknown>).event_type as string) ||
-    ((e as unknown as Record<string,unknown>).severity as number ?? 0) >= 2 ||
-    (e as unknown as Record<string,unknown>).country_code !== null
-  )
+  // --- FIX 1: Strict relevance gate — only conflict/security-relevant events pass ---
+  const INTEL_FEED_TYPES = new Set([
+    'armed_conflict', 'airstrike', 'military', 'mobilization', 'ceasefire',
+    'civil_unrest', 'protest', 'terrorism', 'explosion', 'attack',
+    'political_crisis', 'sanctions', 'diplomacy', 'coup',
+    'border_incident', 'maritime_incident', 'aviation_incident',
+    'natural_disaster', 'humanitarian_crisis',
+    // legacy types from existing ingest
+    'displacement', 'humanitarian', 'wmd_threat', 'economic',
+    'news', // kept but filtered by keyword below
+  ])
+  const AUTHORITATIVE_SOURCES_SET = new Set([
+    'gdacs', 'unhcr', 'nasa_eonet', 'usgs', 'noaa', 'acled', 'reliefweb',
+  ])
+  const CONFLICT_KEYWORDS = /\b(war|conflict|attack|airstrike|bomb|missile|troops|military|soldiers|killed|casualties|rebels|insurgent|terrorist|ceasefire|sanctions|coup|invasion|siege|massacre|protest|riot|gunfire|explosion|hostage|refugee|displaced|evacuation|nuclear|chemical|weapon|navy|army|airforce|NATO|peacekeep|humanitarian|aid|crisis|emergency|threat|escalat)\b/i
 
-  // --- FIX 2: Snippet fallback — description is never blank or "No description provided" ---
+  function passesRelevanceGate(e: Record<string, unknown>): boolean {
+    const src = String(e.source ?? '')
+    const evType = String(e.event_type ?? '')
+    const title = String(e.title ?? '')
+    const sev = Number(e.severity ?? 0)
+    // Authoritative sources always pass
+    if (AUTHORITATIVE_SOURCES_SET.has(src)) return true
+    // High severity always passes
+    if (sev >= 3) return true
+    // Check event type
+    if (INTEL_FEED_TYPES.has(evType)) {
+      // 'news' type from non-authoritative sources requires keyword match
+      if (evType === 'news') return CONFLICT_KEYWORDS.test(title)
+      return true
+    }
+    // Keyword fallback for anything else
+    return CONFLICT_KEYWORDS.test(title)
+  }
+
+  const relevantData = rawEvents.filter(e => passesRelevanceGate(e as unknown as Record<string, unknown>))
+
+  // --- FIX 2: Snippet field — never blank, never "No description provided" ---
+  const BAD_DESCRIPTIONS = new Set(['No description provided', 'N/A', '', 'null', 'undefined'])
   const eventsWithSnippet = relevantData.map(e => {
     const raw = e as unknown as Record<string,unknown>
-    const desc = raw.description as string | null | undefined
+    const desc = (raw.description as string | null | undefined)?.trim() ?? ''
     const title = raw.title as string
+    const cleanDesc = BAD_DESCRIPTIONS.has(desc) ? '' : desc
+    const snippet = cleanDesc.length > 10 ? cleanDesc.slice(0, 200) : title.slice(0, 200)
     return {
       ...raw,
-      description: desc && desc.trim() && desc !== 'No description provided'
-        ? desc
-        : title.length > 80
-          ? `${title.slice(0, 160)}…`
-          : title,
+      description: cleanDesc || title,
+      snippet,
     } as unknown as ConflictEvent
   })
 
   // --- FIX 3: Geo cleanup — remove "UN" and placeholder location strings ---
-  const GEO_PLACEHOLDERS = ['UN', 'United Nations', 'N/A', 'Unknown', 'Global', 'World']
+  const GEO_PLACEHOLDERS = new Set(['UN', 'United Nations', 'N/A', 'Unknown', 'Global', 'World', '', 'null'])
   const cleanedEvents = eventsWithSnippet.map(e => {
     const raw = e as unknown as Record<string,unknown>
-    const region = raw.region as string | null
-    const cc = raw.country_code as string | null
+    const region = (raw.region as string | null) ?? ''
+    const cc = (raw.country_code as string | null) ?? ''
     return {
       ...raw,
-      region: (region && !GEO_PLACEHOLDERS.includes(region)) ? region : null,
-      country_code: (cc && cc.length === 2 && cc !== 'UN') ? cc : null,
+      region: (region && !GEO_PLACEHOLDERS.has(region)) ? region : null,
+      country_code: (cc && cc.length === 2 && !GEO_PLACEHOLDERS.has(cc)) ? cc : null,
     } as unknown as ConflictEvent
   })
 

@@ -5,13 +5,16 @@ import { useRouter } from 'next/navigation'
 import { safeTimeAgo, severityLabel, severityColor, type IntelItem } from '@/types/intel-item'
 import { safeAbsoluteTime, getFreshness, safeRelativeTime, type FreshnessLevel } from '@/lib/utils/time'
 
-const SOURCE_RELIABILITY: Record<string, { label: string; score: string }> = {
-  gdelt: { label: 'GDELT', score: 'B — Automated news aggregation' },
-  gdacs: { label: 'GDACS / UN', score: 'A — UN-affiliated disaster tracking' },
-  reliefweb: { label: 'ReliefWeb / OCHA', score: 'A — UN OCHA humanitarian reporting' },
-  unhcr: { label: 'UNHCR', score: 'A — UN refugee agency official data' },
-  nasa_eonet: { label: 'NASA EONET', score: 'A — NASA Earth Observatory' },
-  news_rss: { label: 'News RSS', score: 'B — Curated international wire services' },
+const SOURCE_LABELS: Record<string, string> = {
+  gdelt: 'GDELT',
+  gdacs: 'GDACS',
+  reliefweb: 'ReliefWeb / OCHA',
+  unhcr: 'UNHCR',
+  nasa_eonet: 'NASA EONET',
+  news_rss: 'News Feed',
+  acled: 'ACLED',
+  noaa: 'NOAA',
+  usgs: 'USGS',
 }
 
 function parseCoords(location: unknown): { lat: number; lng: number } | null {
@@ -147,10 +150,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
   if (!item) return null
 
   const coords = parseCoords(item.location)
-  const reliability = SOURCE_RELIABILITY[item.source] ?? {
-    label: item.source.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-    score: 'Unrated source',
-  }
+  const sourceLabel = SOURCE_LABELS[item.source] ?? item.source.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
   const freshness = getFreshness(item.ingested_at)
 
   const handleViewOnMap = () => {
@@ -285,7 +285,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
               </div>
               <div className="grid grid-cols-[100px_1fr] gap-1">
                 <span style={{ color: 'var(--text-muted)' }}>Source</span>
-                <span style={{ color: 'var(--text-primary)' }}>{reliability.label}</span>
+                <span style={{ color: 'var(--text-primary)' }}>{sourceLabel}</span>
               </div>
               <div className="grid grid-cols-[100px_1fr] gap-1 items-center">
                 <span style={{ color: 'var(--text-muted)' }}>Corroboration</span>
@@ -344,14 +344,14 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
             </p>
           </div>
 
-          {/* EVIDENCE */}
+          {/* SOURCES */}
           {item.url && (
             <div>
-              <SectionHeader label="EVIDENCE" />
+              <SectionHeader label="SOURCES" />
               <div className="flex items-center justify-between rounded-lg px-3 py-2"
                 style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border)' }}>
                 <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                  {reliability.label}
+                  {sourceLabel}
                 </span>
                 <a
                   href={item.url}

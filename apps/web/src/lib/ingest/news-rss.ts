@@ -376,12 +376,14 @@ export async function ingestNewsRSS(): Promise<{
       const cleanUrl = item.link.split('?')[0]!.split('#')[0]!
       const source_id = `news_rss:${src.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}:${Buffer.from(cleanUrl).toString('base64').slice(0, 32)}`
 
+      const snippet = (item.description || item.title || '').trim().slice(0, 1000) || item.title.slice(0, 500)
+
       toUpsert.push({
         source: 'news_rss',
         source_id,
         event_type: evType,
         title: item.title.slice(0, 500),
-        description: item.description.slice(0, 2000) || item.title,
+        description: snippet,
         region,
         country_code: loc.country_code,
         severity,
