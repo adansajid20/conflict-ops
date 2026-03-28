@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, useRef, useState } from 'react'
+import { useEffect, useCallback, useRef, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { safeTimeAgo, severityLabel, severityColor, type IntelItem } from '@/types/intel-item'
 import { safeAbsoluteTime, getFreshness, safeRelativeTime, type FreshnessLevel } from '@/lib/utils/time'
@@ -101,6 +101,42 @@ function SeverityBadge({ severity }: { severity: number | null }) {
       style={{ background: `${color}1A`, color, border: `1px solid ${color}40` }}>
       SEV {severity} · {label}
     </span>
+  )
+}
+
+function DescriptionBlock({ description }: { description: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const DESC_LIMIT = 300
+  const tooLong = description.length > DESC_LIMIT
+  // Convert ALL CAPS text to sentence case
+  const upperRatio = (description.match(/[A-Z]/g)?.length ?? 0) / Math.max(description.length, 1)
+  let cleaned = description
+  if (upperRatio > 0.5) {
+    cleaned = description
+      .toLowerCase()
+      .replace(/\.\s+([a-z])/g, (_m: string, c: string) => '. ' + c.toUpperCase())
+      .replace(/^([a-z])/, (c: string) => c.toUpperCase())
+  }
+  const displayed = tooLong && !expanded ? cleaned.slice(0, DESC_LIMIT).trimEnd() + '…' : cleaned
+
+  return (
+    <div>
+      <SectionHeader label="DESCRIPTION" />
+      <p className="text-sm" style={{ color: 'var(--text-primary)', lineHeight: 1.65 }}>
+        {displayed}
+      </p>
+      {tooLong && (
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="text-xs mt-2 transition-colors rounded outline-none focus-visible:ring-1 focus-visible:ring-gray-500"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)' }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)' }}
+        >
+          {expanded ? 'Show less ↑' : 'Show more ↓'}
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -228,6 +264,12 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
   // Location display — show Unknown if both null after geo cleanup, never show "UN"
   const locationDisplay = displayLocation(item.country_code, item.region)
 
+  // Detect mobile
+  const isMobile = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    return window.innerWidth < 768
+  }, [])
+
   return (
     <>
       {/* Backdrop */}
@@ -238,20 +280,35 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
         aria-hidden="true"
       />
 
-      {/* Panel */}
+      {/* Panel — desktop: right sidebar | mobile: bottom sheet */}
       <div
         ref={focusRef}
         tabIndex={-1}
         role="dialog"
         aria-label="Intel Case File"
-        className="fixed right-0 top-0 bottom-0 z-50 flex flex-col outline-none"
-        style={{
+        className={isMobile
+          ? "fixed inset-x-0 bottom-0 z-50 flex flex-col outline-none rounded-t-xl transition-transform duration-300"
+          : "fixed right-0 top-0 bottom-0 z-50 flex flex-col outline-none"
+        }
+        style={isMobile ? {
+          maxHeight: '85vh',
+          backgroundColor: 'var(--bg-surface)',
+          borderTop: '1px solid var(--border)',
+          boxShadow: '0 -12px 40px rgba(0,0,0,0.5)',
+          overflowY: 'auto',
+        } : {
           width: 'min(560px, 95vw)',
           backgroundColor: 'var(--bg-surface)',
           borderLeft: '1px solid var(--border)',
           boxShadow: '-12px 0 40px rgba(0,0,0,0.5)',
         }}
       >
+        {/* Mobile drag handle */}
+        {isMobile && (
+          <div className="flex justify-center pt-3 pb-2 shrink-0">
+            <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
+          </div>
+        )}
         {/* Header */}
         <div className="flex items-start gap-3 p-4 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div className="flex-1 min-w-0">
@@ -370,12 +427,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
           </div>
 
           {/* DESCRIPTION */}
-          <div>
-            <SectionHeader label="DESCRIPTION" />
-            <p className="text-sm" style={{ color: 'var(--text-primary)', lineHeight: 1.65 }}>
-              {item.description ?? item.title}
-            </p>
-          </div>
+          <DescriptionBlock description={item.description ?? item.title} />
 
           {/* SOURCES */}
           {item.url && (

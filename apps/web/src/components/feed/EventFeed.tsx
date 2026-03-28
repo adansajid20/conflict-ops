@@ -320,7 +320,17 @@ export function EventFeed() {
       {/* Event list */}
       <div className="flex-1 overflow-y-auto" ref={listRef}>
         {loading && events.length === 0 ? (
-          <div className="p-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="mb-3 h-16 rounded-lg skeleton" />)}</div>
+          <div className="p-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="animate-pulse flex gap-3 p-4 border-b mb-1" style={{ borderColor: 'var(--border)' }}>
+                <div className="w-1 self-stretch rounded" style={{ background: 'var(--border)' }} />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 rounded w-3/4" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                  <div className="h-3 rounded w-1/2" style={{ background: 'rgba(255,255,255,0.05)' }} />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : filteredEvents.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
             <AlertCircleIcon size={32} style={{ color: 'var(--text-muted)' }} />
