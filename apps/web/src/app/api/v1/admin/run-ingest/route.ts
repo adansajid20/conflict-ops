@@ -17,10 +17,18 @@ export async function POST(req: Request) {
     if (!userId) return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // HEARTBEAT FIRST — touch ingested_at immediately so freshness clock resets
-  // even if the function times out before completing all sources
+  // HEARTBEAT FIRST — write last_ingest_at to system_flags immediately so freshness
+  // clock resets even if the function times out before completing all sources.
+  // Also touch ingested_at on the most recent event as a secondary signal.
+  const heartbeatTs = new Date().toISOString()
   try {
     const supabase = (await import('@/lib/supabase/server')).createServiceClient()
+    // Primary: system_flags key-value store (reliable, no RLS complexity)
+    await supabase.from('system_flags').upsert(
+      { key: 'last_ingest_at', value: { ts: heartbeatTs } as unknown as Record<string, unknown>, set_by: 'run-ingest', reason: 'ingest started', set_at: heartbeatTs },
+      { onConflict: 'key' }
+    )
+    // Secondary: touch ingested_at on most recent event
     const { data: latest } = await supabase
       .from('events')
       .select('id')
@@ -30,7 +38,7 @@ export async function POST(req: Request) {
     if (latest?.id) {
       await supabase
         .from('events')
-        .update({ ingested_at: new Date().toISOString() })
+        .update({ ingested_at: heartbeatTs })
         .eq('id', latest.id)
     }
   } catch { /* best effort */ }

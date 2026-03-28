@@ -25,11 +25,12 @@ export async function GET() {
     const supabase = createServiceClient()
     const h24 = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-    const [countResult, lastIngestResult, sourceResult, ingest24h] = await Promise.allSettled([
+    const [countResult, lastIngestResult, sourceResult, ingest24h, flagResult] = await Promise.allSettled([
       supabase.from('events').select('id', { count: 'exact', head: true }),
       supabase.from('events').select('ingested_at').order('ingested_at', { ascending: false }).limit(1).single(),
       supabase.from('events').select('source, ingested_at').order('ingested_at', { ascending: false }).limit(500),
       supabase.from('events').select('id', { count: 'exact', head: true }).gte('ingested_at', h24),
+      supabase.from('system_flags').select('value').eq('key', 'last_ingest_at').single(),
     ])
 
     if (countResult.status === 'fulfilled' && !countResult.value.error) {
@@ -40,7 +41,12 @@ export async function GET() {
       errors.push(`db: ${msg}`)
     }
 
-    if (lastIngestResult.status === 'fulfilled' && lastIngestResult.value.data) {
+    // Prefer system_flags.last_ingest_at (set at start of each run) over ingested_at on events
+    if (flagResult.status === 'fulfilled' && flagResult.value.data) {
+      const flagVal = flagResult.value.data.value as { ts?: string } | null
+      if (flagVal?.ts) lastIngestAt = flagVal.ts
+    }
+    if (!lastIngestAt && lastIngestResult.status === 'fulfilled' && lastIngestResult.value.data) {
       lastIngestAt = lastIngestResult.value.data.ingested_at as string
     }
 
