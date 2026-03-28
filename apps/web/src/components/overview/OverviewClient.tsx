@@ -358,7 +358,7 @@ function TopStoriesList({
   if (events.length === 0) {
     return (
       <div className="px-5 py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-        No events in this window. Try switching to 7d or 30d.
+        No significant events in the selected timeframe.
       </div>
     )
   }
@@ -509,12 +509,17 @@ function QuickActions({ hasOrg }: { hasOrg: boolean }) {
         </Link>
       ) : (
         <button
-          disabled
+          title="Create a workspace to enable alerts"
           className="flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm"
-          style={{ color: 'var(--text-muted)', cursor: 'not-allowed' }}
+          style={{
+            color: 'var(--text-muted)',
+            border: '1px solid var(--border)',
+            cursor: 'default',
+            opacity: 0.5,
+          }}
         >
-          <IconBell size={14} /> Create Alert
-          <span className="ml-auto text-xs">(Workspace required)</span>
+          🔒 <span>Create Alert</span>
+          <span className="ml-auto text-xs" style={{ color: 'var(--text-disabled)' }}>Coming soon</span>
         </button>
       )}
       <button
@@ -582,17 +587,7 @@ export function OverviewClient() {
     void fetchOverview(win)
   }, [win, fetchOverview])
 
-  // Auto-refresh: if data is stale (>30min), trigger background ingest on load
-  useEffect(() => {
-    if (!data) return
-    if (data.freshnessStatus !== 'Fresh') {
-      fetch('/api/v1/admin/run-ingest', {
-        method: 'POST',
-        headers: { 'x-internal-secret': 'dev' },
-      }).catch(() => {})
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.freshnessStatus])
+  // Auto-refresh: ingest is server-side scheduled; no client-side ingest trigger
 
   // Trigger ingest every 3 minutes while page is open (rate-limited server-side)
   useEffect(() => {
@@ -670,11 +665,6 @@ export function OverviewClient() {
               <span>Last update: {data.freshnessDescription}</span>
               <span>·</span>
               <span style={{ color: coverageColor }}>Coverage: {data.coverageLevel}</span>
-              {data.coverageTooltip && (
-                <span title={data.coverageTooltip} className="cursor-help">
-                  <IconInfo size={11} style={{ color: 'var(--text-muted)' }} />
-                </span>
-              )}
             </div>
           )}
         </div>
@@ -815,7 +805,7 @@ export function OverviewClient() {
                 <div className="p-3">
                   {data.hotRegions.length === 0 ? (
                     <p className="px-2 py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                      No regional activity in this window. Try switching to 7d or 30d.
+                      Insufficient data to rank regions.
                     </p>
                   ) : (
                     <HotRegionsTable regions={data.hotRegions} />
