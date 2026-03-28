@@ -84,6 +84,41 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
   const rawEvents = (data ?? []) as unknown as ConflictEvent[]
 
   // --- FIX 1: Strict relevance gate — only conflict/security-relevant events pass ---
+
+  // Hard-block consumer/entertainment topics — these NEVER pass regardless of other signals
+  const BLOCK_PATTERNS = /\b(playstation|xbox|nintendo|gaming|PS5|PS4|iphone|android|samsung|apple\s+watch|airpods|headphones?|sneakers?|fashion|celebrity|antique|auction|recipe|cooking|travel\s+tips?|vacation|real\s+estate|mortgage|stock\s+tip|crypto\s+pump|NFT|metaverse|fortnite|minecraft|esports?|football\s+scores?|soccer\s+match|basketball\s+game|baseball|tennis\s+championship|golf\s+tournament|olympic\s+games?|F1\s+race|nascar|wrestling\s+event|beauty\s+tips?|skincare|makeup|weight\s+loss|diet\s+pill)\b/i
+
+  // Numeric relevance scoring
+  const ALLOWED_CATEGORIES = new Set([
+    'armed_conflict', 'airstrike', 'terrorism', 'coup', 'civil_unrest', 'protest',
+    'political_crisis', 'sanctions', 'ceasefire', 'diplomacy', 'wmd_threat',
+    'humanitarian_crisis', 'natural_disaster', 'security', 'cyber',
+    'displacement', 'humanitarian', 'border_incident', 'maritime_incident',
+    'aviation_incident', 'military', 'mobilization', 'explosion', 'attack',
+  ])
+
+  const AUTH_SOURCES_SET = new Set(['gdacs', 'reliefweb', 'unhcr', 'usgs', 'noaa', 'nasa_eonet', 'acled'])
+
+  function computeRelevanceScore(e: Record<string, unknown>): number {
+    const text = `${String(e.title ?? '')} ${String(e.description ?? '')}`.toLowerCase()
+    if (BLOCK_PATTERNS.test(text)) return 0
+
+    let score = 0.3
+    const src = String(e.source ?? '')
+    const evType = String(e.event_type ?? '')
+    const sev = Number(e.severity ?? 0)
+
+    if (AUTH_SOURCES_SET.has(src)) score += 0.25
+    if (ALLOWED_CATEGORIES.has(evType)) score += 0.25
+    if (CONFLICT_KEYWORDS.test(text)) score += 0.25
+    if (sev >= 3) score += 0.1
+    if (sev >= 4) score += 0.1
+
+    return Math.min(score, 1.0)
+  }
+
+  const MIN_RELEVANCE = 0.55
+
   const INTEL_FEED_TYPES = new Set([
     'armed_conflict', 'airstrike', 'military', 'mobilization', 'ceasefire',
     'civil_unrest', 'protest', 'terrorism', 'explosion', 'attack',
@@ -126,7 +161,10 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     return CONFLICT_KEYWORDS.test(title) || CONFLICT_KEYWORDS.test(desc)
   }
 
-  const relevantData = rawEvents.filter(e => passesRelevanceGate(e as unknown as Record<string, unknown>))
+  // First pass: hard gate (existing logic)
+  const hardGated = rawEvents.filter(e => passesRelevanceGate(e as unknown as Record<string, unknown>))
+  // Second pass: numeric score gate — block hard-blocked consumer content
+  const relevantData = hardGated.filter(e => computeRelevanceScore(e as unknown as Record<string, unknown>) >= MIN_RELEVANCE)
 
   // --- FIX 2: Snippet field — never blank, never "No description provided" ---
   const BAD_DESCRIPTIONS = new Set(['No description provided', 'N/A', '', 'null', 'undefined'])
@@ -172,6 +210,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     _corroborated_by: corroborated_by,
     _source_count: source_count,
     _confidence: confidence,
+    _relevance_score: computeRelevanceScore(canonical as unknown as Record<string, unknown>),
   }))
 
   await setCachedSnapshot(cacheKey, events, TTL.FEED)
