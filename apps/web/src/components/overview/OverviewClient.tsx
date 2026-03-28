@@ -18,8 +18,41 @@ const IconActivity   = Activity as React.ComponentType<{ size?: number; style?: 
 import { safeRelativeTime } from '@/lib/utils/time'
 import { KpiStrip } from './KpiStrip'
 import { HotRegionsTable } from './HotRegionsTable'
-import { EventDetailPanel } from './EventDetailPanel'
+import { EventDetailPanel, SOURCE_DISPLAY_NAMES } from './EventDetailPanel'
 import type { OverviewData, OverviewEvent } from './types'
+
+// ─── event type priority (lower = more important) ────────────────────────────
+
+const EVENT_TYPE_PRIORITY: Record<string, number> = {
+  armed_conflict:      1,
+  airstrike:           1,
+  terrorism:           1,
+  political_crisis:    2,
+  coup:                2,
+  diplomacy:           2,
+  humanitarian_crisis: 3,
+  civil_unrest:        3,
+  natural_disaster:    4,
+  news:                5,
+}
+
+// ─── title formatter ──────────────────────────────────────────────────────────
+
+function formatEventTitle(title: string, source: string | null, maxLen = 80): string {
+  if (!title) return 'Untitled event'
+
+  if (source === 'noaa') {
+    // Extract alert type (text before "issued" or "in effect")
+    const type = title.split(/\s+issued|\s+in effect/i)[0]?.trim() ?? title
+    // Extract NWS location from "by NWS [Location] [STATE]"
+    const locMatch = title.match(/by\s+NWS\s+(.+?)(?:\s*$)/i)
+    const loc = locMatch?.[1] ? ` · ${locMatch[1].trim()}` : ''
+    const short = type.length > 60 ? type.slice(0, 57) + '…' : type + loc
+    return short.length > maxLen ? short.slice(0, maxLen - 1) + '…' : short
+  }
+
+  return title.length > maxLen ? title.slice(0, maxLen - 1) + '…' : title
+}
 
 // ─── severity / status configs ────────────────────────────────────────────────
 
@@ -134,6 +167,8 @@ type Window = typeof WINDOWS[number]['key']
 
 // ─── top stories list ─────────────────────────────────────────────────────────
 
+const NOAA_LIMIT = 3
+
 function TopStoriesList({
   events,
   onSelect,
@@ -141,6 +176,8 @@ function TopStoriesList({
   events: OverviewEvent[]
   onSelect: (e: OverviewEvent) => void
 }) {
+  const [noaaExpanded, setNoaaExpanded] = useState(false)
+
   if (events.length === 0) {
     return (
       <div className="px-5 py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -149,57 +186,104 @@ function TopStoriesList({
     )
   }
 
+  // Sort: event type priority → severity desc → occurred_at desc
+  const sorted = [...events].sort((a, b) => {
+    const ap = EVENT_TYPE_PRIORITY[a.event_type ?? ''] ?? 5
+    const bp = EVENT_TYPE_PRIORITY[b.event_type ?? ''] ?? 5
+    if (ap !== bp) return ap - bp
+    const as_ = a.severity ?? 1, bs_ = b.severity ?? 1
+    if (as_ !== bs_) return bs_ - as_
+    return new Date(b.occurred_at ?? 0).getTime() - new Date(a.occurred_at ?? 0).getTime()
+  })
+
+  // Separate NOAA from non-NOAA
+  const nonNoaa = sorted.filter((e) => e.source !== 'noaa')
+  const noaaAll = sorted.filter((e) => e.source === 'noaa')
+  const noaaToShow = noaaExpanded ? noaaAll : noaaAll.slice(0, NOAA_LIMIT)
+  const hiddenNoaaCount = noaaAll.length - NOAA_LIMIT
+
+  // Combined list: non-NOAA first (up to 10), then NOAA
+  const displayEvents = [...nonNoaa.slice(0, 10 - Math.min(noaaToShow.length, NOAA_LIMIT)), ...noaaToShow]
+
+  const renderRow = (event: OverviewEvent) => {
+    const sev = SEVERITY_CONFIG[(event.severity as 1|2|3|4) ?? 1] ?? SEVERITY_CONFIG[1]
+    const status = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG['pending']!
+    const rel = safeRelativeTime(event.occurred_at)
+    const displayTitle = formatEventTitle(event.title ?? '', event.source)
+    const sourceName = SOURCE_DISPLAY_NAMES[event.source ?? ''] ?? null
+
+    return (
+      <button
+        key={event.id}
+        onClick={() => onSelect(event)}
+        className="w-full text-left px-5 py-3.5 transition-colors duration-150 block"
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.03)' }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '' }}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <span
+            className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide flex-shrink-0"
+            style={{ background: sev.bg, color: sev.color }}
+          >
+            {sev.label}
+          </span>
+          <span
+            className="rounded-full px-2 py-0.5 text-[10px] font-medium flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.06)', color: status.color }}
+          >
+            {status.label}
+          </span>
+          {event.country_code && (
+            <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+              {event.country_code}
+            </span>
+          )}
+          {(event.region ?? sourceName) && (
+            <span className="text-xs truncate flex-1" style={{ color: 'var(--text-muted)' }}>
+              {event.region ?? sourceName}
+            </span>
+          )}
+          <span
+            className="text-[11px] flex-shrink-0 ml-auto tabular-nums"
+            style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}
+          >
+            {rel}
+          </span>
+        </div>
+        <p className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+          {displayTitle}
+        </p>
+      </button>
+    )
+  }
+
   return (
     <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-      {events.slice(0, 10).map((event) => {
-        const sev = SEVERITY_CONFIG[(event.severity as 1|2|3|4) ?? 1] ?? SEVERITY_CONFIG[1]
-        const status = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG['pending']!
-        const rel = safeRelativeTime(event.occurred_at)
+      {displayEvents.map(renderRow)}
 
-        return (
-          <button
-            key={event.id}
-            onClick={() => onSelect(event)}
-            className="w-full text-left px-5 py-3.5 transition-colors duration-150 block"
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.03)' }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '' }}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide flex-shrink-0"
-                style={{ background: sev.bg, color: sev.color }}
-              >
-                {sev.label}
-              </span>
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-medium flex-shrink-0"
-                style={{ background: 'rgba(255,255,255,0.06)', color: status.color }}
-              >
-                {status.label}
-              </span>
-              {event.country_code && (
-                <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
-                  {event.country_code}
-                </span>
-              )}
-              {event.region && (
-                <span className="text-xs truncate flex-1" style={{ color: 'var(--text-muted)' }}>
-                  {event.region}
-                </span>
-              )}
-              <span
-                className="text-[11px] flex-shrink-0 ml-auto tabular-nums"
-                style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}
-              >
-                {rel}
-              </span>
-            </div>
-            <p className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>
-              {event.title ?? 'Untitled event'}
-            </p>
-          </button>
-        )
-      })}
+      {/* NOAA "show more" toggle */}
+      {!noaaExpanded && hiddenNoaaCount > 0 && (
+        <button
+          onClick={() => setNoaaExpanded(true)}
+          className="w-full text-left px-5 py-3 text-xs transition-colors"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.02)' }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '' }}
+        >
+          + {hiddenNoaaCount} more weather alert{hiddenNoaaCount > 1 ? 's' : ''} from NOAA — click to expand
+        </button>
+      )}
+      {noaaExpanded && hiddenNoaaCount > 0 && (
+        <button
+          onClick={() => setNoaaExpanded(false)}
+          className="w-full text-left px-5 py-3 text-xs transition-colors"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.02)' }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '' }}
+        >
+          ↑ Show fewer weather alerts
+        </button>
+      )}
     </div>
   )
 }

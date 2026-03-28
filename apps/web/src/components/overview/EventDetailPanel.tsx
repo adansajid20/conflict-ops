@@ -6,7 +6,6 @@ import {
   X, ExternalLink, Map, Bell, Globe, AlertTriangle,
   ChevronDown, ChevronUp,
 } from 'lucide-react'
-import { safeRelativeTime, safeAbsoluteTime } from '@/lib/utils/time'
 import type { OverviewEvent } from './types'
 
 // Cast all lucide icons to avoid React 18 JSX type mismatch
@@ -18,9 +17,6 @@ const IconGlobe      = Globe as React.ComponentType<{ size?: number; style?: Rea
 const IconAlert      = AlertTriangle as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
 const IconChevUp     = ChevronUp as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
 const IconChevDown   = ChevronDown as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
-
-// Silence unused import lint — safeRelativeTime imported but only safeAbsoluteTime used below
-void safeRelativeTime
 
 // ─── configs ─────────────────────────────────────────────────────────────────
 
@@ -39,31 +35,108 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   pending:    { label: 'Developing', color: '#f59e0b' },
 }
 
-const SOURCE_RELIABILITY: Record<string, { label: string; score: string }> = {
-  gdelt:      { label: 'GDELT',      score: 'B — Automated news aggregation' },
-  gdacs:      { label: 'GDACS / UN', score: 'A — UN-affiliated disaster tracking' },
-  reliefweb:  { label: 'ReliefWeb',  score: 'A — UN OCHA humanitarian reporting' },
-  unhcr:      { label: 'UNHCR',      score: 'A — UN refugee agency' },
-  nasa_eonet: { label: 'NASA EONET', score: 'A — NASA Earth Observatory' },
+// ─── source display names ─────────────────────────────────────────────────────
+
+export const SOURCE_DISPLAY_NAMES: Record<string, string> = {
+  'noaa':       'NOAA National Weather Service',
+  'usgs':       'USGS Earthquake Hazards Program',
+  'gdacs':      'GDACS (Global Disaster Alert)',
+  'unhcr':      'UNHCR (UN Refugee Agency)',
+  'nasa_eonet': 'NASA EONET (Natural Events)',
+  'reliefweb':  'ReliefWeb (OCHA)',
+  'gdelt':      'GDELT Project',
+  'acled':      'ACLED Armed Conflict Database',
+  'news_rss':   'News Wire',
+  'newsapi':    'News Aggregator',
+}
+
+// ─── country centroids ────────────────────────────────────────────────────────
+
+const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
+  'US': [37.09, -95.71], 'RU': [61.52, 105.32], 'UA': [48.37, 31.16],
+  'IL': [31.05, 34.85],  'PS': [31.95, 35.23],  'LB': [33.85, 35.86],
+  'SY': [34.80, 38.99],  'IQ': [33.22, 43.68],  'IR': [32.43, 53.69],
+  'YE': [15.55, 48.52],  'SA': [23.89, 45.08],  'AF': [33.93, 67.71],
+  'PK': [30.37, 69.35],  'SD': [12.86, 30.22],  'SS': [6.88, 31.31],
+  'ET': [9.14, 40.49],   'SO': [5.15, 46.20],   'NG': [9.08, 8.68],
+  'ML': [17.57, -3.99],  'LY': [26.34, 17.23],  'MM': [21.91, 95.96],
+  'CN': [35.86, 104.19], 'IN': [20.59, 78.96],  'TR': [38.96, 35.24],
+  'DE': [51.16, 10.45],  'FR': [46.23, 2.21],   'GB': [55.38, -3.44],
+  'MX': [23.63, -102.55],'BR': [-14.24, -51.93],'JP': [36.20, 138.25],
 }
 
 // ─── utilities ───────────────────────────────────────────────────────────────
 
-function parseCoords(location: unknown): { lat: number; lng: number } | null {
-  if (!location) return null
-  if (typeof location === 'string') {
-    const m = location.match(/POINT\(([-.0-9]+)\s+([-.0-9]+)\)/)
-    if (!m || m[1] === undefined || m[2] === undefined) return null
-    return { lng: parseFloat(m[1]), lat: parseFloat(m[2]) }
-  }
-  if (typeof location === 'object' && location !== null) {
-    const loc = location as { type?: string; coordinates?: number[] }
-    if (loc.type === 'Point' && Array.isArray(loc.coordinates) &&
-        loc.coordinates[0] !== undefined && loc.coordinates[1] !== undefined) {
-      return { lng: loc.coordinates[0], lat: loc.coordinates[1] }
+function getEventCoords(
+  event: { location?: unknown; country_code?: string | null }
+): { lat: number; lng: number } | null {
+  const loc = event.location
+  if (loc) {
+    if (typeof loc === 'string') {
+      const m = (loc as string).match(/POINT\(([-.0-9]+)\s+([-.0-9]+)\)/)
+      if (m && m[1] !== undefined && m[2] !== undefined) {
+        return { lng: parseFloat(m[1]), lat: parseFloat(m[2]) }
+      }
+    }
+    if (typeof loc === 'object' && loc !== null) {
+      const l = loc as { type?: string; coordinates?: number[] }
+      if (l.type === 'Point' && Array.isArray(l.coordinates) &&
+          l.coordinates[0] !== undefined && l.coordinates[1] !== undefined) {
+        return { lng: l.coordinates[0], lat: l.coordinates[1] }
+      }
     }
   }
+  // Fallback: country centroid
+  if (event.country_code) {
+    const centroid = COUNTRY_CENTROIDS[event.country_code]
+    if (centroid) return { lat: centroid[0], lng: centroid[1] }
+  }
   return null
+}
+
+function formatEventTime(dateStr: string | null): { local: string; utc: string } {
+  if (!dateStr) return { local: 'Unknown', utc: 'Unknown' }
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return { local: 'Unknown', utc: 'Unknown' }
+
+  const utc = d.toLocaleString('en-US', {
+    timeZone: 'UTC',
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  }) + ' UTC'
+
+  // Local uses browser's timezone
+  const local = d.toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+    timeZoneName: 'short',
+  })
+
+  return { local, utc }
+}
+
+function cleanEventDescription(text: string): string {
+  if (!text) return ''
+
+  let cleaned = text
+
+  // Convert ALL CAPS to sentence case (if >50% uppercase)
+  const upperRatio = (text.match(/[A-Z]/g)?.length ?? 0) / text.length
+  if (upperRatio > 0.5) {
+    cleaned = text
+      .toLowerCase()
+      .replace(/\.\s+([a-z])/g, (_m, c: string) => '. ' + c.toUpperCase())
+      .replace(/^([a-z])/, (c: string) => c.toUpperCase())
+  }
+
+  // Remove NOAA ellipsis separators
+  cleaned = cleaned.replace(/\.\.\./g, ' ').replace(/\s+/g, ' ').trim()
+
+  // Remove technical zone codes
+  cleaned = cleaned.replace(/fire weather zones? \d+( and \d+)?/gi, 'affected fire weather zones')
+  cleaned = cleaned.replace(/\bzone \d+/gi, 'the affected zone')
+
+  return cleaned
 }
 
 function copyToClipboard(text: string) {
@@ -81,12 +154,14 @@ interface EventDetailPanelProps {
 }
 
 export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelProps) {
-  const [evidenceOpen, setEvidenceOpen] = useState(false)
+  const [sourcesOpen, setSourcesOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [descExpanded, setDescExpanded] = useState(false)
 
   useEffect(() => {
-    setEvidenceOpen(false)
+    setSourcesOpen(false)
     setCopied(false)
+    setDescExpanded(false)
   }, [event?.id])
 
   useEffect(() => {
@@ -100,15 +175,34 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
   const sevKey = (event.severity ?? 1) as 1 | 2 | 3 | 4
   const sev = SEVERITY_CONFIG[sevKey] ?? SEVERITY_CONFIG[1]
   const status = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG['pending']!
-  const source = SOURCE_RELIABILITY[event.source ?? ''] ?? { label: event.source ?? 'Unknown', score: 'Unknown' }
-  const coords = parseCoords(event.location)
-  const mapHref = coords ? `/tracking?lat=${coords.lat}&lng=${coords.lng}` : null
+
+  // Source display
+  const sourceKey = event.source ?? ''
+  const sourceDisplayName = SOURCE_DISPLAY_NAMES[sourceKey] ?? (sourceKey || 'Unknown Source')
+
+  // Coordinates — with country centroid fallback
+  const coords = getEventCoords(event)
+  const mapHref = coords ? `/tracking?lat=${coords.lat}&lng=${coords.lng}&zoom=5` : null
+
+  // Provenance
   const provenanceUrl = event.provenance_raw?.url
   const provenanceAttr = event.provenance_raw?.attribution
 
-  const hoursAgo = event.occurred_at
-    ? Math.floor((Date.now() - new Date(event.occurred_at).getTime()) / 3600000)
-    : null
+  // Severity label for "why" text
+  const severityLabels = ['', 'Low', 'Medium', 'High', 'Critical']
+  const severityLabel = severityLabels[event.severity ?? 1] ?? 'High'
+
+  // Event time (client-side, browser timezone)
+  const eventTime = formatEventTime(event.occurred_at)
+
+  // Description — cleaned
+  const rawDesc = event.description ?? ''
+  const cleanedDesc = cleanEventDescription(rawDesc)
+  const DESC_LIMIT = 300
+  const descTooLong = cleanedDesc.length > DESC_LIMIT
+  const displayedDesc = descTooLong && !descExpanded
+    ? cleanedDesc.slice(0, DESC_LIMIT).trim() + '…'
+    : cleanedDesc
 
   function handleShare() {
     copyToClipboard(typeof window !== 'undefined' ? window.location.href : '')
@@ -139,7 +233,7 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         className="fixed right-0 top-0 h-full z-50 overflow-y-auto flex flex-col"
         style={{
-          width: 'min(400px, 100vw)',
+          width: 'min(420px, 100vw)',
           background: 'var(--bg-surface)',
           borderLeft: '1px solid var(--border)',
         }}
@@ -174,11 +268,19 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-5 py-4 space-y-5">
+        <div className="flex-1 px-5 py-4 space-y-5 overflow-y-auto">
 
           {/* Intel Header */}
           <div>
-            <h2 className="text-base font-semibold leading-snug mb-2" style={{ color: 'var(--text-primary)' }}>
+            <h2
+              className="text-base font-semibold leading-snug mb-2 overflow-hidden"
+              style={{
+                color: 'var(--text-primary)',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+              } as React.CSSProperties}
+            >
               {event.title ?? 'Untitled Event'}
             </h2>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -207,27 +309,34 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
             <div className="text-[11px] uppercase tracking-wider font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
               Source
             </div>
-            <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{source.label}</div>
-            <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{source.score}</div>
+            <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              {sourceDisplayName}
+            </div>
+            {/* Only show attribution if it has real content */}
+            {provenanceAttr && provenanceAttr.trim() && provenanceAttr.toLowerCase() !== 'unknown' && (
+              <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                {provenanceAttr}
+              </div>
+            )}
           </div>
 
           {/* Timeline */}
           <div>
             <div className="text-[11px] uppercase tracking-wider font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
-              Timeline
+              Event Time
             </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span style={{ color: 'var(--text-secondary)' }}>First seen</span>
-                <span style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
-                  {safeAbsoluteTime(event.occurred_at)}
-                </span>
+            <div className="space-y-1">
+              <div
+                className="text-xs"
+                style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}
+              >
+                {eventTime.local}
               </div>
-              <div className="flex items-center justify-between text-xs">
-                <span style={{ color: 'var(--text-secondary)' }}>Ingested</span>
-                <span style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
-                  {safeAbsoluteTime(event.ingested_at)}
-                </span>
+              <div
+                className="text-xs"
+                style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}
+              >
+                {eventTime.utc}
               </div>
             </div>
           </div>
@@ -237,23 +346,40 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
             <div className="text-[11px] uppercase tracking-wider font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
               Details
             </div>
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              {event.description ?? 'No additional details available for this event.'}
-            </p>
+            {cleanedDesc ? (
+              <>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {displayedDesc}
+                </p>
+                {descTooLong && (
+                  <button
+                    onClick={() => setDescExpanded((v) => !v)}
+                    className="mt-1.5 text-xs font-medium"
+                    style={{ color: 'var(--primary)' }}
+                  >
+                    {descExpanded ? 'Show less' : 'Show more'}
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                No additional details available for this event.
+              </p>
+            )}
           </div>
 
-          {/* Evidence (collapsible) */}
-          {(provenanceUrl ?? provenanceAttr) && (
+          {/* Sources (formerly Evidence — collapsible) */}
+          {(provenanceUrl ?? (provenanceAttr && provenanceAttr.toLowerCase() !== 'unknown')) && (
             <div>
               <button
-                onClick={() => setEvidenceOpen((v) => !v)}
+                onClick={() => setSourcesOpen((v) => !v)}
                 className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold w-full"
                 style={{ color: 'var(--text-muted)' }}
               >
-                Evidence
-                {evidenceOpen ? <IconChevUp size={12} /> : <IconChevDown size={12} />}
+                Sources
+                {sourcesOpen ? <IconChevUp size={12} /> : <IconChevDown size={12} />}
               </button>
-              {evidenceOpen && (
+              {sourcesOpen && (
                 <div className="mt-2 space-y-2">
                   {provenanceUrl && (
                     <a
@@ -266,9 +392,6 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
                       <IconExternalLink size={11} />
                       View source article
                     </a>
-                  )}
-                  {provenanceAttr && (
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{provenanceAttr}</p>
                   )}
                 </div>
               )}
@@ -284,11 +407,11 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
               Why am I seeing this?
             </div>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              Detected from{' '}
-              <strong style={{ color: 'var(--text-primary)' }}>{source.label}</strong>{' '}
-              {hoursAgo !== null ? `within the last ${hoursAgo < 1 ? '1' : hoursAgo}h` : 'recently'}.{' '}
-              Included based on severity level{' '}
-              <strong style={{ color: sev.color }}>{sev.label}</strong>.
+              Reported by{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>{sourceDisplayName}</strong>.{' '}
+              Severity rated{' '}
+              <strong style={{ color: sev.color }}>{severityLabel}</strong>
+              {' '}— included in your feed.
             </p>
           </div>
         </div>
@@ -309,11 +432,11 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
           ) : (
             <button
               disabled
+              title="Location unknown"
               className="flex items-center justify-center gap-2 w-full rounded-lg px-4 py-2.5 text-sm font-medium cursor-not-allowed"
               style={{ background: 'var(--border)', color: 'var(--text-muted)' }}
             >
               <IconMap size={14} /> View on Map
-              <span className="ml-auto text-xs">(No coordinates)</span>
             </button>
           )}
           <div className="flex gap-2">
