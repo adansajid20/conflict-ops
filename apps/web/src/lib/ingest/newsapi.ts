@@ -9,8 +9,8 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { detectEventType } from './utils'
 
-// Focused on conflict/security — no domestic crime, sports, finance
-const CONFLICT_KEYWORDS = '(war OR airstrike OR "military operation" OR "killed in" OR bombing OR ceasefire OR invasion OR siege OR coup OR "rebel forces" OR "terrorist attack" OR "missile strike" OR "drone strike" OR casualties OR "armed conflict" OR "ground offensive" OR "war crimes")'
+// Free tier: no quoted phrases allowed — single words only
+const CONFLICT_KEYWORDS = 'war OR airstrike OR bombing OR ceasefire OR invasion OR siege OR coup OR casualties OR offensive OR airstrike OR missile OR troops OR military OR killed OR attack OR rebel OR terrorist'
 
 interface NewsAPIArticle {
   source: { id: string | null; name: string }
@@ -39,8 +39,8 @@ export async function ingestNewsAPI(): Promise<{ stored: number; skipped: number
   const supabase = createServiceClient()
   let stored = 0, skipped = 0, errors = 0
 
-  // NewsAPI free tier: 100 req/day — query last 6h sorted by publishedAt
-  const cutoff = new Date(Date.now() - 6 * 60 * 60 * 1000)
+  // NewsAPI free tier: 100 req/day — query last 12h sorted by publishedAt
+  const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000)
 
   try {
     const params = new URLSearchParams({
