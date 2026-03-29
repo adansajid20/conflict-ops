@@ -34,19 +34,7 @@ export async function POST(req: Request) {
       { onConflict: 'key' }
     )
   } catch { /* best effort */ }
-  // Also touch ingested_at on most recent event as tertiary fallback
-  try {
-    const supabaseHB1 = (await import('@/lib/supabase/server')).createServiceClient()
-    const { data: latest } = await supabaseHB1
-      .from('events')
-      .select('id')
-      .order('ingested_at', { ascending: false })
-      .limit(1)
-      .single()
-    if (latest?.id) {
-      await supabaseHB1.from('events').update({ ingested_at: heartbeatTs }).eq('id', latest.id)
-    }
-  } catch { /* best effort */ }
+  // NOTE: do NOT touch ingested_at on events — corrupts timestamps and makes old events appear fresh
 
   const results: Record<string, unknown> = {}
   const start = Date.now()
@@ -127,22 +115,7 @@ export async function POST(req: Request) {
   const heartbeatFinalTs = new Date().toISOString()
   try {
     const supabaseHB = (await import('@/lib/supabase/server')).createServiceClient()
-    const ACTIVE_SOURCES = ['gdelt', 'reliefweb', 'gdacs', 'unhcr', 'nasa_eonet', 'news_rss', 'usgs', 'noaa']
-    for (const src of ACTIVE_SOURCES) {
-      const { data: ev } = await supabaseHB
-        .from('events')
-        .select('id')
-        .eq('source', src)
-        .order('ingested_at', { ascending: false })
-        .limit(1)
-        .single()
-      if (ev?.id) {
-        await supabaseHB
-          .from('events')
-          .update({ ingested_at: heartbeatFinalTs })
-          .eq('id', ev.id)
-      }
-    }
+    // NOTE: removed per-source ingested_at touching — it corrupted timestamps
     // Final system_flags write: overwrite start-of-run timestamp with completed timestamp + stats
     await supabaseHB.from('system_flags').upsert(
       {

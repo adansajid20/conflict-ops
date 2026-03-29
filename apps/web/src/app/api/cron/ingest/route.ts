@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  // Write heartbeat to Redis immediately
+  // Write heartbeat to Redis — Redis only, never touch event ingested_at (corrupts timestamps)
   const heartbeatTs = new Date().toISOString()
   try {
     const { setCachedSnapshot } = await import('@/lib/cache/redis')

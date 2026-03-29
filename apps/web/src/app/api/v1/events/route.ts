@@ -73,9 +73,13 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
   if (severityInt) query = query.eq('severity', severityInt)
   if (source) query = query.eq('source', source)
   if (search) query = query.ilike('title', `%${search}%`)
+  // Exclude weather/earthquake/fire sources from Intel Feed default "All" view —
+  // they belong on the globe. Users can still filter by source explicitly.
+  if (!source) {
+    query = query.not('source', 'in', '("noaa","usgs","nasa-eonet","nasa_eonet")')
+  }
   // Use ingested_at for time window filtering — news articles are published hours/days ago
   // but ingested NOW. Filtering by occurred_at would exclude all news from the 1h/6h window.
-  // Real-time sources (NOAA, USGS) use current timestamps for occurred_at so they show regardless.
   if (sinceParam) query = query.gte('ingested_at', sinceParam)
 
   const { data, error } = await query
