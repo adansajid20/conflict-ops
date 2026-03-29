@@ -85,13 +85,16 @@ function prettifyDomain(domain: string): string | null {
  */
 function extractOutletFromTitle(title: string): string | null {
   if (!title) return null
-  // Match " - Outlet Name" or " | Outlet Name" at end of title (2-50 chars)
-  const match = title.match(/[\s–\-|]+([A-Z][A-Za-z0-9 &'.,-]{1,50})\s*$/)
+  // Require strict " - Outlet" or " | Outlet" separator at end of title
+  // Outlet name: 2-45 chars, starts uppercase, no embedded dashes or pipes (those indicate it's still part of title)
+  const match = title.match(/\s[-–|]\s([A-Z][A-Za-z0-9&'. ]{1,44})\s*$/)
   if (!match) return null
   const candidate = (match[1] ?? '').trim()
-  // Reject if it looks like part of a sentence (lowercase start, too long, contains common words)
-  if (candidate.length < 2 || candidate.length > 50) return null
-  if (/^(the|a|an|in|on|at|for|of|and|or|but|with|from|to|is|are|was|were|has|have|had|it|its)\b/i.test(candidate)) return null
+  if (candidate.length < 2 || candidate.length > 45) return null
+  // Reject if it contains " - " or " | " — means it's a phrase, not an outlet name
+  if (/\s[-–|]\s/.test(candidate)) return null
+  // Reject common sentence-starter words that aren't outlet names
+  if (/^(the |a |an |in |on |at |for |of |and |or |but |with |from |to |is |are |was |says |report|update|analysis|breaking|watch|live)/i.test(candidate)) return null
   return candidate
 }
 

@@ -10,7 +10,6 @@ const GENERIC_SNIPPETS = [
   'aggregated from sources all over the world by google news',
   'stay updated with the latest news',
   'read full articles from',
-  'breaking news and latest headlines',
 ]
 
 function isGeneric(text: string): boolean {
@@ -38,47 +37,12 @@ async function resolveGoogleNewsUrl(url: string): Promise<string> {
       redirect: 'follow',
       signal: AbortSignal.timeout(5000),
     })
-    // Check if we ended up at a different URL
-    if (res.url && res.url !== url && !res.url.includes('news.google.com')) {
-      return res.url
-    }
-    // Try to extract canonical URL from page HTML
+    if (res.url && res.url !== url && !res.url.includes('news.google.com')) return res.url
     const html = await res.text()
     const canonical = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i)?.[1]
     if (canonical && !canonical.includes('news.google.com')) return canonical
   } catch { /* best effort */ }
   return url
-}
-
-/** Extract article body text from HTML — tries article/main tags, then paragraphs */
-function extractArticleText(html: string): string | null {
-  // 1. Try <article> tag
-  const articleMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i)
-  if (articleMatch?.[1]) {
-    const text = stripHtml(articleMatch[1])
-    if (text.length > 100) return text.substring(0, 1200)
-  }
-
-  // 2. Try <main> tag
-  const mainMatch = html.match(/<main[^>]*>([\s\S]*?)<\/main>/i)
-  if (mainMatch?.[1]) {
-    const text = stripHtml(mainMatch[1])
-    if (text.length > 100) return text.substring(0, 1200)
-  }
-
-  // 3. Collect all substantial <p> paragraphs
-  const paragraphs: string[] = []
-  const pRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi
-  let match
-  while ((match = pRegex.exec(html)) !== null) {
-    const text = stripHtml(match[1] ?? '')
-    if (text.length > 60) paragraphs.push(text)
-  }
-  if (paragraphs.length > 0) {
-    return paragraphs.join(' ').substring(0, 1200)
-  }
-
-  return null
 }
 
 export async function GET(req: Request) {
@@ -98,17 +62,45 @@ export async function GET(req: Request) {
   let targetUrl = url
   if (parsedUrl.hostname.includes('news.google.com')) {
     targetUrl = await resolveGoogleNewsUrl(url)
-    // If still Google News after resolution, skip
     if (targetUrl.includes('news.google.com')) {
       return NextResponse.json({ snippet: null })
     }
   }
 
-  // Skip other known aggregators
+  // Skip known aggregators that never have real article content
   if (SKIP_DOMAINS.some(d => parsedUrl.hostname.includes(d))) {
     return NextResponse.json({ snippet: null })
   }
 
+  // --- Strategy 1: Jina Reader API (handles JS-rendered sites, paywalls, bot protection) ---
+  try {
+    const jinaRes = await fetch(`https://r.jina.ai/${encodeURIComponent(targetUrl)}`, {
+      headers: {
+        'Accept': 'application/json',
+        'X-Return-Format': 'text',
+        'X-Timeout': '8',
+      },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (jinaRes.ok) {
+      const text = await jinaRes.text()
+      // Jina returns markdown/plain text — take first 1200 meaningful chars
+      const cleaned = text
+        .replace(/\[.*?\]\(.*?\)/g, '') // remove markdown links
+        .replace(/#{1,6}\s/g, '')        // remove markdown headers
+        .replace(/\*{1,2}(.*?)\*{1,2}/g, '$1') // remove bold/italic
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+      if (cleaned.length > 100 && !isGeneric(cleaned)) {
+        return NextResponse.json(
+          { snippet: cleaned.substring(0, 1200) },
+          { headers: { 'Cache-Control': 'public, max-age=3600' } }
+        )
+      }
+    }
+  } catch { /* fall through to direct fetch */ }
+
+  // --- Strategy 2: Direct fetch with browser UA ---
   try {
     const res = await fetch(targetUrl, {
       headers: {
@@ -117,27 +109,28 @@ export async function GET(req: Request) {
         'Accept-Language': 'en-US,en;q=0.9',
       },
       redirect: 'follow',
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(8000),
     })
-
     if (!res.ok) return NextResponse.json({ snippet: null })
 
     const html = await res.text()
 
-    // First try full article body extraction
-    const articleText = extractArticleText(html)
-    if (articleText && articleText.length > 80 && !isGeneric(articleText)) {
-      return NextResponse.json(
-        { snippet: articleText.substring(0, 1200) },
-        { headers: { 'Cache-Control': 'public, max-age=3600' } }
-      )
+    // Try <article> tag first
+    const articleMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i)
+    if (articleMatch?.[1]) {
+      const text = stripHtml(articleMatch[1])
+      if (text.length > 100 && !isGeneric(text)) {
+        return NextResponse.json(
+          { snippet: text.substring(0, 1200) },
+          { headers: { 'Cache-Control': 'public, max-age=3600' } }
+        )
+      }
     }
 
-    // Fallback: OG description / meta description
+    // OG/meta description fallback
     const ogDesc = html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']{10,600})["']/i)?.[1]
       ?? html.match(/<meta[^>]+content=["']([^"']{10,600})["'][^>]+property=["']og:description["']/i)?.[1]
     const metaDesc = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']{10,600})["']/i)?.[1]
-      ?? html.match(/<meta[^>]+content=["']([^"']{10,600})["'][^>]+name=["']description["']/i)?.[1]
 
     const fallback = ogDesc ?? metaDesc ?? null
     if (fallback && !isGeneric(fallback)) {
@@ -146,9 +139,7 @@ export async function GET(req: Request) {
         { headers: { 'Cache-Control': 'public, max-age=3600' } }
       )
     }
+  } catch { /* best effort */ }
 
-    return NextResponse.json({ snippet: null })
-  } catch {
-    return NextResponse.json({ snippet: null })
-  }
+  return NextResponse.json({ snippet: null })
 }
