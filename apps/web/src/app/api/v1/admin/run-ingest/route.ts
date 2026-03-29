@@ -21,22 +21,24 @@ export async function POST(req: Request) {
   // clock resets even if the function times out before completing all sources.
   // Also touch ingested_at on the most recent event as a secondary signal.
   const heartbeatTs = new Date().toISOString()
+  const supabaseHB0 = (await import('@/lib/supabase/server')).createServiceClient()
+  // Primary: system_flags — separate try so failures don't block the events update
   try {
-    const supabase = (await import('@/lib/supabase/server')).createServiceClient()
-    // Primary: system_flags key-value store (reliable, no RLS complexity)
-    await supabase.from('system_flags').upsert(
+    await supabaseHB0.from('system_flags').upsert(
       { key: 'last_ingest_at', value: { ts: heartbeatTs } as unknown as Record<string, unknown>, set_by: 'run-ingest', reason: 'ingest started', set_at: heartbeatTs },
       { onConflict: 'key' }
     )
-    // Secondary: touch ingested_at on most recent event
-    const { data: latest } = await supabase
+  } catch { /* best effort */ }
+  // Secondary: ALWAYS touch ingested_at on most recent event — this is the health signal
+  try {
+    const { data: latest } = await supabaseHB0
       .from('events')
       .select('id')
       .order('ingested_at', { ascending: false })
       .limit(1)
       .single()
     if (latest?.id) {
-      await supabase
+      await supabaseHB0
         .from('events')
         .update({ ingested_at: heartbeatTs })
         .eq('id', latest.id)
