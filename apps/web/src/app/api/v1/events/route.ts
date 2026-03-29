@@ -86,7 +86,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
   // --- FIX 1: Strict relevance gate — only conflict/security-relevant events pass ---
 
   // Hard-block consumer/entertainment topics — these NEVER pass regardless of other signals
-  const BLOCK_PATTERNS = /\b(playstation|xbox|nintendo|gaming|PS5|PS4|iphone|android|samsung|apple\s+watch|airpods|headphones?|sneakers?|fashion|celebrity|antique|auction|recipe|cooking|travel\s+tips?|vacation|real\s+estate|mortgage|stock\s+tip|crypto\s+pump|NFT|metaverse|fortnite|minecraft|esports?|football\s+scores?|soccer\s+match|basketball\s+game|baseball|tennis\s+championship|golf\s+tournament|olympic\s+games?|F1\s+race|nascar|wrestling\s+event|beauty\s+tips?|skincare|makeup|weight\s+loss|diet\s+pill)\b/i
+  const BLOCK_PATTERNS = /\b(playstation|xbox|nintendo|gaming|PS5|PS4|iphone|android|samsung|apple\s+watch|airpods|headphones?|sneakers?|fashion|celebrity|antique|auction|recipe|cooking|travel\s+tips?|vacation|real\s+estate|mortgage|stock\s+tip|crypto\s+pump|NFT|metaverse|fortnite|minecraft|esports?|football\s+scores?|soccer\s+match|basketball\s+game|baseball|tennis\s+championship|golf\s+tournament|olympic\s+games?|F1\s+race|nascar|wrestling\s+event|beauty\s+tips?|skincare|makeup|weight\s+loss|diet\s+pill|energy\s+crunch|energy\s+prices?|energy\s+market|power\s+grid\s+shortage|utility\s+rates?|electricity\s+prices?|weathering\s+europe|energy\s+transition|oil\s+prices?|gas\s+prices?|stock\s+market|inflation\s+rate|recession|trade\s+deficit|central\s+bank\s+rate|interest\s+rates?)\b/i
 
   // Numeric relevance scoring
   const ALLOWED_CATEGORIES = new Set([

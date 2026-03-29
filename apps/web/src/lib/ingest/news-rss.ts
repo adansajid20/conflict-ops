@@ -260,11 +260,23 @@ const RELEVANCE_KEYWORDS = [
   'north korea', 'taiwan strait', 'south china sea',
 ]
 
+// Block economics/energy articles that aren't conflict-related
+const ECON_BLOCK_PATTERNS = /\b(energy\s+crunch|energy\s+prices?|energy\s+market|power\s+grid\s+shortage|utility\s+rates?|electricity\s+prices?|oil\s+prices?|gas\s+prices?|stock\s+market|inflation\s+rate|recession|gdp\s+growth|trade\s+deficit|central\s+bank\s+rate|interest\s+rates?|weathering\s+europe|energy\s+transition)\b/i
+
+// Conflict keywords that would save an otherwise-blocked econ article (e.g. "oil fields attacked")
+const CONFLICT_OVERRIDE = /\b(attack|strike|airstrike|missile|bomb|kill|dead|wound|troops|military|war|conflict|rebel|coup|terror|threat|weapon|sanction|invad)\b/i
+
 function isConflictRelevant(title: string, description: string, eventType: string): boolean {
   // Always keep explicitly typed events (scored above 'news')
   if (RELEVANT_EVENT_TYPES.has(eventType)) return true
   // For generic 'news' type, require at least one conflict keyword
   const combined = `${title} ${description}`.toLowerCase()
+
+  // Block economics/energy articles unless they have clear conflict context
+  if (ECON_BLOCK_PATTERNS.test(combined) && !CONFLICT_OVERRIDE.test(combined)) {
+    return false
+  }
+
   return RELEVANCE_KEYWORDS.some(kw => combined.includes(kw))
 }
 

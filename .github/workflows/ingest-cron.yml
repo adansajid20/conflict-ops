@@ -1,19 +1,29 @@
 name: Ingest Cron
+
 on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+
 jobs:
   ingest:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
       - name: Trigger ingest
         run: |
-          curl -s -X POST https://conflictradar.co/api/v1/admin/run-ingest \
+          echo "Triggering ingest at $(date -u)"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST https://conflictradar.co/api/v1/admin/run-ingest \
             -H "x-internal-secret: ${{ secrets.INTERNAL_SECRET }}" \
             -H "Content-Type: application/json" \
             --max-time 65 \
-            --retry 0 \
-            -w "\nHTTP %{http_code} in %{time_total}s\n" \
-            -o /dev/null || echo "Ingest triggered (timeout is expected)"
+            --retry 0)
+          echo "Response: HTTP $HTTP_CODE"
+          # 200 or 504 (timeout) are both acceptable
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "504" ] || [ "$HTTP_CODE" = "0" ]; then
+            echo "Ingest triggered successfully (or timed out as expected)"
+          else
+            echo "Warning: unexpected HTTP $HTTP_CODE"
+          fi
         continue-on-error: true

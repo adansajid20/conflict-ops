@@ -601,13 +601,24 @@ export function OverviewClient() {
     return () => clearInterval(triggerInterval)
   }, [])
 
-  // Auto-refresh overview data every 3 minutes (silent, uses SWR cache)
+  // Auto-refresh overview data every 60 seconds (silent, uses SWR cache)
   useEffect(() => {
     const refreshInterval = setInterval(() => {
       void fetchOverview(win)
-    }, 3 * 60 * 1000)
+    }, 60_000)
 
     return () => clearInterval(refreshInterval)
+  }, [win, fetchOverview])
+
+  // Also refresh when page becomes visible again (user switches tabs and returns)
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchOverview(win)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [win, fetchOverview])
 
   // Reset filters when window changes so stale counts don't persist
