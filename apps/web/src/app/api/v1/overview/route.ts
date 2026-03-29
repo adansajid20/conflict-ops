@@ -246,13 +246,12 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     .from('events')
     .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw')
     .gte('occurred_at', since)
-    .in('source', ['noaa', 'nasa_eonet', 'usgs'])
-    .gte('severity', 2)
-    .not('title', 'ilike', '%prescribed fire%')   // exclude controlled burns
-    .not('title', 'ilike', '%green forest fire%')  // exclude routine green-level EONET alerts
+    .in('source', ['noaa'])                        // NOAA only — usgs/eonet too noisy for top stories
+    .gte('severity', 3)                            // only high/critical weather events
+    .not('title', 'ilike', '%green%')
     .order('severity', { ascending: false })
     .order('occurred_at', { ascending: false })
-    .limit(10)
+    .limit(5)
   const weatherCandidates = (disasterRes.data ?? []) as EventRow[]
 
   // Build top stories: NEWEST FIRST — no complex priority sorting that buries breaking news

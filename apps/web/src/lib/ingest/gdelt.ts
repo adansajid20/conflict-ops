@@ -7,6 +7,10 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
+import { detectEventType } from './utils'
+
+// Hard-block patterns for GDELT — science/tech/sports/entertainment noise
+const GDELT_BLOCK = /\b(laser|seal paper|adhesive|plastic|recipe|cooking|sport|soccer|football|basketball|baseball|tennis|golf|nba|nfl|mlb|celebrity|oscar|grammy|box office|movie release|album|fashion|beauty|skincare|gadget|iphone|android|app store|cryptocurrency|bitcoin|ethereum|stock market|earnings report|quarterly results|IPO|merger|acquisition)\b/i
 import crypto from 'crypto'
 
 const HIGH_CONFLICT_COUNTRIES = [
@@ -182,14 +186,19 @@ export async function ingestGDELT(): Promise<IngestResult> {
   })
 
   for (const article of articles) {
+    // Block non-conflict articles — GDELT query is broad, many irrelevant results slip through
+    if (!article.title) { result.duplicates++; continue }
+    if (GDELT_BLOCK.test(article.title)) { result.duplicates++; continue }
+
     // Use URL hash as source_id for deduplication
     const sourceId = crypto.createHash('md5').update(article.url).digest('hex')
+    const evType = detectEventType(article.title)
 
     const { error } = await supabase.from('events').upsert(
       {
         source: 'gdelt',
         source_id: sourceId,
-        event_type: 'news',
+        event_type: evType,
         title: article.title.substring(0, 200),
         description: null,
         description_original: null,
