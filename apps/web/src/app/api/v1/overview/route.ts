@@ -255,35 +255,12 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     .limit(10)
   const weatherCandidates = (disasterRes.data ?? []) as EventRow[]
 
-  // Build top stories: cap NOAA at 3, fill rest with conflict events newest-first
-  const EVENT_TYPE_PRIORITY: Record<string, number> = {
-    armed_conflict:      1,
-    airstrike:           1,
-    terrorism:           1,
-    political_crisis:    2,
-    coup:                2,
-    diplomacy:           2,
-    humanitarian_crisis: 3,
-    civil_unrest:        3,
-    natural_disaster:    4,
-    news:                5,
-  }
+  // Build top stories: NEWEST FIRST — no complex priority sorting that buries breaking news
+  // Sort purely by ingested_at DESC so the most recently processed events show at top
   const sortedConflict = [...conflictCandidates].sort((a, b) => {
-    const pa = EVENT_TYPE_PRIORITY[a.event_type ?? 'news'] ?? 5
-    const pb = EVENT_TYPE_PRIORITY[b.event_type ?? 'news'] ?? 5
-    // Use ingested_at for sort — news articles have old pub dates but were just ingested
     const ta = new Date(a.ingested_at ?? a.occurred_at ?? 0).getTime()
     const tb = new Date(b.ingested_at ?? b.occurred_at ?? 0).getTime()
-    const priorityDiff = pa - pb
-    const ageHrsDiff = (tb - ta) / 3_600_000  // positive = b ingested more recently
-    // Clear priority difference + ingested within similar timeframe → use priority
-    if (Math.abs(priorityDiff) >= 2 && Math.abs(ageHrsDiff) < 2) return priorityDiff
-    // Ingested 2h+ apart → newer ingestion wins regardless of priority
-    if (ageHrsDiff > 2) return 1
-    if (ageHrsDiff < -2) return -1
-    if (priorityDiff !== 0) return priorityDiff
-    if ((b.severity ?? 1) !== (a.severity ?? 1)) return (b.severity ?? 1) - (a.severity ?? 1)
-    return tb - ta
+    return tb - ta  // newest ingested first
   })
   const sortedWeather = [...weatherCandidates].sort((a, b) => {
     if ((b.severity ?? 1) !== (a.severity ?? 1)) return (b.severity ?? 1) - (a.severity ?? 1)
