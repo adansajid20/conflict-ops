@@ -343,8 +343,12 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
             <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
               {sourceDisplayName}
             </div>
-            {/* Only show attribution if it has real content */}
-            {provenanceAttr && provenanceAttr.trim() && provenanceAttr.toLowerCase() !== 'unknown' && (
+            {/* Only show attribution if it's not a pipeline internal (GDELT, NewsAPI etc.) */}
+            {provenanceAttr && provenanceAttr.trim() &&
+             !provenanceAttr.toLowerCase().includes('gdelt') &&
+             !provenanceAttr.toLowerCase().includes('newsapi') &&
+             !provenanceAttr.toLowerCase().includes('news_rss') &&
+             provenanceAttr.toLowerCase() !== 'unknown' && (
               <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
                 {provenanceAttr}
               </div>

@@ -214,7 +214,7 @@ export async function ingestGDELT(): Promise<IngestResult> {
         heavy_lane_processed: false,
         provenance_raw: {
           source: 'GDELT',
-          attribution: 'Source: GDELT Project (gdeltproject.org)',
+          attribution: null,
           url: article.url,
           domain: article.domain,
           language: article.language,
