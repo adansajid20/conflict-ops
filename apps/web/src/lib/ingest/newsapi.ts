@@ -7,9 +7,10 @@
  * If not set, gracefully skips.
  */
 import { createServiceClient } from '@/lib/supabase/server'
-import { titleFingerprint } from './dedup'
+import { detectEventType } from './utils'
 
-const CONFLICT_KEYWORDS = 'war OR conflict OR airstrike OR attack OR military OR killed OR bombing OR troops OR ceasefire OR coup OR rebel OR terrorist OR refugee OR displaced OR sanctions OR invasion OR siege OR massacre OR protest OR riot'
+// Focused on conflict/security — no domestic crime, sports, finance
+const CONFLICT_KEYWORDS = '(war OR airstrike OR "military operation" OR "killed in" OR bombing OR ceasefire OR invasion OR siege OR coup OR "rebel forces" OR "terrorist attack" OR "missile strike" OR "drone strike" OR casualties OR "armed conflict" OR "ground offensive" OR "war crimes")'
 
 interface NewsAPIArticle {
   source: { id: string | null; name: string }
@@ -38,18 +39,8 @@ export async function ingestNewsAPI(): Promise<{ stored: number; skipped: number
   const supabase = createServiceClient()
   let stored = 0, skipped = 0, errors = 0
 
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)
-
-  // Pre-fetch fingerprints to avoid cross-source duplicates
-  const { data: recentTitles } = await supabase
-    .from('events')
-    .select('title')
-    .gte('ingested_at', cutoff.toISOString())
-    .limit(2000)
-
-  const fingerprintSet = new Set(
-    (recentTitles ?? []).map((e: { title: string }) => titleFingerprint(e.title))
-  )
+  // NewsAPI free tier: 100 req/day — query last 6h sorted by publishedAt
+  const cutoff = new Date(Date.now() - 6 * 60 * 60 * 1000)
 
   try {
     const params = new URLSearchParams({
@@ -76,20 +67,17 @@ export async function ingestNewsAPI(): Promise<{ stored: number; skipped: number
       const pubDate = new Date(article.publishedAt)
       if (pubDate < cutoff) { skipped++; continue }
 
-      // Fingerprint dedup
-      const fp = titleFingerprint(article.title)
-      if (fingerprintSet.has(fp)) { skipped++; continue }
-      fingerprintSet.add(fp)
-
       const cleanUrl = article.url.split('?')[0]!
       const source_id = `newsapi:${article.source.name?.toLowerCase().replace(/[^a-z0-9]/g, '_') ?? 'unknown'}:${Buffer.from(cleanUrl).toString('base64').slice(0, 32)}`
 
       const description = article.description ?? article.content?.slice(0, 500) ?? article.title
+      const fullText = `${article.title} ${description}`
+      const evType = detectEventType(fullText)
 
       const { error } = await supabase.from('events').upsert({
         source: 'newsapi',
         source_id,
-        event_type: 'news',
+        event_type: evType,
         title: article.title.slice(0, 500),
         description: description.slice(0, 2000),
         region: null,
