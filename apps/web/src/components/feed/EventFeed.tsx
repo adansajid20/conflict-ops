@@ -34,9 +34,11 @@ function formatFeedTitle(title: string, source: string): string {
   if (source === 'noaa') {
     // "Red Flag Warning issued March 27 at 9:43PM MDT until March 29 at 8:00PM MDT by NWS Grand Junction CO"
     // → "Red Flag Warning · NWS Grand Junction CO"
-    const type = (title.split(/\s+(?:issued|in effect)/i)[0] ?? title).trim()
+    const parts = title.split(/\s+(?:issued|in effect)/i)
+    const type = parts.length > 0 && parts[0] ? parts[0].trim() : title
     const locMatch = title.match(/by NWS\s+(.+?)(?:\s+(?:until|$))/i)
-    const loc = locMatch ? ` · NWS ${locMatch[1].trim()}` : ''
+    const locGroup = locMatch ? locMatch[1] : null
+    const loc = locGroup ? ` · NWS ${locGroup.trim()}` : ''
     const short = type + loc
     return short.length > 90 ? short.slice(0, 87) + '…' : short
   }
