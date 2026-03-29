@@ -21,27 +21,30 @@ export async function POST(req: Request) {
   // clock resets even if the function times out before completing all sources.
   // Also touch ingested_at on the most recent event as a secondary signal.
   const heartbeatTs = new Date().toISOString()
-  const supabaseHB0 = (await import('@/lib/supabase/server')).createServiceClient()
-  // Primary: system_flags — separate try so failures don't block the events update
+  // Write heartbeat to Redis — fastest and most reliable signal for health endpoint
   try {
+    const { setCachedSnapshot } = await import('@/lib/cache/redis')
+    await setCachedSnapshot('ingest:last_run_at', { ts: heartbeatTs }, 3600)
+  } catch { /* best effort */ }
+  // Also try system_flags (Supabase)
+  try {
+    const supabaseHB0 = (await import('@/lib/supabase/server')).createServiceClient()
     await supabaseHB0.from('system_flags').upsert(
       { key: 'last_ingest_at', value: { ts: heartbeatTs } as unknown as Record<string, unknown>, set_by: 'run-ingest', reason: 'ingest started', set_at: heartbeatTs },
       { onConflict: 'key' }
     )
   } catch { /* best effort */ }
-  // Secondary: ALWAYS touch ingested_at on most recent event — this is the health signal
+  // Also touch ingested_at on most recent event as tertiary fallback
   try {
-    const { data: latest } = await supabaseHB0
+    const supabaseHB1 = (await import('@/lib/supabase/server')).createServiceClient()
+    const { data: latest } = await supabaseHB1
       .from('events')
       .select('id')
       .order('ingested_at', { ascending: false })
       .limit(1)
       .single()
     if (latest?.id) {
-      await supabaseHB0
-        .from('events')
-        .update({ ingested_at: heartbeatTs })
-        .eq('id', latest.id)
+      await supabaseHB1.from('events').update({ ingested_at: heartbeatTs }).eq('id', latest.id)
     }
   } catch { /* best effort */ }
 

@@ -41,11 +41,18 @@ export async function GET() {
       errors.push(`db: ${msg}`)
     }
 
-    // Prefer system_flags.last_ingest_at (set at start of each run) over ingested_at on events
-    if (flagResult.status === 'fulfilled' && flagResult.value.data) {
+    // Priority 1: Redis heartbeat (most reliable — written at start of every ingest run)
+    try {
+      const { getCachedSnapshot } = await import('@/lib/cache/redis')
+      const redisHB = await getCachedSnapshot<{ ts: string }>('ingest:last_run_at')
+      if (redisHB?.ts) lastIngestAt = redisHB.ts
+    } catch { /* fallback */ }
+    // Priority 2: system_flags
+    if (!lastIngestAt && flagResult.status === 'fulfilled' && flagResult.value.data) {
       const flagVal = flagResult.value.data.value as { ts?: string } | null
       if (flagVal?.ts) lastIngestAt = flagVal.ts
     }
+    // Priority 3: max ingested_at on events table
     if (!lastIngestAt && lastIngestResult.status === 'fulfilled' && lastIngestResult.value.data) {
       lastIngestAt = lastIngestResult.value.data.ingested_at as string
     }
