@@ -23,7 +23,7 @@ export function cleanDescription(raw: string | null | undefined, fallback: strin
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 800)
+    .slice(0, 2000)
 }
 
 /**

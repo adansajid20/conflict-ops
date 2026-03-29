@@ -229,11 +229,20 @@ function parseRSS(xml: string, sourceName: string): RssItem[] {
       block.match(/<published>([\s\S]*?)<\/published>/)
     const pubDate = pubMatch ? pubMatch[1]!.trim() : null
 
-    // description
-    const descMatch =
+    // description — prefer content:encoded (full article) over description (short snippet)
+    const fullContentMatch =
+      block.match(/<content:encoded><!\[CDATA\[([\s\S]*?)\]\]><\/content:encoded>/) ??
+      block.match(/<content:encoded>([\s\S]*?)<\/content:encoded>/) ??
+      block.match(/<media:description><!\[CDATA\[([\s\S]*?)\]\]><\/media:description>/)
+    const shortDescMatch =
       block.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) ??
       block.match(/<description>([\s\S]*?)<\/description>/)
-    const description = descMatch ? stripTags(descMatch[1]!).slice(0, 800) : ''
+    const rawDescText = fullContentMatch
+      ? stripTags(fullContentMatch[1]!).slice(0, 2000)   // full article up to 2000 chars
+      : shortDescMatch
+        ? stripTags(shortDescMatch[1]!).slice(0, 800)
+        : ''
+    const description = rawDescText
 
     items.push({ title, link, pubDate, description, sourceName })
   }

@@ -244,9 +244,10 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
   const detectedTime = formatEventTime(event.ingested_at ?? event.occurred_at)
 
   // Description — cleaned; fall back to auto-fetched snippet for GDELT/no-desc events
-  const rawDesc = event.description ?? fetchedSnippet ?? ''
+  // Use || not ?? so empty string also falls through to fetchedSnippet
+  const rawDesc = event.description || fetchedSnippet || ''
   const cleanedDesc = cleanEventDescription(rawDesc)
-  const DESC_LIMIT = 600
+  const DESC_LIMIT = 800
   const descTooLong = cleanedDesc.length > DESC_LIMIT
   const displayedDesc = descTooLong && !descExpanded
     ? cleanedDesc.slice(0, DESC_LIMIT).trim() + '…'
