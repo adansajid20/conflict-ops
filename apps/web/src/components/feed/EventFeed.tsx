@@ -28,6 +28,21 @@ type FeedEvent = {
   _confidence?: 'confirmed' | 'corroborated' | 'unverified'
 }
 
+// Shorten NOAA titles — strip the full date range, keep alert type + location
+function formatFeedTitle(title: string, source: string): string {
+  if (!title) return ''
+  if (source === 'noaa') {
+    // "Red Flag Warning issued March 27 at 9:43PM MDT until March 29 at 8:00PM MDT by NWS Grand Junction CO"
+    // → "Red Flag Warning · NWS Grand Junction CO"
+    const type = (title.split(/\s+(?:issued|in effect)/i)[0] ?? title).trim()
+    const locMatch = title.match(/by NWS\s+(.+?)(?:\s+(?:until|$))/i)
+    const loc = locMatch ? ` · NWS ${locMatch[1].trim()}` : ''
+    const short = type + loc
+    return short.length > 90 ? short.slice(0, 87) + '…' : short
+  }
+  return title.length > 90 ? title.slice(0, 87) + '…' : title
+}
+
 const TIME_WINDOWS = ['1h', '6h', '24h', '7d', '30d'] as const
 type TimeWindow = (typeof TIME_WINDOWS)[number]
 
@@ -418,7 +433,7 @@ export function EventFeed() {
                       overflow: 'hidden',
                       marginBottom: '4px',
                     }}>
-                      {event.title}
+                      {formatFeedTitle(event.title, event.source)}
                     </div>
 
                     {/* Row 3: Snippet */}

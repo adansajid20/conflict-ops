@@ -55,7 +55,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     .from('events')
     .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,provenance_raw,provenance_inferred,location::text')
     .not('status', 'eq', 'clustered')
-    .order('occurred_at', { ascending: false })
+    .order('ingested_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
   const historyDays = user?.org_id
@@ -73,7 +73,10 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
   if (severityInt) query = query.eq('severity', severityInt)
   if (source) query = query.eq('source', source)
   if (search) query = query.ilike('title', `%${search}%`)
-  if (sinceParam) query = query.gte('occurred_at', sinceParam)
+  // Use ingested_at for time window filtering — news articles are published hours/days ago
+  // but ingested NOW. Filtering by occurred_at would exclude all news from the 1h/6h window.
+  // Real-time sources (NOAA, USGS) use current timestamps for occurred_at so they show regardless.
+  if (sinceParam) query = query.gte('ingested_at', sinceParam)
 
   const { data, error } = await query
 
