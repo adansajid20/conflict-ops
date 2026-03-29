@@ -48,13 +48,13 @@ export async function GET(req: Request) {
     await setCachedSnapshot('ingest:last_run_at', { ts: new Date().toISOString() }, 3600)
   } catch { /* best effort */ }
 
-  const totalInserted = Object.values(results).reduce((sum, r) => {
+  let totalInserted = 0
+  for (const r of Object.values(results)) {
     if (r && typeof r === 'object') {
       const v = r as Record<string, unknown>
-      return sum + (Number(v['stored'] ?? v['inserted'] ?? 0))
+      totalInserted += Number(v['stored'] ?? v['inserted'] ?? 0)
     }
-    return sum
-  }, 0)
+  }
 
   return Response.json({ ok: true, totalInserted, results })
 }
