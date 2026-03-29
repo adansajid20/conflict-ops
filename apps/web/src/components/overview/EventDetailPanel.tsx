@@ -246,7 +246,7 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
   // Description — cleaned; fall back to auto-fetched snippet for GDELT/no-desc events
   const rawDesc = event.description ?? fetchedSnippet ?? ''
   const cleanedDesc = cleanEventDescription(rawDesc)
-  const DESC_LIMIT = 300
+  const DESC_LIMIT = 600
   const descTooLong = cleanedDesc.length > DESC_LIMIT
   const displayedDesc = descTooLong && !descExpanded
     ? cleanedDesc.slice(0, DESC_LIMIT).trim() + '…'
