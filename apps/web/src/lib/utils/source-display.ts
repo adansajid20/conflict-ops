@@ -91,10 +91,10 @@ function extractOutletFromTitle(title: string): string | null {
   if (!match) return null
   const candidate = (match[1] ?? '').trim()
   if (candidate.length < 2 || candidate.length > 45) return null
-  // Reject if it contains " - " or " | " — means it's a phrase, not an outlet name
+  // Reject if it contains " - " or " | " — means it's a compound phrase, not an outlet name
   if (/\s[-–|]\s/.test(candidate)) return null
-  // Reject common sentence-starter words that aren't outlet names
-  if (/^(the |a |an |in |on |at |for |of |and |or |but |with |from |to |is |are |was |says |report|update|analysis|breaking|watch|live)/i.test(candidate)) return null
+  // Reject generic sentence-starter words — but NOT "The X" publications (The Guardian, The Hindu etc.)
+  if (/^(a |an |in |on |at |for |of |and |or |but |with |from |to |is |are |was |says |report|update|analysis|breaking|watch|live)/i.test(candidate)) return null
   return candidate
 }
 

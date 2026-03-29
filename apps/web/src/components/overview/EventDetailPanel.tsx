@@ -335,7 +335,22 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
               <span className="flex items-center gap-1">
                 <IconGlobe size={11} />
-                {event.country_code ? `${event.country_code} / ` : ''}{event.region ?? 'Global'}
+                {(() => {
+                  const COUNTRY_NAMES: Record<string, string> = {
+                    'US':'United States','RU':'Russia','UA':'Ukraine','IL':'Israel','PS':'Palestine',
+                    'LB':'Lebanon','SY':'Syria','IQ':'Iraq','IR':'Iran','YE':'Yemen','SA':'Saudi Arabia',
+                    'AF':'Afghanistan','PK':'Pakistan','SD':'Sudan','SS':'South Sudan','ET':'Ethiopia',
+                    'SO':'Somalia','NG':'Nigeria','ML':'Mali','LY':'Libya','MM':'Myanmar','CN':'China',
+                    'IN':'India','TR':'Turkey','DE':'Germany','FR':'France','GB':'UK','MX':'Mexico',
+                    'BR':'Brazil','JP':'Japan','AZ':'Azerbaijan','AM':'Armenia','GE':'Georgia',
+                    'KE':'Kenya','TZ':'Tanzania','UG':'Uganda','MZ':'Mozambique','CD':'DR Congo',
+                    'CF':'Central African Republic','TD':'Chad','NE':'Niger','BF':'Burkina Faso',
+                    'MW':'Malawi','ZW':'Zimbabwe','VE':'Venezuela','CO':'Colombia','HT':'Haiti',
+                  }
+                  const name = event.country_code ? (COUNTRY_NAMES[event.country_code] ?? event.country_code) : null
+                  const loc = name ?? event.region
+                  return loc ?? 'Location unspecified'
+                })()}
               </span>
               {event.event_type && (
                 <span className="flex items-center gap-1">

@@ -61,14 +61,13 @@ export async function GET(req: Request) {
   // For Google News, try to resolve to the real article URL first
   let targetUrl = url
   if (parsedUrl.hostname.includes('news.google.com')) {
-    targetUrl = await resolveGoogleNewsUrl(url)
-    if (targetUrl.includes('news.google.com')) {
-      return NextResponse.json({ snippet: null })
-    }
+    const resolved = await resolveGoogleNewsUrl(url)
+    targetUrl = resolved // use resolved URL if available; Jina will handle the rest
   }
 
-  // Skip known aggregators that never have real article content
-  if (SKIP_DOMAINS.some(d => parsedUrl.hostname.includes(d))) {
+  // Skip non-Google aggregators that never have real article content
+  const nonGoogleSkip = SKIP_DOMAINS.filter(d => d !== 'news.google.com')
+  if (nonGoogleSkip.some(d => parsedUrl.hostname.includes(d))) {
     return NextResponse.json({ snippet: null })
   }
 
