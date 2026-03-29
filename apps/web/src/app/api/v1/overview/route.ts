@@ -224,14 +224,14 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .select('id', { count: 'exact', head: true })
       .eq('read', false),
 
-    // Top stories (conflict/news) — exclude NOAA so severity cap doesn't block them
+    // Top stories (conflict/news) — exclude disaster sources so they don't crowd out conflict news
     // Use ingested_at NOT occurred_at: news articles are published 24-48h ago but ingested NOW
-    // filtering by occurred_at would exclude all news articles from the 24h window
+    // Exclude: noaa (weather), nasa_eonet (natural fires), usgs (earthquakes) — these go in weather bucket
     supabase
       .from('events')
       .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw')
       .gte('ingested_at', since)
-      .neq('source', 'noaa')
+      .not('source', 'in', '("noaa","nasa_eonet","usgs")')
       .order('ingested_at', { ascending: false })
       .limit(100),
   ])
@@ -240,16 +240,20 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   const allEvents = (windowEvents.data ?? []) as EventRow[]
   const conflictCandidates = (topStories.data ?? []) as EventRow[]
 
-  // Fetch NOAA separately so severity ordering doesn't block conflict events
-  const noaaRes = await supabase
+  // Fetch disaster sources separately — cap at 3 total in Top Stories
+  // Only show severity >= 2 NOAA alerts and severity >= 3 EONET/USGS events
+  const disasterRes = await supabase
     .from('events')
     .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw')
     .gte('occurred_at', since)
-    .eq('source', 'noaa')
+    .in('source', ['noaa', 'nasa_eonet', 'usgs'])
+    .gte('severity', 2)
+    .not('title', 'ilike', '%prescribed fire%')   // exclude controlled burns
+    .not('title', 'ilike', '%green forest fire%')  // exclude routine green-level EONET alerts
     .order('severity', { ascending: false })
     .order('occurred_at', { ascending: false })
     .limit(10)
-  const weatherCandidates = (noaaRes.data ?? []) as EventRow[]
+  const weatherCandidates = (disasterRes.data ?? []) as EventRow[]
 
   // Build top stories: cap NOAA at 3, fill rest with conflict events newest-first
   const EVENT_TYPE_PRIORITY: Record<string, number> = {
@@ -285,12 +289,27 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     if ((b.severity ?? 1) !== (a.severity ?? 1)) return (b.severity ?? 1) - (a.severity ?? 1)
     return new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() - new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
   })
-  const NOAA_CAP = 3
-  const weatherSlots = Math.min(sortedWeather.length, NOAA_CAP)
+  // Dedup by title — remove near-identical events (e.g. 3x "Green forest fire in Thailand")
+  const seenTitles = new Set<string>()
+  const dedupedConflict = sortedConflict.filter(e => {
+    const key = (e.title ?? '').toLowerCase().trim().slice(0, 60)
+    if (seenTitles.has(key)) return false
+    seenTitles.add(key)
+    return true
+  })
+  const dedupedWeather = sortedWeather.filter(e => {
+    const key = (e.title ?? '').toLowerCase().trim().slice(0, 60)
+    if (seenTitles.has(key)) return false
+    seenTitles.add(key)
+    return true
+  })
+
+  const DISASTER_CAP = 3
+  const weatherSlots = Math.min(dedupedWeather.length, DISASTER_CAP)
   const conflictSlots = 20 - weatherSlots
   const stories: EventRow[] = [
-    ...sortedConflict.slice(0, conflictSlots),
-    ...sortedWeather.slice(0, weatherSlots),
+    ...dedupedConflict.slice(0, conflictSlots),
+    ...dedupedWeather.slice(0, weatherSlots),
   ]
 
   const lastIngested = freshRes.data?.ingested_at as string | null

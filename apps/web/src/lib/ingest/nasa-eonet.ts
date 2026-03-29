@@ -112,6 +112,11 @@ export async function ingestNASAEONET(): Promise<{ stored: number; skipped: numb
       const lat = coords[1]
       if (typeof lat !== 'number' || typeof lng !== 'number') continue
 
+      // Skip prescribed/controlled burns — not emergencies
+      if (/prescribed fire|rx fire|controlled burn/i.test(event.title)) { skipped++; continue }
+      // Skip routine green-level fire notifications
+      if (/green forest fire/i.test(event.title)) { skipped++; continue }
+
       const region = inConflictZone(lat, lng)
       // Only skip low-severity events outside conflict zones
       const sevScore = severityFromCategory(category.id, latestGeom?.magnitudeValue ?? null)
