@@ -405,7 +405,9 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
               </>
             ) : (
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                No additional details available for this event.
+                {provenanceUrl
+                  ? 'Full article available at the source link below.'
+                  : 'No additional details available for this event.'}
               </p>
             )}
           </div>
