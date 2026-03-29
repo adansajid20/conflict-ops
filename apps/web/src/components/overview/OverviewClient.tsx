@@ -100,7 +100,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 const CATEGORY_TYPES: Record<string, string[]> = {
   Conflict:   ['armed_conflict', 'terrorism', 'civil_unrest', 'protest'],
   Airstrikes: ['airstrike', 'explosion', 'attack'],
-  Political:  ['political_crisis', 'coup', 'diplomacy', 'sanctions'],
+  Political:  ['political_crisis', 'coup', 'ceasefire', 'diplomacy', 'sanctions'],
   Disasters:  ['natural_disaster', 'humanitarian_crisis'],
   News:       ['news'],
 }

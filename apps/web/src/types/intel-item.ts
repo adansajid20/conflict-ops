@@ -3,6 +3,7 @@ export type IntelItem = {
   kind: 'event' | 'evidence'
   title: string
   source: string
+  provenance_source?: string | null  // humanized source name from provenance_raw.source (e.g. 'BBC World')
   country_code: string | null
   region: string | null
   severity: number | null
@@ -63,11 +64,17 @@ export function eventToIntelItem(e: Record<string, unknown>): IntelItem {
   const BAD_DESC = new Set(['No description provided', 'N/A', 'null', 'undefined'])
   const cleanDesc = desc && !BAD_DESC.has(desc.trim()) ? desc : null
   const displaySnippet = snippetRaw || cleanDesc?.slice(0, 200) || null
+  // Extract humanized source name from provenance_raw.source for news_rss/newsapi
+  const src = String(e.source ?? '')
+  const provenanceSource = (src === 'news_rss' || src === 'newsapi')
+    ? ((raw.source as string | undefined) ?? null)
+    : null
   return {
     id: String(e.id ?? ''),
     kind: 'event',
     title: String(e.title ?? 'Untitled'),
-    source: String(e.source ?? ''),
+    source: src,
+    provenance_source: provenanceSource,
     country_code: (e.country_code as string) ?? null,
     region: (e.region as string) ?? null,
     severity: typeof e.severity === 'number' ? e.severity : null,

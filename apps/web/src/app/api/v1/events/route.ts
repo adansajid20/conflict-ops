@@ -81,6 +81,12 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
   // Use ingested_at for time window filtering — news articles are published hours/days ago
   // but ingested NOW. Filtering by occurred_at would exclude all news from the 1h/6h window.
   if (sinceParam) query = query.gte('ingested_at', sinceParam)
+  // Also require occurred_at within 30 days — prevents heartbeat-corrupted old events
+  // (forest fires from March 22, WHO Nov 2025) from appearing in short time windows
+  if (sinceParam) {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    query = query.gte('occurred_at', thirtyDaysAgo)
+  }
 
   const { data, error } = await query
 

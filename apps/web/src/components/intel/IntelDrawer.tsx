@@ -7,15 +7,44 @@ import { safeAbsoluteTime, getFreshness, safeRelativeTime, type FreshnessLevel }
 import { displayLocation, COUNTRY_NAMES } from '@/lib/utils/location'
 
 const SOURCE_LABELS: Record<string, string> = {
-  gdelt: 'GDELT',
-  gdacs: 'GDACS',
-  reliefweb: 'ReliefWeb / OCHA',
-  unhcr: 'UNHCR',
+  gdelt:      'GDELT Project',
+  gdacs:      'GDACS',
+  reliefweb:  'ReliefWeb / OCHA',
+  unhcr:      'UNHCR',
   nasa_eonet: 'NASA EONET',
-  news_rss: 'News Feed',
-  acled: 'ACLED',
-  noaa: 'NOAA',
-  usgs: 'USGS',
+  news_rss:   'News Feed',
+  newsapi:    'News Aggregator',
+  acled:      'ACLED',
+  noaa:       'NOAA',
+  usgs:       'USGS',
+}
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  armed_conflict:      'Armed Conflict',
+  airstrike:           'Airstrike',
+  terrorism:           'Terrorism',
+  coup:                'Coup',
+  civil_unrest:        'Civil Unrest',
+  protest:             'Protest',
+  political_crisis:    'Political Crisis',
+  sanctions:           'Sanctions',
+  ceasefire:           'Ceasefire',
+  diplomacy:           'Diplomacy',
+  wmd_threat:          'WMD Threat',
+  humanitarian_crisis: 'Humanitarian Crisis',
+  natural_disaster:    'Natural Disaster',
+  security:            'Security',
+  cyber:               'Cyber',
+  displacement:        'Displacement',
+  humanitarian:        'Humanitarian',
+  border_incident:     'Border Incident',
+  maritime_incident:   'Maritime Incident',
+  aviation_incident:   'Aviation Incident',
+  military:            'Military',
+  mobilization:        'Mobilization',
+  explosion:           'Explosion',
+  attack:              'Attack',
+  news:                'News',
 }
 
 const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
@@ -214,7 +243,10 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
 
   const coordInfo = getIntelCoords(item)
   const coords = coordInfo
-  const sourceLabel = SOURCE_LABELS[item.source] ?? item.source.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+  // Use provenance_source (e.g. 'BBC World') for news_rss/newsapi when available
+  const sourceLabel = item.provenance_source
+    ?? SOURCE_LABELS[item.source]
+    ?? item.source.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
   const freshness = getFreshness(item.ingested_at)
 
   const handleViewOnMap = () => {
@@ -316,7 +348,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
               {item.event_type && (
                 <span className="text-[10px] mono font-medium px-2 py-0.5 rounded"
                   style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                  {item.event_type.replace(/_/g, ' ').toUpperCase()}
+                  {(EVENT_TYPE_LABELS[item.event_type] ?? item.event_type.replace(/_/g, ' ')).toUpperCase()}
                 </span>
               )}
             </div>

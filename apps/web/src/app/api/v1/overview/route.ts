@@ -231,6 +231,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .from('events')
       .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw')
       .gte('ingested_at', since)
+      .gte('occurred_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .not('source', 'in', '("noaa","nasa_eonet","usgs")')
       .order('ingested_at', { ascending: false })
       .limit(100),

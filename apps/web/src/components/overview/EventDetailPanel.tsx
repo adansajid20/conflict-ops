@@ -35,6 +35,36 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   pending:    { label: 'Developing', color: '#f59e0b' },
 }
 
+// ─── event type human labels ──────────────────────────────────────────────────
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  armed_conflict:      'Armed Conflict',
+  airstrike:           'Airstrike',
+  terrorism:           'Terrorism',
+  coup:                'Coup',
+  civil_unrest:        'Civil Unrest',
+  protest:             'Protest',
+  political_crisis:    'Political Crisis',
+  sanctions:           'Sanctions',
+  ceasefire:           'Ceasefire',
+  diplomacy:           'Diplomacy',
+  wmd_threat:          'WMD Threat',
+  humanitarian_crisis: 'Humanitarian Crisis',
+  natural_disaster:    'Natural Disaster',
+  security:            'Security',
+  cyber:               'Cyber',
+  displacement:        'Displacement',
+  humanitarian:        'Humanitarian',
+  border_incident:     'Border Incident',
+  maritime_incident:   'Maritime Incident',
+  aviation_incident:   'Aviation Incident',
+  military:            'Military',
+  mobilization:        'Mobilization',
+  explosion:           'Explosion',
+  attack:              'Attack',
+  news:                'News',
+}
+
 // ─── source display names ─────────────────────────────────────────────────────
 
 export const SOURCE_DISPLAY_NAMES: Record<string, string> = {
@@ -176,9 +206,12 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
   const sev = SEVERITY_CONFIG[sevKey] ?? SEVERITY_CONFIG[1]
   const status = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG['pending']!
 
-  // Source display
+  // Source display — for news_rss/newsapi use provenance_raw.source (e.g. 'BBC World')
   const sourceKey = event.source ?? ''
-  const sourceDisplayName = SOURCE_DISPLAY_NAMES[sourceKey] ?? (sourceKey || 'Unknown Source')
+  const provenanceSourceName = (sourceKey === 'news_rss' || sourceKey === 'newsapi')
+    ? (event.provenance_raw?.source ?? null)
+    : null
+  const sourceDisplayName = provenanceSourceName ?? SOURCE_DISPLAY_NAMES[sourceKey] ?? (sourceKey || 'Unknown Source')
 
   // Coordinates — with country centroid fallback
   const coords = getEventCoords(event)
@@ -292,7 +325,7 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
               {event.event_type && (
                 <span className="flex items-center gap-1">
                   <IconAlert size={11} />
-                  {event.event_type}
+                  {EVENT_TYPE_LABELS[event.event_type] ?? event.event_type.replace(/_/g, ' ')}
                 </span>
               )}
             </div>
@@ -376,6 +409,20 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
               </p>
             )}
           </div>
+
+          {/* Read original — direct link if provenance URL is available */}
+          {provenanceUrl && (
+            <a
+              href={provenanceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm font-medium"
+              style={{ color: 'var(--primary)' }}
+            >
+              <IconExternalLink size={13} />
+              Read original →
+            </a>
+          )}
 
           {/* Sources (formerly Evidence — collapsible) */}
           {(provenanceUrl ?? (provenanceAttr && provenanceAttr.toLowerCase() !== 'unknown')) && (
