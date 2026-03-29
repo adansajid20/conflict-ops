@@ -419,7 +419,7 @@ export function EventFeed() {
                         {country}
                       </span>
                       <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace', marginLeft: 'auto' }}>
-                        {safeRelativeTime(event.occurred_at)}
+                        {safeRelativeTime(event.ingested_at ?? event.occurred_at)}
                       </span>
                     </div>
 

@@ -194,6 +194,7 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
 
   // Event time (client-side, browser timezone)
   const eventTime = formatEventTime(event.occurred_at)
+  const detectedTime = formatEventTime(event.ingested_at ?? event.occurred_at)
 
   // Description — cleaned
   const rawDesc = event.description ?? ''
@@ -325,19 +326,27 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
             <div className="text-[11px] uppercase tracking-wider font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
               Event Time
             </div>
-            <div className="space-y-1">
-              <div
-                className="text-xs"
-                style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}
-              >
-                {eventTime.local}
+            <div className="space-y-2">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Published</div>
+                <div
+                  className="text-xs"
+                  style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}
+                >
+                  {eventTime.utc}
+                </div>
               </div>
-              <div
-                className="text-xs"
-                style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}
-              >
-                {eventTime.utc}
-              </div>
+              {event.ingested_at && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Detected</div>
+                  <div
+                    className="text-xs"
+                    style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}
+                  >
+                    {detectedTime.utc}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

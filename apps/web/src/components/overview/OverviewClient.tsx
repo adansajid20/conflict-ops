@@ -385,7 +385,7 @@ function TopStoriesList({
   const renderRow = (event: OverviewEvent) => {
     const sev = SEVERITY_CONFIG[(event.severity as 1|2|3|4) ?? 1] ?? SEVERITY_CONFIG[1]
     const status = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG['pending']!
-    const rel = safeRelativeTime(event.occurred_at)
+    const rel = safeRelativeTime(event.ingested_at ?? event.occurred_at)
     const displayTitle = formatEventTitle(event.title ?? '', event.source)
     const sourceName = SOURCE_DISPLAY_NAMES[event.source ?? ''] ?? null
 

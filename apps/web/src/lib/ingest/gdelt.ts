@@ -73,9 +73,9 @@ export async function ingestGDELT(): Promise<IngestResult> {
   const countryQuery = HIGH_CONFLICT_COUNTRIES.slice(0, 20).join(' OR ')
 
   const params = new URLSearchParams({
-    query: `(war OR conflict OR attack OR military OR troops OR bombing OR airstrike OR protest OR coup OR election OR sanctions) sourcelang:English`,
+    query: `(war OR "military operation" OR airstrike OR bombing OR "killed in" OR casualties OR ceasefire OR invasion OR "armed conflict" OR "rebel forces" OR "terrorist attack" OR "missile strike" OR "drone strike" OR "military clash" OR siege OR coup) sourcelang:English`,
     mode: 'artlist',
-    maxrecords: '75',
+    maxrecords: '200',
     sort: 'DateDesc',
     format: 'json',
   })
