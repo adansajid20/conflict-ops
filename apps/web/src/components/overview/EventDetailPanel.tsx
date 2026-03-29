@@ -225,7 +225,7 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
   const status = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG['pending']!
 
   const sourceKey = event.source ?? ''
-  const sourceDisplayName = getPublicSourceName(sourceKey, event.provenance_raw ?? null)
+  const sourceDisplayName = getPublicSourceName(sourceKey, event.provenance_raw ?? null, event.title ?? null)
 
   // Coordinates — with country centroid fallback
   const coords = getEventCoords(event)

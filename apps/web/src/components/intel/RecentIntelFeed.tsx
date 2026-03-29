@@ -68,7 +68,7 @@ export function RecentIntelFeed({ limit = 8 }: { limit?: number }) {
           </p>
           {/* Meta */}
           <span className="text-xs font-mono shrink-0 flex items-center gap-1.5" style={{ color: 'var(--text-disabled)', fontSize: 10 }}>
-            <span style={{ color: 'var(--primary)' }}>{getPublicSourceName(item.source)}</span>
+            <span style={{ color: 'var(--primary)' }}>{getPublicSourceName(item.source, null, item.title ?? null)}</span>
             {item.country_code && <span>{item.country_code}</span>}
             <span>{safeTimeAgo(item.occurred_at ?? item.ingested_at)}</span>
             <span>›</span>

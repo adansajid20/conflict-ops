@@ -79,8 +79,24 @@ function prettifyDomain(domain: string): string | null {
   return base.charAt(0).toUpperCase() + base.slice(1)
 }
 
+/**
+ * Extract outlet name from GDELT title suffix pattern.
+ * GDELT often uses Google News URLs, but includes " - The Hindu" or " | Reuters" at end of title.
+ */
+function extractOutletFromTitle(title: string): string | null {
+  if (!title) return null
+  // Match " - Outlet Name" or " | Outlet Name" at end of title (2-50 chars)
+  const match = title.match(/[\s–\-|]+([A-Z][A-Za-z0-9 &'.,-]{1,50})\s*$/)
+  if (!match) return null
+  const candidate = (match[1] ?? '').trim()
+  // Reject if it looks like part of a sentence (lowercase start, too long, contains common words)
+  if (candidate.length < 2 || candidate.length > 50) return null
+  if (/^(the|a|an|in|on|at|for|of|and|or|but|with|from|to|is|are|was|were|has|have|had|it|its)\b/i.test(candidate)) return null
+  return candidate
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getPublicSourceName(source: string | null | undefined, provenanceRaw?: Record<string, any> | null): string {
+export function getPublicSourceName(source: string | null | undefined, provenanceRaw?: Record<string, any> | null, title?: string | null): string {
   const src = source ?? ''
 
   // news_rss and newsapi: provenance_raw.source IS the outlet name (e.g. "BBC World")
@@ -88,10 +104,18 @@ export function getPublicSourceName(source: string | null | undefined, provenanc
     return (provenanceRaw?.source as string | undefined) ?? 'News Wire'
   }
 
-  // GDELT: show the article domain, not "GDELT Project"
+  // GDELT: show actual outlet, not "GDELT Project" or "Google News"
   if (src === 'gdelt') {
     const domain = provenanceRaw?.domain as string | undefined
-    return domain ? (prettifyDomain(domain) ?? 'Global News') : 'Global News'
+    const domainLabel = domain ? prettifyDomain(domain) : null
+
+    // If domain maps to "Google News", try to extract real outlet from title suffix
+    if (!domainLabel || domainLabel === 'Google News') {
+      const fromTitle = title ? extractOutletFromTitle(title) : null
+      if (fromTitle) return fromTitle
+    }
+
+    return domainLabel ?? 'Global News'
   }
 
   // Official/authoritative sources — show clean public names

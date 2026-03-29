@@ -410,7 +410,7 @@ function TopStoriesList({
     const status = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG['pending']!
     const rel = safeRelativeTime(event.ingested_at ?? event.occurred_at)
     const displayTitle = formatEventTitle(event.title ?? '', event.source)
-    const sourceName = getPublicSourceName(event.source, event.provenance_raw ?? null)
+    const sourceName = getPublicSourceName(event.source, event.provenance_raw ?? null, event.title ?? null)
 
     return (
       <button
@@ -664,8 +664,17 @@ export function OverviewClient() {
       const types = CATEGORY_TYPES[categoryFilter] ?? []
       result = result.filter(e => types.includes(getEffectiveEventType(e)))
     }
-    // Always cap at top 20 latest (sorted by ingested_at already from API)
-    return result.slice(0, 20)
+    // Diversity cap: max 5 events per source domain to prevent GDELT flooding
+    // Preserves ingested_at DESC order — just skips excess from same source
+    const sourceCounts: Record<string, number> = {}
+    const diverse: typeof result = []
+    for (const e of result) {
+      const src = e.source ?? 'unknown'
+      sourceCounts[src] = (sourceCounts[src] ?? 0) + 1
+      if (sourceCounts[src] <= 5) diverse.push(e)
+      if (diverse.length >= 20) break
+    }
+    return diverse
   }, [data, severityFilter, categoryFilter])
 
   // ─── header meta ───────────────────────────────────────────────────────────

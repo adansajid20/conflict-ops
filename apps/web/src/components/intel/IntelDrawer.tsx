@@ -231,7 +231,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
 
   const coordInfo = getIntelCoords(item)
   const coords = coordInfo
-  const sourceLabel = item.provenance_source ?? getPublicSourceName(item.source)
+  const sourceLabel = item.provenance_source ?? getPublicSourceName(item.source, null, item.title ?? null)
   const freshness = getFreshness(item.ingested_at)
 
   const handleViewOnMap = () => {
