@@ -22,6 +22,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/inngest(.*)',
   '/api/v1/admin/run-ingest(.*)',
   '/api/v1/admin/cleanup(.*)',
+  '/api/v1/admin/reclassify(.*)',
 ])
 
 export default clerkMiddleware((auth, req) => {
