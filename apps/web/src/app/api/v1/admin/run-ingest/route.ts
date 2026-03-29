@@ -56,6 +56,11 @@ export async function POST(req: Request) {
     }
   }
 
+  // NewsAPI first — fast, real-time, and gets cut off when placed last due to 60s limit
+  await runSource('newsapi', async () => {
+    const { ingestNewsAPI } = await import('@/lib/ingest/newsapi')
+    return ingestNewsAPI()
+  })
   await runSource('gdelt', async () => {
     const { ingestGDELT } = await import('@/lib/ingest/gdelt')
     return ingestGDELT()
@@ -91,10 +96,6 @@ export async function POST(req: Request) {
   await runSource('acled', async () => {
     const { ingestACLED } = await import('@/lib/ingest/acled')
     return ingestACLED()
-  })
-  await runSource('newsapi', async () => {
-    const { ingestNewsAPI } = await import('@/lib/ingest/newsapi')
-    return ingestNewsAPI()
   })
 
   // Invalidate overview Redis cache so next fetch gets fresh data
