@@ -39,8 +39,8 @@ export async function ingestNewsAPI(): Promise<{ stored: number; skipped: number
   const supabase = createServiceClient()
   let stored = 0, skipped = 0, errors = 0
 
-  // NewsAPI free tier: 100 req/day — query last 12h sorted by publishedAt
-  const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000)
+  // NewsAPI free tier has ~24h indexing delay — use 25h window to catch everything
+  const cutoff = new Date(Date.now() - 25 * 60 * 60 * 1000)
 
   try {
     const params = new URLSearchParams({
