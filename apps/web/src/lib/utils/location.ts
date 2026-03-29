@@ -1,3 +1,5 @@
+import { getPublicSourceName } from './source-display'
+
 // Country code → display name lookup
 export const COUNTRY_NAMES: Record<string, string> = {
   'US': 'United States', 'RU': 'Russia', 'UA': 'Ukraine', 'IL': 'Israel',
@@ -32,19 +34,6 @@ export const COUNTRY_NAMES: Record<string, string> = {
   'FI': 'Finland', 'DK': 'Denmark', 'AT': 'Austria', 'CH': 'Switzerland',
 }
 
-// Source code → display name
-export const SOURCE_DISPLAY_NAMES: Record<string, string> = {
-  'noaa':       'NOAA National Weather Service',
-  'usgs':       'USGS Earthquake Hazards Program',
-  'gdacs':      'GDACS (Global Disaster Alert)',
-  'unhcr':      'UNHCR (UN Refugee Agency)',
-  'nasa_eonet': 'NASA EONET (Natural Events)',
-  'reliefweb':  'ReliefWeb (OCHA)',
-  'gdelt':      'GDELT Project',
-  'acled':      'ACLED Armed Conflict Database',
-  'news_rss':   'News Wire',
-  'newsapi':    'News Aggregator',
-}
 
 /**
  * Return a human-readable location string, never showing raw "UN" to users.
@@ -81,6 +70,6 @@ export function generateSummary(event: {
     : ''
   const sev = event.severity === 4 ? 'Critical' : event.severity === 3 ? 'Significant' : 'Reported'
   const typeStr = event.event_type?.replace(/_/g, ' ') ?? 'event'
-  const source = event.source ? (SOURCE_DISPLAY_NAMES[event.source] ?? event.source) : 'unknown source'
+  const source = event.source ? getPublicSourceName(event.source) : 'unknown source'
   return `${sev} ${typeStr}${loc} reported by ${source}.`
 }

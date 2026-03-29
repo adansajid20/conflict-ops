@@ -5,19 +5,7 @@ import { useRouter } from 'next/navigation'
 import { safeTimeAgo, severityLabel, severityColor, type IntelItem } from '@/types/intel-item'
 import { safeAbsoluteTime, getFreshness, safeRelativeTime, type FreshnessLevel } from '@/lib/utils/time'
 import { displayLocation, COUNTRY_NAMES } from '@/lib/utils/location'
-
-const SOURCE_LABELS: Record<string, string> = {
-  gdelt:      'GDELT Project',
-  gdacs:      'GDACS',
-  reliefweb:  'ReliefWeb / OCHA',
-  unhcr:      'UNHCR',
-  nasa_eonet: 'NASA EONET',
-  news_rss:   'News Feed',
-  newsapi:    'News Aggregator',
-  acled:      'ACLED',
-  noaa:       'NOAA',
-  usgs:       'USGS',
-}
+import { getPublicSourceName } from '@/lib/utils/source-display'
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   armed_conflict:      'Armed Conflict',
@@ -243,10 +231,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
 
   const coordInfo = getIntelCoords(item)
   const coords = coordInfo
-  // Use provenance_source (e.g. 'BBC World') for news_rss/newsapi when available
-  const sourceLabel = item.provenance_source
-    ?? SOURCE_LABELS[item.source]
-    ?? item.source.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+  const sourceLabel = item.provenance_source ?? getPublicSourceName(item.source)
   const freshness = getFreshness(item.ingested_at)
 
   const handleViewOnMap = () => {

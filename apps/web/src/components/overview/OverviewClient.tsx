@@ -18,7 +18,8 @@ const IconActivity   = Activity as React.ComponentType<{ size?: number; style?: 
 import { safeRelativeTime } from '@/lib/utils/time'
 import { KpiStrip } from './KpiStrip'
 import { HotRegionsTable } from './HotRegionsTable'
-import { EventDetailPanel, SOURCE_DISPLAY_NAMES } from './EventDetailPanel'
+import { EventDetailPanel } from './EventDetailPanel'
+import { getPublicSourceName } from '@/lib/utils/source-display'
 import type { OverviewData, OverviewEvent } from './types'
 
 // ─── event type priority (lower = more important) ────────────────────────────
@@ -387,7 +388,7 @@ function TopStoriesList({
     const status = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG['pending']!
     const rel = safeRelativeTime(event.ingested_at ?? event.occurred_at)
     const displayTitle = formatEventTitle(event.title ?? '', event.source)
-    const sourceName = SOURCE_DISPLAY_NAMES[event.source ?? ''] ?? null
+    const sourceName = getPublicSourceName(event.source, event.provenance_raw ?? null)
 
     return (
       <button

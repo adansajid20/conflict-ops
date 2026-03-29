@@ -4,13 +4,7 @@ import { useEffect, useState } from 'react'
 import { eventToIntelItem, safeTimeAgo, severityColor, severityLabel, type IntelItem } from '@/types/intel-item'
 import { IntelDrawer } from './IntelDrawer'
 import Link from 'next/link'
-
-function sourceLabel(source: string): string {
-  const map: Record<string, string> = {
-    gdelt: 'GDELT', reliefweb: 'RW', gdacs: 'GDACS', unhcr: 'UNHCR', nasa_eonet: 'EONET',
-  }
-  return map[source] ?? source.slice(0, 6).toUpperCase()
-}
+import { getPublicSourceName } from '@/lib/utils/source-display'
 
 export function RecentIntelFeed({ limit = 8 }: { limit?: number }) {
   const [items, setItems] = useState<IntelItem[]>([])
@@ -74,7 +68,7 @@ export function RecentIntelFeed({ limit = 8 }: { limit?: number }) {
           </p>
           {/* Meta */}
           <span className="text-xs font-mono shrink-0 flex items-center gap-1.5" style={{ color: 'var(--text-disabled)', fontSize: 10 }}>
-            <span style={{ color: 'var(--primary)' }}>{sourceLabel(item.source)}</span>
+            <span style={{ color: 'var(--primary)' }}>{getPublicSourceName(item.source)}</span>
             {item.country_code && <span>{item.country_code}</span>}
             <span>{safeTimeAgo(item.occurred_at ?? item.ingested_at)}</span>
             <span>›</span>

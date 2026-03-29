@@ -7,6 +7,7 @@ import {
   ChevronDown, ChevronUp,
 } from 'lucide-react'
 import type { OverviewEvent } from './types'
+import { getPublicSourceName } from '@/lib/utils/source-display'
 
 // Cast all lucide icons to avoid React 18 JSX type mismatch
 const IconX          = X as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
@@ -206,12 +207,8 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
   const sev = SEVERITY_CONFIG[sevKey] ?? SEVERITY_CONFIG[1]
   const status = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG['pending']!
 
-  // Source display — for news_rss/newsapi use provenance_raw.source (e.g. 'BBC World')
   const sourceKey = event.source ?? ''
-  const provenanceSourceName = (sourceKey === 'news_rss' || sourceKey === 'newsapi')
-    ? (event.provenance_raw?.source ?? null)
-    : null
-  const sourceDisplayName = provenanceSourceName ?? SOURCE_DISPLAY_NAMES[sourceKey] ?? (sourceKey || 'Unknown Source')
+  const sourceDisplayName = getPublicSourceName(sourceKey, event.provenance_raw ?? null)
 
   // Coordinates — with country centroid fallback
   const coords = getEventCoords(event)
