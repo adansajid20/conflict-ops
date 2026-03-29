@@ -22,6 +22,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ snippet: null }, { status: 400 })
   }
 
+  // Skip known aggregators — they never return useful OG descriptions
+  const SKIP_DOMAINS = ['news.google.com', 'msn.com', 'yahoo.com', 'bing.com', 'flipboard.com', 'feedly.com']
+  if (SKIP_DOMAINS.some(d => parsedUrl.hostname.includes(d))) {
+    return NextResponse.json({ snippet: null })
+  }
+
   try {
     const res = await fetch(parsedUrl.toString(), {
       headers: {
@@ -57,7 +63,24 @@ export async function GET(req: Request) {
       }
     }
 
-    const snippet = ogDesc ?? metaDesc ?? paraText ?? null
+    // Filter out generic/useless aggregator descriptions
+    const GENERIC_DESCRIPTIONS = [
+      'comprehensive up-to-date news coverage',
+      'aggregated from sources all over the world by google news',
+      'google news',
+      'read full articles',
+      'stay updated with the latest news',
+      'breaking news',
+      'latest news, breaking news',
+      'msn news',
+      'yahoo news',
+      'find latest news',
+    ]
+    const isGeneric = (text: string) =>
+      GENERIC_DESCRIPTIONS.some(g => text.toLowerCase().includes(g))
+
+    const rawSnippet = ogDesc ?? metaDesc ?? paraText ?? null
+    const snippet = rawSnippet && !isGeneric(rawSnippet) ? rawSnippet : null
 
     return NextResponse.json({
       snippet: snippet ? snippet.substring(0, 400) : null,
