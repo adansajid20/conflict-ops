@@ -4,7 +4,12 @@ import { cleanDescription, detectEventType } from './utils'
 
 const NEWS_SOURCES = [
   // === TIER A — Wire services & UN (highest reliability) ===
+  { name: 'Reuters World',            url: 'https://feeds.reuters.com/reuters/worldNews',                                                                    tier: 'A',  region: null },
+  { name: 'Reuters Conflicts',        url: 'https://feeds.reuters.com/reuters/topNews',                                                                      tier: 'A',  region: null },
+  { name: 'AFP (via Google News)',     url: 'https://news.google.com/rss/search?q=AFP+conflict+OR+war+OR+attack&hl=en-US&gl=US&ceid=US:en',                  tier: 'A',  region: null },
+  { name: 'Radio Free Europe',        url: 'https://www.rferl.org/api/zv-pvtqpnpi',                                                                         tier: 'A',  region: 'Eastern Europe' },
   { name: 'AP News',                  url: 'https://apnews.com/hub/world-news?format=rss',                                                                   tier: 'A',  region: null },
+  { name: 'AP Breaking News',         url: 'https://apnews.com/hub/ap-top-news?format=rss',                                                                  tier: 'A',  region: null },
   { name: 'WHO News',                 url: 'https://www.who.int/rss-feeds/news-english.xml',                                                                 tier: 'A',  region: null },
   { name: 'UN News',                  url: 'https://news.un.org/feed/subscribe/en/news/all/rss.xml',                                                         tier: 'A',  region: null },
   { name: 'UN Peace & Security',      url: 'https://news.un.org/feed/subscribe/en/news/topic/peace-and-security/rss.xml',                                    tier: 'A',  region: null },
