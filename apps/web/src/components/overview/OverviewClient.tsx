@@ -106,6 +106,28 @@ const CATEGORY_TYPES: Record<string, string[]> = {
   News:       ['news'],
 }
 
+// Title-based keyword classification for events still tagged 'news' in DB
+// Runs only as fallback when event_type = 'news'
+const CONFLICT_KW   = /\b(war|attack(ed|s)?|killed|clash|battle|offensive|bombing|airstrike|missile|rocket|military|troops|armed|ceasefire|siege|invasion|strike|combat|soldier|casualt|hostage|terror|explosion|insurgent|rebel|militia|coup|shoot|sniper|mortar|artillery|drone strike|IED|ambush|jihad|mujahid|assassination|kidnap|blockade|sanction|nuclear|chemical weapon|genocide|ethnic cleansing|mass atrocity)\b/i
+const AIRSTRIKE_KW  = /\b(airstrike|air strike|air raid|missile strike|drone strike|bombing raid|bombs?\s+drop|jet fighter|F-16|F-35|strikes?\s+(UAE|Israel|Saudi|Yemen|Syria|Iraq|Iran|Bahrain|Jordan)|hit(s)?\s+target)\b/i
+const POLITICAL_KW  = /\b(ceasefire|diplomacy|sanction|treaty|negotiat|election|parliament|president|prime minister|government|summit|diplomatic|bilateral|accord|agreement|embargo|veto|UN\s+secur|resolution|coalition|regime change|coup)\b/i
+const DISASTER_KW   = /\b(earthquake|flood|tsunami|cyclone|hurricane|typhoon|tornado|wildfire|drought|famine|epidemic|pandemic|outbreak|refugee|displacement|humanitarian)\b/i
+
+function classifyNewsEvent(title: string): string {
+  if (AIRSTRIKE_KW.test(title))  return 'airstrike'
+  if (CONFLICT_KW.test(title))   return 'armed_conflict'
+  if (POLITICAL_KW.test(title))  return 'political_crisis'
+  if (DISASTER_KW.test(title))   return 'natural_disaster'
+  return 'news'
+}
+
+function getEffectiveEventType(e: { event_type?: string | null; title?: string | null }): string {
+  const et = e.event_type ?? 'news'
+  if (et !== 'news') return et
+  // Fallback: classify 'news' events by title at display time
+  return classifyNewsEvent(e.title ?? '')
+}
+
 const CATEGORY_LIST = [
   { key: 'Conflict',   emoji: '⚔️' },
   { key: 'Airstrikes', emoji: '💥' },
@@ -150,11 +172,11 @@ function FilterBar({
     return counts
   }, [allEvents])
 
-  // Count events per category
+  // Count events per category — uses effective type (title fallback for 'news' events)
   const catCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     CATEGORY_LIST.forEach(c => {
-      counts[c.key] = allEvents.filter(e => CATEGORY_TYPES[c.key]?.includes(e.event_type ?? '')).length
+      counts[c.key] = allEvents.filter(e => CATEGORY_TYPES[c.key]?.includes(getEffectiveEventType(e))).length
     })
     return counts
   }, [allEvents])
@@ -640,9 +662,10 @@ export function OverviewClient() {
     }
     if (categoryFilter !== null) {
       const types = CATEGORY_TYPES[categoryFilter] ?? []
-      result = result.filter(e => types.includes(e.event_type ?? ''))
+      result = result.filter(e => types.includes(getEffectiveEventType(e)))
     }
-    return result
+    // Always cap at top 20 latest (sorted by ingested_at already from API)
+    return result.slice(0, 20)
   }, [data, severityFilter, categoryFilter])
 
   // ─── header meta ───────────────────────────────────────────────────────────

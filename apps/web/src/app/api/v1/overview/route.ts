@@ -250,13 +250,13 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   const disasterRes = await supabase
     .from('events')
     .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw')
-    .gte('occurred_at', since)
+    .gte('occurred_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString())  // last 12h only
     .in('source', ['noaa'])                        // NOAA only — usgs/eonet too noisy for top stories
-    .gte('severity', 3)                            // only high/critical weather events
+    .gte('severity', 4)                            // CRITICAL weather events only (Red Flag Warning = 3, skip it)
     .not('title', 'ilike', '%green%')
     .order('severity', { ascending: false })
     .order('occurred_at', { ascending: false })
-    .limit(5)
+    .limit(3)
   const weatherCandidates = (disasterRes.data ?? []) as EventRow[]
 
   // Build top stories: NEWEST FIRST — no complex priority sorting that buries breaking news
