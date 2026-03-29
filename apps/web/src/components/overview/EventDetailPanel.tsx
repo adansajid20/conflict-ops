@@ -188,11 +188,28 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [descExpanded, setDescExpanded] = useState(false)
+  const [fetchedSnippet, setFetchedSnippet] = useState<string | null>(null)
+  const [snippetLoading, setSnippetLoading] = useState(false)
 
   useEffect(() => {
     setSourcesOpen(false)
     setCopied(false)
     setDescExpanded(false)
+    setFetchedSnippet(null)
+  }, [event?.id])
+
+  // Auto-fetch article preview when description is missing and URL is available
+  useEffect(() => {
+    if (!event) return
+    const hasDesc = !!(event.description ?? '').trim()
+    const url = event.provenance_raw?.url as string | undefined
+    if (hasDesc || !url) return
+    setSnippetLoading(true)
+    fetch(`/api/v1/article-preview?url=${encodeURIComponent(url)}`)
+      .then(r => r.json())
+      .then(d => { if (d.snippet) setFetchedSnippet(d.snippet) })
+      .catch(() => {})
+      .finally(() => setSnippetLoading(false))
   }, [event?.id])
 
   useEffect(() => {
@@ -226,8 +243,8 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
   const eventTime = formatEventTime(event.occurred_at)
   const detectedTime = formatEventTime(event.ingested_at ?? event.occurred_at)
 
-  // Description — cleaned
-  const rawDesc = event.description ?? ''
+  // Description — cleaned; fall back to auto-fetched snippet for GDELT/no-desc events
+  const rawDesc = event.description ?? fetchedSnippet ?? ''
   const cleanedDesc = cleanEventDescription(rawDesc)
   const DESC_LIMIT = 300
   const descTooLong = cleanedDesc.length > DESC_LIMIT
@@ -406,9 +423,11 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
               </>
             ) : (
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                {provenanceUrl
-                  ? 'Full article available at the source link below.'
-                  : 'No additional details available for this event.'}
+                {snippetLoading
+                  ? 'Loading preview…'
+                  : provenanceUrl
+                    ? 'Full article available at the source link below.'
+                    : 'No additional details available for this event.'}
               </p>
             )}
           </div>

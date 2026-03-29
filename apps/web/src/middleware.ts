@@ -24,6 +24,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/v1/admin/cleanup(.*)',
   '/api/v1/admin/reclassify(.*)',
   '/api/cron/(.*)',
+  '/api/v1/article-preview(.*)',
 ])
 
 export default clerkMiddleware((auth, req) => {
