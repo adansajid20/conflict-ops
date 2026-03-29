@@ -1,38 +1,34 @@
-import { NextResponse } from 'next/server'
-
+/**
+ * GET /api/cron/ingest?token=<INTERNAL_SECRET>
+ * Public cron trigger — for use with cron-job.org (free tier, GET only, no custom headers)
+ * Token validated via query param instead of header.
+ */
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  const internalSecret = request.headers.get('x-internal-secret')
+export async function GET(req: Request) {
+  const url = new URL(req.url)
+  const token = url.searchParams.get('token') ?? ''
+  const validSecret = process.env['INTERNAL_SECRET'] ?? ''
 
-  if (
-    authHeader !== `Bearer ${process.env.CRON_SECRET}` &&
-    internalSecret !== process.env.INTERNAL_SECRET
-  ) {
-    return new NextResponse('Unauthorized', { status: 401 })
+  if (!token || token !== validSecret) {
+    return new Response('Unauthorized', { status: 401 })
   }
 
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://conflictradar.co'
-    const response = await fetch(`${baseUrl}/api/v1/admin/run-ingest`, {
-      method: 'POST',
-      headers: {
-        'x-internal-secret': process.env.INTERNAL_SECRET || '',
-      },
-      cache: 'no-store',
-    })
+  // Forward to the actual ingest handler
+  const ingestUrl = new URL('/api/v1/admin/run-ingest', url.origin)
+  const res = await fetch(ingestUrl.toString(), {
+    method: 'POST',
+    headers: {
+      'x-internal-secret': validSecret,
+      'Content-Type': 'application/json',
+    },
+    signal: AbortSignal.timeout(58000),
+  })
 
-    const data = await response.json()
-    return NextResponse.json(data, { status: response.status })
-  } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : 'Cron ingest failed',
-      },
-      { status: 500 },
-    )
-  }
+  const body = await res.text()
+  return new Response(body, {
+    status: res.status,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
