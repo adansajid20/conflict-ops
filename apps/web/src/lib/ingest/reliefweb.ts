@@ -5,7 +5,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
-import { cleanDescription, humanitarianSeverity } from './utils'
+import { cleanDescription, humanitarianSeverity, isBlocklisted } from './utils'
 
 // rss2json proxies reliefweb RSS to bypass Cloudflare bot protection on cloud IPs
 const RSS2JSON_BASE = 'https://api.rss2json.com/v1/api.json?rss_url='
@@ -157,6 +157,9 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
       }
       if (new Date(occurredAt).getTime() < cutoff) continue
 
+      // Skip boilerplate/blocklisted titles
+      if (!title || isBlocklisted(title)) { skipped++; continue }
+
       // Country: prefer first category (reliefweb puts country first), fallback to description parse
       const categoryCountry = item.categories?.[0] ?? null
       const descCountry = extractCountry(item.description ?? '')
@@ -185,6 +188,9 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
           status: 'pending',
           occurred_at: occurredAt,
           heavy_lane_processed: false,
+          outlet_name: sourceName ?? 'ReliefWeb',
+          language: 'en',
+          location_confidence: countryCode ? 'approximate' : 'unknown',
           provenance_raw: {
             source: 'ReliefWeb',
             attribution: 'Powered by ReliefWeb (reliefweb.int)',

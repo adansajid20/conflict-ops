@@ -4,6 +4,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
 import { isSafeMode, getCachedSnapshot, setCachedSnapshot, TTL } from '@/lib/cache/redis'
 import { clusterEvents } from '@/lib/ingest/dedup'
+import { isBlocklisted } from '@/lib/classification'
+import { getBestDescription, getEffectiveType, isStaleReliefWebContent } from '@/lib/event-presentation'
 import type { ApiResponse, ConflictEvent } from '@conflict-ops/shared'
 
 export async function GET(req: Request): Promise<NextResponse<ApiResponse<ConflictEvent[]>>> {
@@ -87,6 +89,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     query = query.gte('occurred_at', thirtyDaysAgo)
   }
+
 
   const { data, error } = await query
 
@@ -176,23 +179,52 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     return CONFLICT_KEYWORDS.test(title) || CONFLICT_KEYWORDS.test(desc)
   }
 
+  // Tighter stale filter for ReliefWeb/UNHCR — cap at 7 days (they publish old reports constantly)
+  const sevenDaysAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const staleFiltered = !source ? rawEvents.filter(e => {
+    const raw = e as unknown as Record<string, unknown>
+    const src = String(raw.source ?? '')
+    if (src === 'reliefweb' || src === 'unhcr') {
+      const ts = String(raw.occurred_at ?? '')
+      return ts ? new Date(ts).getTime() > sevenDaysAgoMs : true
+    }
+    return true
+  }) : rawEvents
+
   // First pass: hard gate (existing logic)
-  const hardGated = rawEvents.filter(e => passesRelevanceGate(e as unknown as Record<string, unknown>))
+  const hardGated = staleFiltered.filter(e => passesRelevanceGate(e as unknown as Record<string, unknown>))
   // Second pass: numeric score gate — block hard-blocked consumer content
   const relevantData = hardGated.filter(e => computeRelevanceScore(e as unknown as Record<string, unknown>) >= MIN_RELEVANCE)
+  // Third pass: shared blocklist — catch any remaining consumer/entertainment noise
+  const blocklistGated = relevantData.filter(e => !isBlocklisted(String((e as unknown as Record<string,unknown>).title ?? '')))
 
   // --- FIX 2: Snippet field — never blank, never "No description provided" ---
-  const BAD_DESCRIPTIONS = new Set(['No description provided', 'N/A', '', 'null', 'undefined'])
-  const eventsWithSnippet = relevantData.map(e => {
+  // Use shared getBestDescription for clean ReliefWeb/UNHCR handling
+  const eventsWithSnippet = blocklistGated.map(e => {
     const raw = e as unknown as Record<string,unknown>
+    const src = String(raw.source ?? '')
+    // For ReliefWeb/UNHCR: use shared stale content cleaner
+    const isReliefSource = src === 'reliefweb' || src === 'unhcr'
     const desc = (raw.description as string | null | undefined)?.trim() ?? ''
-    const title = raw.title as string
-    const cleanDesc = BAD_DESCRIPTIONS.has(desc) ? '' : desc
+    const title = String(raw.title ?? '')
+
+    let cleanDesc: string
+    if (isReliefSource && isStaleReliefWebContent(desc)) {
+      cleanDesc = title
+    } else {
+      cleanDesc = getBestDescription(
+        { description: desc, title, source: src } as Parameters<typeof getBestDescription>[0],
+        400
+      )
+    }
+
     const snippet = cleanDesc.length > 10 ? cleanDesc.slice(0, 200) : title.slice(0, 200)
     return {
       ...raw,
       description: cleanDesc || title,
       snippet,
+      // Expose effective_type for category alignment groundwork
+      effective_type: getEffectiveType(raw.event_type as string | null),
     } as unknown as ConflictEvent
   })
 

@@ -2,6 +2,8 @@ import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCachedSnapshot, setCachedSnapshot } from '@/lib/cache/redis'
+import { isBlocklisted } from '@/lib/classification'
+import { humanizeDriver, isGeopoliticalType, computeSeverityCounts } from '@/lib/event-presentation'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,6 +53,7 @@ export interface OverviewResponse {
   notices: string[]
   hasOrg: boolean
   window: string
+  severityCounts: { critical: number; high: number; medium: number; low: number }
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -91,17 +94,30 @@ const RISK_ORDER: Record<HotRegion['riskLevel'], number> = {
 function computeHotRegions(events: EventRow[]): HotRegion[] {
   const map = new Map<
     string,
-    { count: number; sev4: number; sev3: number; sev2: number; types: Map<string, number>; countries: Set<string> }
+    { count: number; sev4: number; sev3: number; sev2: number; geoSev4: number; geoSev3: number; types: Map<string, number>; countries: Set<string> }
   >()
+
+  const GEO_PLACEHOLDER_REGIONS = new Set(['Global', 'World', '', 'UN', 'United Nations'])
 
   for (const e of events) {
     const region = e.region || 'Global'
-    const entry = map.get(region) ?? { count: 0, sev4: 0, sev3: 0, sev2: 0, types: new Map(), countries: new Set() }
+    // Skip Global/placeholder regions — they clutter the output with aggregate noise
+    if (GEO_PLACEHOLDER_REGIONS.has(region)) continue
+
+    const entry = map.get(region) ?? {
+      count: 0, sev4: 0, sev3: 0, sev2: 0, geoSev4: 0, geoSev3: 0,
+      types: new Map(), countries: new Set()
+    }
     entry.count++
     const sev = e.severity ?? 1
     if (sev >= 4) entry.sev4++
     else if (sev >= 3) entry.sev3++
     else if (sev >= 2) entry.sev2++
+    // Geopolitical risk counts: exclude natural_disaster from scoring
+    if (isGeopoliticalType(e.event_type)) {
+      if (sev >= 4) entry.geoSev4++
+      else if (sev >= 3) entry.geoSev3++
+    }
     if (e.event_type) entry.types.set(e.event_type, (entry.types.get(e.event_type) ?? 0) + 1)
     if (e.country_code) entry.countries.add(e.country_code)
     map.set(region, entry)
@@ -109,16 +125,18 @@ function computeHotRegions(events: EventRow[]): HotRegion[] {
 
   const regions: HotRegion[] = []
   for (const [region, data] of map.entries()) {
+    // Risk level based on geopolitical events only (no natural disaster inflation)
     let riskLevel: HotRegion['riskLevel']
-    if (data.sev4 >= 1 || data.sev3 >= 3) riskLevel = 'Critical'
-    else if (data.sev3 >= 2 || data.sev2 >= 5) riskLevel = 'High'
+    if (data.geoSev4 >= 1 || data.geoSev3 >= 3) riskLevel = 'Critical'
+    else if (data.geoSev3 >= 2 || data.sev2 >= 5) riskLevel = 'High'
     else if (data.count >= 3) riskLevel = 'Moderate'
     else riskLevel = 'Monitored'
 
+    // Humanize driver labels
     const topDrivers = [...data.types.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([t]) => t)
+      .map(([t]) => humanizeDriver(t))
 
     regions.push({
       region,
@@ -259,12 +277,20 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     .limit(3)
   const weatherCandidates = (disasterRes.data ?? []) as EventRow[]
 
-  // Build top stories: NEWEST FIRST — no complex priority sorting that buries breaking news
-  // Sort purely by ingested_at DESC so the most recently processed events show at top
-  const sortedConflict = [...conflictCandidates].sort((a, b) => {
+  // Filter out blocklisted titles from top stories
+  const filteredConflict = conflictCandidates.filter(e => !isBlocklisted(e.title ?? ''))
+
+  // Build top stories: NEWEST FIRST with lightweight significance tie-break
+  // Primary sort: ingested_at DESC (freshness dominates)
+  // Tie-break within same 30-min bucket: higher severity first
+  const sortedConflict = [...filteredConflict].sort((a, b) => {
     const ta = new Date(a.ingested_at ?? a.occurred_at ?? 0).getTime()
     const tb = new Date(b.ingested_at ?? b.occurred_at ?? 0).getTime()
-    return tb - ta  // newest ingested first
+    // 30-min bucket for tie-breaking
+    const bucketA = Math.floor(ta / (30 * 60 * 1000))
+    const bucketB = Math.floor(tb / (30 * 60 * 1000))
+    if (bucketA !== bucketB) return bucketB - bucketA
+    return (b.severity ?? 1) - (a.severity ?? 1)  // tie-break by severity
   })
   const sortedWeather = [...weatherCandidates].sort((a, b) => {
     if ((b.severity ?? 1) !== (a.severity ?? 1)) return (b.severity ?? 1) - (a.severity ?? 1)
@@ -306,6 +332,8 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     notices.push('Updates are delayed. Core tracking continues. Try refresh.')
   }
 
+  const severityCounts = computeSeverityCounts(allEvents)
+
   const payload: OverviewResponse = {
     lastUpdatedAt: lastIngested,
     freshnessStatus: freshness.label,
@@ -326,6 +354,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     notices,
     hasOrg,
     window: win,
+    severityCounts,
   }
 
   // Cache for 5 minutes (300s)

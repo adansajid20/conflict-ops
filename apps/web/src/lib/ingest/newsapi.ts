@@ -7,7 +7,8 @@
  * If not set, gracefully skips.
  */
 import { createServiceClient } from '@/lib/supabase/server'
-import { detectEventType } from './utils'
+import { detectEventType, isBlocklisted } from './utils'
+import { resolveOutletName } from '@/lib/outlet-resolver'
 
 // Free tier: no quoted phrases allowed — single words only
 const CONFLICT_KEYWORDS = 'war OR airstrike OR bombing OR ceasefire OR invasion OR siege OR coup OR casualties OR offensive OR airstrike OR missile OR troops OR military OR killed OR attack OR rebel OR terrorist'
@@ -63,6 +64,9 @@ export async function ingestNewsAPI(): Promise<{ stored: number; skipped: number
 
     for (const article of data.articles) {
       if (!article.title || article.title === '[Removed]') { skipped++; continue }
+      // Shared blocklist: reject consumer/entertainment noise
+      const articleDomain = (() => { try { return new URL(article.url).hostname } catch { return '' } })()
+      if (isBlocklisted(article.title, articleDomain)) { skipped++; continue }
 
       const pubDate = new Date(article.publishedAt)
       if (pubDate < cutoff) { skipped++; continue }
@@ -74,6 +78,12 @@ export async function ingestNewsAPI(): Promise<{ stored: number; skipped: number
       const fullText = `${article.title} ${description}`
       const evType = detectEventType(fullText)
 
+      const newsApiProvenance = {
+        source: article.source.name ?? 'NewsAPI',
+        attribution: `${article.source.name} (via NewsAPI)`,
+        url: article.url,
+      }
+      const outletName = resolveOutletName('newsapi', newsApiProvenance)
       const { error } = await supabase.from('events').upsert({
         source: 'newsapi',
         source_id,
@@ -86,11 +96,9 @@ export async function ingestNewsAPI(): Promise<{ stored: number; skipped: number
         status: 'developing',
         occurred_at: pubDate.toISOString(),
         heavy_lane_processed: false,
-        provenance_raw: {
-          source: article.source.name ?? 'NewsAPI',
-          attribution: `${article.source.name} (via NewsAPI)`,
-          url: article.url,
-        } as Record<string, unknown>,
+        outlet_name: outletName,
+        language: 'en',
+        provenance_raw: newsApiProvenance as Record<string, unknown>,
         raw: { title: article.title, url: article.url, source: article.source } as Record<string, unknown>,
       }, { onConflict: 'source,source_id', ignoreDuplicates: true })
 

@@ -7,7 +7,8 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
-import { detectEventType } from './utils'
+import { detectEventType, isBlocklisted } from './utils'
+import { resolveOutletName } from '@/lib/outlet-resolver'
 
 // Hard-block patterns for GDELT — science/tech/sports/entertainment noise
 const GDELT_BLOCK = /\b(laser|seal paper|adhesive|plastic|recipe|cooking|sport|soccer|football|basketball|baseball|tennis|golf|nba|nfl|mlb|celebrity|oscar|grammy|box office|movie release|album|fashion|beauty|skincare|gadget|iphone|android|app store|cryptocurrency|bitcoin|ethereum|stock market|earnings report|quarterly results|IPO|merger|acquisition)\b/i
@@ -189,10 +190,17 @@ export async function ingestGDELT(): Promise<IngestResult> {
     // Block non-conflict articles — GDELT query is broad, many irrelevant results slip through
     if (!article.title) { result.duplicates++; continue }
     if (GDELT_BLOCK.test(article.title)) { result.duplicates++; continue }
+    // Shared blocklist check — rejects consumer/entertainment/boilerplate titles
+    if (isBlocklisted(article.title, article.domain)) { result.duplicates++; continue }
 
     // Use URL hash as source_id for deduplication
     const sourceId = crypto.createHash('md5').update(article.url).digest('hex')
     const evType = detectEventType(article.title)
+    const provenanceForOutlet = {
+      source: 'GDELT', attribution: null, url: article.url,
+      domain: article.domain, language: article.language, sourcecountry: article.sourcecountry,
+    }
+    const outletName = resolveOutletName('gdelt', provenanceForOutlet, article.title)
 
     const { error } = await supabase.from('events').upsert(
       {
@@ -212,14 +220,9 @@ export async function ingestGDELT(): Promise<IngestResult> {
         status: 'pending',
         occurred_at: parseGDELTDate(article.seendate),
         heavy_lane_processed: false,
-        provenance_raw: {
-          source: 'GDELT',
-          attribution: null,
-          url: article.url,
-          domain: article.domain,
-          language: article.language,
-          sourcecountry: article.sourcecountry,
-        },
+        outlet_name: outletName,
+        language: 'en',
+        provenance_raw: provenanceForOutlet,
         raw: article as unknown as Record<string, unknown>,
       },
       { onConflict: 'source,source_id', ignoreDuplicates: true }
