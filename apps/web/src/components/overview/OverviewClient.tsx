@@ -20,6 +20,14 @@ import { KpiStrip } from './KpiStrip'
 import { HotRegionsTable } from './HotRegionsTable'
 import { EventDetailPanel } from './EventDetailPanel'
 import { getPublicSourceName } from '@/lib/utils/source-display'
+import {
+  getEffectiveType,
+  getBestDescription,
+  getLocationDisplay,
+  isBreaking,
+  UI_CATEGORY_TYPES,
+  computeSeverityCounts,
+} from '@/lib/event-presentation'
 import type { OverviewData, OverviewEvent } from './types'
 
 // ─── event type priority (lower = more important) ────────────────────────────
@@ -96,37 +104,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   pending:    { label: 'Developing', color: '#f59e0b' },
 }
 
-// ─── category → event_type mapping ──────────────────────────────────────────
+// ─── UI category helpers (shared from event-presentation) ────────────────────
 
-const CATEGORY_TYPES: Record<string, string[]> = {
-  Conflict:   ['armed_conflict', 'terrorism', 'civil_unrest', 'protest'],
-  Airstrikes: ['airstrike', 'explosion', 'attack'],
-  Political:  ['political_crisis', 'coup', 'ceasefire', 'diplomacy', 'sanctions'],
-  Disasters:  ['natural_disaster', 'humanitarian_crisis'],
-  News:       ['news'],
-}
-
-// Title-based keyword classification for events still tagged 'news' in DB
-// Runs only as fallback when event_type = 'news'
-const CONFLICT_KW   = /\b(war|attack(ed|s)?|killed|clash|battle|offensive|bombing|airstrike|missile|rocket|military|troops|armed|ceasefire|siege|invasion|strike|combat|soldier|casualt|hostage|terror|explosion|insurgent|rebel|militia|coup|shoot|sniper|mortar|artillery|drone strike|IED|ambush|jihad|mujahid|assassination|kidnap|blockade|sanction|nuclear|chemical weapon|genocide|ethnic cleansing|mass atrocity)\b/i
-const AIRSTRIKE_KW  = /\b(airstrike|air strike|air raid|missile strike|drone strike|bombing raid|bombs?\s+drop|jet fighter|F-16|F-35|strikes?\s+(UAE|Israel|Saudi|Yemen|Syria|Iraq|Iran|Bahrain|Jordan)|hit(s)?\s+target)\b/i
-const POLITICAL_KW  = /\b(ceasefire|diplomacy|sanction|treaty|negotiat|election|parliament|president|prime minister|government|summit|diplomatic|bilateral|accord|agreement|embargo|veto|UN\s+secur|resolution|coalition|regime change|coup)\b/i
-const DISASTER_KW   = /\b(earthquake|flood|tsunami|cyclone|hurricane|typhoon|tornado|wildfire|drought|famine|epidemic|pandemic|outbreak|refugee|displacement|humanitarian)\b/i
-
-function classifyNewsEvent(title: string): string {
-  if (AIRSTRIKE_KW.test(title))  return 'airstrike'
-  if (CONFLICT_KW.test(title))   return 'armed_conflict'
-  if (POLITICAL_KW.test(title))  return 'political_crisis'
-  if (DISASTER_KW.test(title))   return 'natural_disaster'
-  return 'news'
-}
-
-function getEffectiveEventType(e: { event_type?: string | null; title?: string | null }): string {
-  const et = e.event_type ?? 'news'
-  if (et !== 'news') return et
-  // Fallback: classify 'news' events by title at display time
-  return classifyNewsEvent(e.title ?? '')
-}
+// UI category display list
+// Uses shared UI_CATEGORY_TYPES from event-presentation for consistent filtering
 
 const CATEGORY_LIST = [
   { key: 'Conflict',   emoji: '⚔️' },
@@ -154,6 +135,7 @@ function FilterBar({
   setCategoryFilter,
   filteredCount,
   totalCount,
+  severityCounts,
 }: {
   allEvents: OverviewEvent[]
   severityFilter: number | null
@@ -162,21 +144,23 @@ function FilterBar({
   setCategoryFilter: (v: string | null) => void
   filteredCount: number
   totalCount: number
+  severityCounts?: { critical: number; high: number; medium: number; low: number }
 }) {
   const isFiltered = severityFilter !== null || categoryFilter !== null
 
   // Count events per severity (out of full set)
   const sevCounts = useMemo(() => {
-    const counts: Record<number, number> = { 4: 0, 3: 0, 2: 0, 1: 0 }
-    allEvents.forEach(e => { const s = e.severity ?? 0; if (counts[s] !== undefined) counts[s]++ })
-    return counts
-  }, [allEvents])
+    if (severityCounts) {
+      return { 4: severityCounts.critical, 3: severityCounts.high, 2: severityCounts.medium, 1: severityCounts.low }
+    }
+    const counts = computeSeverityCounts(allEvents)
+    return { 4: counts.critical, 3: counts.high, 2: counts.medium, 1: counts.low }
+  }, [allEvents, severityCounts])
 
-  // Count events per category — uses effective type (title fallback for 'news' events)
   const catCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     CATEGORY_LIST.forEach(c => {
-      counts[c.key] = allEvents.filter(e => CATEGORY_TYPES[c.key]?.includes(getEffectiveEventType(e))).length
+      counts[c.key] = allEvents.filter(e => UI_CATEGORY_TYPES[c.key]?.includes(getEffectiveType(e.event_type))).length
     })
     return counts
   }, [allEvents])
@@ -411,6 +395,10 @@ function TopStoriesList({
     const rel = safeRelativeTime(event.ingested_at ?? event.occurred_at)
     const displayTitle = formatEventTitle(event.title ?? '', event.source)
     const sourceName = getPublicSourceName(event.source, event.provenance_raw ?? null, event.title ?? null)
+    const locationText = getLocationDisplay(event)
+    const subtitle = getBestDescription(event, 120)
+    const breaking = isBreaking(event)
+    const corroboration = event.corroboration_count ?? 0
 
     return (
       <button
@@ -420,7 +408,12 @@ function TopStoriesList({
         onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.03)' }}
         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '' }}
       >
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          {breaking && (
+            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide flex-shrink-0" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
+              Breaking
+            </span>
+          )}
           <span
             className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide flex-shrink-0"
             style={{ background: sev.bg, color: sev.color }}
@@ -433,16 +426,12 @@ function TopStoriesList({
           >
             {status.label}
           </span>
-          {event.country_code && (
-            <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
-              {event.country_code}
-            </span>
+          {corroboration > 1 && (
+            <span className="rounded-full px-2 py-0.5 text-[10px] font-medium flex-shrink-0" style={{ background: 'rgba(59,130,246,0.12)', color: '#60a5fa' }}>📡 {corroboration} sources</span>
           )}
-          {(event.region ?? sourceName) && (
-            <span className="text-xs truncate flex-1" style={{ color: 'var(--text-muted)' }}>
-              {event.region ?? sourceName}
-            </span>
-          )}
+          <span className="text-xs truncate flex-1" style={{ color: 'var(--text-muted)' }}>
+            {sourceName} · {locationText}
+          </span>
           <span
             className="text-[11px] flex-shrink-0 ml-auto tabular-nums"
             style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}
@@ -450,8 +439,11 @@ function TopStoriesList({
             {rel}
           </span>
         </div>
-        <p className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+        <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
           {displayTitle}
+        </p>
+        <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+          {subtitle}
         </p>
       </button>
     )
@@ -661,8 +653,8 @@ export function OverviewClient() {
       result = result.filter(e => (e.severity ?? 0) === severityFilter)
     }
     if (categoryFilter !== null) {
-      const types = CATEGORY_TYPES[categoryFilter] ?? []
-      result = result.filter(e => types.includes(getEffectiveEventType(e)))
+      const types = UI_CATEGORY_TYPES[categoryFilter] ?? []
+      result = result.filter(e => types.includes(getEffectiveType(e.event_type)))
     }
     // Diversity cap: max 5 events per source domain to prevent GDELT flooding
     // Preserves ingested_at DESC order — just skips excess from same source
@@ -709,6 +701,8 @@ export function OverviewClient() {
               <span>Last update: {data.freshnessDescription}</span>
               <span>·</span>
               <span style={{ color: coverageColor }}>Coverage: {data.coverageLevel}</span>
+              <span>·</span>
+              <span>Showing top 20 of {data.topStories.length} events</span>
             </div>
           )}
         </div>
@@ -827,6 +821,7 @@ export function OverviewClient() {
                 setCategoryFilter={setCategoryFilter}
                 filteredCount={filteredStories.length}
                 totalCount={data.topStories.length}
+                severityCounts={data.severityCounts}
               />
               <TopStoriesList
                 events={filteredStories}

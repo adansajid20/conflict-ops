@@ -7,7 +7,8 @@ import { IntelDrawer } from '@/components/intel/IntelDrawer'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { eventToIntelItem } from '@/types/intel-item'
 import { safeRelativeTime } from '@/lib/utils/time'
-import { displayLocation, generateSummary } from '@/lib/utils/location'
+import { EVENT_TYPE_TO_CATEGORY, getEffectiveType, getBestDescription, getLocationDisplay } from '@/lib/event-presentation'
+import { getPublicSourceName } from '@/lib/utils/source-display'
 
 type FeedEvent = {
   id: string
@@ -49,13 +50,13 @@ const TIME_WINDOWS = ['1h', '6h', '24h', '7d', '30d'] as const
 type TimeWindow = (typeof TIME_WINDOWS)[number]
 
 const CATEGORIES = [
-  { value: 'all', label: 'All', types: [] as string[] },
-  { value: 'conflict', label: 'Conflict', types: ['airstrike', 'armed_conflict', 'terrorism'] },
-  { value: 'crisis', label: 'Crisis', types: ['political_crisis', 'civil_unrest', 'wmd_threat'] },
-  { value: 'humanitarian', label: 'Humanitarian', types: ['humanitarian', 'displacement'] },
-  { value: 'disaster', label: 'Disaster', types: ['natural_disaster'] },
-  { value: 'diplomatic', label: 'Diplomatic', types: ['economic'] },
-]
+  { value: 'all', label: 'All' },
+  { value: 'Conflict', label: 'Conflict' },
+  { value: 'Airstrikes', label: 'Airstrikes' },
+  { value: 'Political', label: 'Political' },
+  { value: 'Disasters', label: 'Disasters' },
+  { value: 'News', label: 'News' },
+] as const
 
 const SEV_FILTERS = [
   { label: 'All',      value: 0, emoji: null },
@@ -208,10 +209,7 @@ export function EventFeed() {
   const filteredEvents = useMemo(() => {
     let result = events
     if (categoryFilter !== 'all') {
-      const cat = CATEGORIES.find(c => c.value === categoryFilter)
-      if (cat && cat.types.length > 0) {
-        result = result.filter(e => cat.types.includes(e.event_type ?? ''))
-      }
+      result = result.filter(e => (EVENT_TYPE_TO_CATEGORY[getEffectiveType(e.event_type)] ?? 'News') === categoryFilter)
     }
     if (severityFilter > 0) {
       result = result.filter(e => (Number(e.severity) || 0) >= severityFilter)
@@ -365,11 +363,10 @@ export function EventFeed() {
               const isFocused = focusedIndex === index
               const sColor = sevColor(event.severity)
               const sLabel = sevLabel(event.severity)
-              const country = displayLocation(event.country_code, event.region, event.location)
-              const snippet = event.snippet || event.description || generateSummary({
-                ...event,
-                severity: typeof event.severity === 'number' ? event.severity : null,
-              })
+              const normalizedEvent = { ...event, severity: typeof event.severity === 'number' ? event.severity : null }
+              const country = getLocationDisplay(normalizedEvent)
+              const sourceName = getPublicSourceName(event.source, event.provenance_raw ?? null, event.title ?? null)
+              const snippet = getBestDescription(normalizedEvent, 180)
 
               return (
                 <motion.div
@@ -416,7 +413,7 @@ export function EventFeed() {
                         </span>
                       )}
                       <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                        {country}
+                        {sourceName} · {country}
                       </span>
                       <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace', marginLeft: 'auto' }}>
                         {safeRelativeTime(event.ingested_at ?? event.occurred_at)}
@@ -487,7 +484,7 @@ export function EventFeed() {
           disabled={loading || !nextCursor}
           className="rounded-md border px-3 py-1.5 btn-ghost disabled:opacity-40"
           style={{ borderColor: 'var(--border)', color: 'var(--text-primary)', fontSize: '12px' }}>
-          {loading ? 'Loading…' : nextCursor ? 'Load more' : 'All caught up'}
+          {loading ? 'Loading…' : nextCursor ? 'Load more' : `End of feed — ${filteredEvents.length} events displayed`}
         </button>
         <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
           {filteredEvents.length}/{events.length} events · Refreshing in {countdown}s

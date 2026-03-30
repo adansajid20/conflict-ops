@@ -19,8 +19,9 @@ const RISK_COLORS: Record<HotRegion['riskLevel'], string> = {
 
 export function HotRegionsTable({ regions }: { regions: HotRegion[] }) {
   const router = useRouter()
+  const safeRegions = regions.filter(r => r.region.toLowerCase() !== 'global')
 
-  if (regions.length === 0) {
+  if (safeRegions.length === 0) {
     return (
       <div className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
         No regional activity in the last 24h.
@@ -48,7 +49,7 @@ export function HotRegionsTable({ regions }: { regions: HotRegion[] }) {
           </tr>
         </thead>
         <tbody>
-          {regions.map((row, i) => {
+          {safeRegions.map((row, i) => {
             const color = RISK_COLORS[row.riskLevel]
             return (
               <tr
@@ -56,7 +57,7 @@ export function HotRegionsTable({ regions }: { regions: HotRegion[] }) {
                 onClick={() => router.push(`/feed?region=${encodeURIComponent(row.region)}`)}
                 className="cursor-pointer transition-colors duration-150"
                 style={{
-                  borderBottom: i < regions.length - 1 ? '1px solid var(--border)' : undefined,
+                  borderBottom: i < safeRegions.length - 1 ? '1px solid var(--border)' : undefined,
                 }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.03)' }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = '' }}

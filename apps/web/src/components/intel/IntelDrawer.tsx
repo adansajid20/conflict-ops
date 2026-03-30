@@ -4,8 +4,9 @@ import { useEffect, useCallback, useRef, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { safeTimeAgo, severityLabel, severityColor, type IntelItem } from '@/types/intel-item'
 import { safeAbsoluteTime, getFreshness, safeRelativeTime, type FreshnessLevel } from '@/lib/utils/time'
-import { displayLocation, COUNTRY_NAMES } from '@/lib/utils/location'
+import { COUNTRY_NAMES } from '@/lib/utils/location'
 import { getPublicSourceName } from '@/lib/utils/source-display'
+import { getLocationDisplay, getBestDescription } from '@/lib/event-presentation'
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   armed_conflict:      'Armed Conflict',
@@ -278,7 +279,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
   }
 
   // Location display — show Unknown if both null after geo cleanup, never show "UN"
-  const locationDisplay = displayLocation(item.country_code, item.region)
+  const locationDisplay = getLocationDisplay(item)
 
   // Detect mobile
   const isMobile = useMemo(() => {
@@ -443,7 +444,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
           </div>
 
           {/* DESCRIPTION */}
-          <DescriptionBlock description={item.description ?? item.title} />
+          <DescriptionBlock description={getBestDescription(item, 1200)} />
 
           {/* SOURCES */}
           {item.url && (
