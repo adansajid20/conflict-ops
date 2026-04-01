@@ -47,8 +47,11 @@ export async function GET(req: Request) {
   await runSource('news_rss', async () => { const { ingestNewsRSS } = await import('@/lib/ingest/news-rss'); return ingestNewsRSS() })
   await runSource('gdelt', async () => { const { ingestGDELT } = await import('@/lib/ingest/gdelt'); return ingestGDELT() })
   await runSource('acled', async () => { const { ingestACLED } = await import('@/lib/ingest/acled'); return ingestACLED() })
-  await runSource('reliefweb', async () => { const { ingestReliefWeb } = await import('@/lib/ingest/reliefweb'); return ingestReliefWeb() })
-  await runSource('unhcr', async () => { const { ingestUNHCR } = await import('@/lib/ingest/unhcr'); return ingestUNHCR() })
+  // DISABLED: ReliefWeb produces bureaucratic documents, not breaking news
+  // await runSource('reliefweb', async () => { const { ingestReliefWeb } = await import('@/lib/ingest/reliefweb'); return ingestReliefWeb() })
+
+  // DISABLED: UNHCR produces housing bulletins and meeting minutes, not intelligence
+  // await runSource('unhcr', async () => { const { ingestUNHCR } = await import('@/lib/ingest/unhcr'); return ingestUNHCR() })
   await runSource('usgs', async () => { const { ingestUSGS } = await import('@/lib/ingest/usgs'); return ingestUSGS() })
   await runSource('nasa-eonet', async () => { const { ingestNASAEONET } = await import('@/lib/ingest/nasa-eonet'); return ingestNASAEONET() })
   await runSource('gdacs', async () => { const { ingestGDACS } = await import('@/lib/ingest/gdacs'); return ingestGDACS() })

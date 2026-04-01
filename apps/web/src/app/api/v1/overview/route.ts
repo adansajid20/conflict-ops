@@ -260,6 +260,11 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw,summary_short')
       .gte('occurred_at', since)
       .eq('is_humanitarian_report', false)
+      .not('source', 'ilike', '%usgs%')
+      .not('source', 'ilike', '%eonet%')
+      .not('source', 'ilike', '%nasa%')
+      .not('event_type', 'in', '("natural_disaster","wildfire","earthquake")')
+      .not('region', 'in', '("north_america","oceania")')
       .order('severity', { ascending: false })
       .order('occurred_at', { ascending: false })
       .limit(500),

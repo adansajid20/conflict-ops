@@ -29,6 +29,7 @@ export interface EventLike {
   ingested_at?: string | null
   location?: string | null
   provenance_raw?: Record<string, unknown> | null
+  raw?: Record<string, unknown> | null
   outlet_name?: string | null
   location_confidence?: string | number | null
   significance_score?: number | null
@@ -135,6 +136,8 @@ export function getLocationDisplay(event: EventLike): string {
 export function getEffectiveType(eventType: string | null | undefined): string {
   if (!eventType) return 'news'
   const ALIASES: Record<string, string> = {
+    conflict: 'armed_conflict',
+    political: 'political_crisis',
     military: 'armed_conflict', mobilization: 'armed_conflict', explosion: 'airstrike',
     attack: 'armed_conflict', displacement: 'humanitarian_crisis', humanitarian: 'humanitarian_crisis',
     security: 'armed_conflict', cyber: 'political_crisis', wmd_threat: 'armed_conflict',
@@ -191,13 +194,28 @@ export function getSeverityMeta(severity: number | null | undefined): SeverityMe
   }
 }
 
-const BREAKING_WINDOW_MS = 4 * 60 * 60 * 1000
-export function isBreaking(event: EventLike): boolean {
-  const ts = event.published_at ?? event.event_date ?? event.occurred_at ?? event.ingested_at
-  if (!ts) return false
-  const ageMs = Date.now() - new Date(ts).getTime()
-  if (ageMs > BREAKING_WINDOW_MS) return false
-  return new Set(['armed_conflict', 'airstrike', 'terrorism', 'coup', 'civil_unrest', 'natural_disaster']).has(getEffectiveType(event.event_type))
+export function isBreaking(event: {
+  occurred_at?: string | null
+  ingested_at?: string | null
+  event_type?: string | null
+  severity?: number | null
+  title?: string | null
+}): boolean {
+  const timeField = event.occurred_at ?? event.ingested_at ?? new Date().toISOString()
+  const ageMs = Date.now() - new Date(timeField).getTime()
+  if (ageMs > 2 * 60 * 60 * 1000) return false
+
+  const conflictTypes = ['conflict', 'airstrike', 'political', 'military', 'terrorism']
+  if (event.event_type && !conflictTypes.includes(event.event_type)) return false
+
+  if ((event.severity ?? 0) < 3) return false
+
+  const hardKeywords = [
+    'killed', 'attack', 'airstrike', 'missile', 'explosion', 'bomb',
+    'troops', 'invasion', 'offensive', 'ceasefire', 'coup', 'assassination', 'nuclear', 'hostage',
+  ]
+  const title = (event.title ?? '').toLowerCase()
+  return hardKeywords.some((kw) => title.includes(kw))
 }
 
 const DRIVER_LABELS: Record<string, string> = {
@@ -260,7 +278,10 @@ export function sanitizeEventForClient(event: Record<string, unknown>): ClientEv
         : typeof event.created_at === 'string'
           ? event.created_at
           : null
-  const outletName = sanitizeSourceDisplay(resolveOutletName(source, (event.provenance_raw as Record<string, any> | null) ?? null, title))
+  const provenance = ((event.provenance_raw as Record<string, any> | null) ?? (event.raw as Record<string, any> | null) ?? null)
+  const outletName = typeof provenance?.outlet === 'string'
+    ? sanitizeSourceDisplay(provenance.outlet)
+    : sanitizeSourceDisplay(resolveOutletName(source, provenance, title))
   const locationConfidence = getLocationConfidenceLabel(coerceLocationConfidence((event.location_confidence as string | number | null | undefined) ?? null))
   return {
     id: String(event.id ?? ''),
@@ -281,9 +302,11 @@ export function sanitizeEventForClient(event: Record<string, unknown>): ClientEv
     outlet_name: outletName,
     source_url: typeof event.source_url === 'string'
       ? event.source_url
-      : typeof (event.provenance_raw as Record<string, unknown> | null)?.url === 'string'
-        ? String((event.provenance_raw as Record<string, unknown>).url)
-        : null,
+      : typeof event.source_id === 'string'
+        ? event.source_id
+        : typeof provenance?.url === 'string'
+          ? String(provenance.url)
+          : null,
     key_actors: Array.isArray(event.key_actors) ? (event.key_actors as string[]) : null,
     summary_short: typeof event.summary_short === 'string' ? event.summary_short : null,
     corroboration_count: typeof event.corroboration_count === 'number' ? event.corroboration_count : null,
