@@ -371,19 +371,12 @@ function TopStoriesList({
     )
   }
 
-  // Sort: event type priority → severity desc → occurred_at desc
-  const sorted = [...events].sort((a, b) => {
-    const ap = EVENT_TYPE_PRIORITY[a.event_type ?? ''] ?? 5
-    const bp = EVENT_TYPE_PRIORITY[b.event_type ?? ''] ?? 5
-    if (ap !== bp) return ap - bp
-    const as_ = a.severity ?? 1, bs_ = b.severity ?? 1
-    if (as_ !== bs_) return bs_ - as_
-    return new Date(b.occurred_at ?? 0).getTime() - new Date(a.occurred_at ?? 0).getTime()
-  })
+  // API already returns freshness-ranked stories; preserve that order here.
+  const rankedEvents = [...events]
 
   // Separate NOAA from non-NOAA
-  const nonNoaa = sorted.filter((e) => e.source !== 'noaa')
-  const noaaAll = sorted.filter((e) => e.source === 'noaa')
+  const nonNoaa = rankedEvents.filter((e) => e.source !== 'noaa')
+  const noaaAll = rankedEvents.filter((e) => e.source === 'noaa')
   const noaaToShow = noaaExpanded ? noaaAll : noaaAll.slice(0, NOAA_LIMIT)
   const hiddenNoaaCount = noaaAll.length - NOAA_LIMIT
 
@@ -643,6 +636,18 @@ export function OverviewClient() {
   }
 
   // Client-side filtered top stories
+  const breakingStories = useMemo(() => {
+    if (!data) return []
+
+    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000
+    return data.topStories
+      .filter((event) => {
+        const ts = event.ingested_at ? new Date(event.ingested_at).getTime() : 0
+        return ts >= twoHoursAgo && (event.severity === 4 || event.severity === 3)
+      })
+      .slice(0, 3)
+  }, [data])
+
   const filteredStories = useMemo(() => {
     if (!data) return []
     let result = data.topStories
@@ -812,6 +817,37 @@ export function OverviewClient() {
                   {win} window
                 </span>
               </div>
+              {breakingStories.length > 0 && (
+                <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)', background: 'rgba(239,68,68,0.04)' }}>
+                  <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-red-500">
+                    BREAKING
+                  </div>
+                  <div className="space-y-2.5">
+                    {breakingStories.map((event) => {
+                      const locationText = getLocationDisplay(event)
+                      const sourceName = event.source ? sanitizeSourceDisplay(event.source) : ''
+                      return (
+                        <button
+                          key={`breaking-${event.id}`}
+                          onClick={() => setSelectedEvent(event)}
+                          className="flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors hover:bg-white/5"
+                          style={{ borderColor: 'rgba(239,68,68,0.18)' }}
+                        >
+                          <span className="text-xs font-semibold uppercase tracking-wide animate-pulse text-red-500">●LIVE</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                              {formatEventTitle(event.title ?? '', event.source, 100)}
+                            </div>
+                            <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                              {[sourceName, locationText !== 'Location unknown' ? locationText : null, safeRelativeTime(event.ingested_at ?? event.occurred_at)].filter(Boolean).join(' · ')}
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
               <FilterBar
                 allEvents={data.topStories}
                 severityFilter={severityFilter}

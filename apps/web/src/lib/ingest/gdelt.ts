@@ -81,7 +81,8 @@ export async function ingestGDELT(): Promise<IngestResult> {
     query: `(war OR "military operation" OR airstrike OR bombing OR "killed in" OR casualties OR ceasefire OR invasion OR "armed conflict" OR "rebel forces" OR "terrorist attack" OR "missile strike" OR "drone strike" OR "military clash" OR siege OR coup) sourcelang:English`,
     mode: 'artlist',
     maxrecords: '200',
-    sort: 'DateDesc',
+    TIMESPAN: '120',
+    SORT: 'DateDesc',
     format: 'json',
   })
 

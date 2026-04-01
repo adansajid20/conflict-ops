@@ -99,6 +99,7 @@ const PILL_ACTIVE: React.CSSProperties = { background: '#2563EB', color: '#fff',
 const PILL_INACTIVE: React.CSSProperties = { background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '9999px', padding: '3px 10px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', lineHeight: '1.4', whiteSpace: 'nowrap' }
 
 export function EventFeed() {
+  const [sortOrder, setSortOrder] = useState<'newest' | 'significance'>('newest')
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('24h')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [feedTab, setFeedTab] = useState<'all' | 'humanitarian'>('all')
@@ -162,8 +163,20 @@ export function EventFeed() {
       result = result.filter((event) => event.title.toLowerCase().includes(q) || (event.description ?? '').toLowerCase().includes(q))
     }
     if (languageFilter !== 'all') result = result.filter((event) => (event.description_lang ?? 'unknown') === languageFilter)
-    return result
-  }, [categoryFilter, events, languageFilter, searchQuery, severityFilter])
+
+    const sorted = [...result]
+    if (sortOrder === 'significance') {
+      sorted.sort((left, right) => {
+        const sigDiff = (right.significance_score ?? 0) - (left.significance_score ?? 0)
+        if (sigDiff !== 0) return sigDiff
+        return new Date(right.ingested_at ?? right.occurred_at ?? 0).getTime() - new Date(left.ingested_at ?? left.occurred_at ?? 0).getTime()
+      })
+      return sorted
+    }
+
+    sorted.sort((left, right) => new Date(right.ingested_at ?? right.occurred_at ?? 0).getTime() - new Date(left.ingested_at ?? left.occurred_at ?? 0).getTime())
+    return sorted
+  }, [categoryFilter, events, languageFilter, searchQuery, severityFilter, sortOrder])
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -229,6 +242,10 @@ export function EventFeed() {
             {languages.map((language) => <option key={language} value={language}>{language === 'all' ? 'All languages' : language}</option>)}
           </select>
           <button onClick={() => setRawFeed((value) => !value)} style={rawFeed ? PILL_ACTIVE : PILL_INACTIVE}>Raw Feed</button>
+          <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value as 'newest' | 'significance')} className="shrink-0 rounded-md border px-2 py-1.5 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)', background: 'var(--bg-surface-2)' }}>
+            <option value="newest">Newest First</option>
+            <option value="significance">Most Significant</option>
+          </select>
           <button onClick={exportCsv} className="btn-ghost inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}><DownloadIcon size={12} /> Export</button>
         </div>
 

@@ -19,6 +19,7 @@ interface EventRow {
   region: string | null
   country_code: string | null
   severity: number | null
+  significance_score?: number | null
   status: string | null
   occurred_at: string | null
   ingested_at: string | null
@@ -83,6 +84,36 @@ function computeCoverage(distinctSourceCount: number, eventCount: number): {
   if (distinctSourceCount >= 2 || eventCount >= 20)
     return { label: 'Medium', tooltip: 'Partial coverage from some sources. Core tracking active.' }
   return { label: 'Low', tooltip: 'Limited source diversity. Tracking may be incomplete.' }
+}
+
+function computeFreshnessScore(event: { ingested_at: string; severity?: string | number | null; significance_score?: number | null }): number {
+  const ageMs = Date.now() - new Date(event.ingested_at).getTime()
+  const ageHours = ageMs / (1000 * 60 * 60)
+
+  const freshnessScore =
+    ageHours <= 3 ? 100 :
+    ageHours <= 6 ? 80 :
+    ageHours <= 12 ? 50 :
+    ageHours <= 24 ? 20 : 5
+
+  const normalizedSeverity = typeof event.severity === 'string'
+    ? event.severity.toLowerCase()
+    : event.severity == 4
+      ? 'critical'
+      : event.severity == 3
+        ? 'high'
+        : event.severity == 2
+          ? 'medium'
+          : null
+
+  const severityBonus =
+    normalizedSeverity === 'critical' ? 30 :
+    normalizedSeverity === 'high' ? 20 :
+    normalizedSeverity === 'medium' ? 10 : 0
+
+  const significanceBonus = (event.significance_score ?? 0) * 0.2
+
+  return freshnessScore + severityBonus + significanceBonus
 }
 
 const RISK_ORDER: Record<HotRegion['riskLevel'], number> = {
@@ -212,6 +243,8 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   const supabase = createServiceClient()
   const since = new Date(Date.now() - WINDOW_MS[win]!).toISOString()
   const since7d = new Date(Date.now() - WINDOW_MS['7d']!).toISOString()
+  const topStoriesSince6h = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+  const topStoriesSince24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
   // Parallel queries — never expose source health/pipeline status
   const [
@@ -254,12 +287,12 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .gte('occurred_at', since)
       .in('status', ['developing', 'pending']),
 
-    // Most recent published_at for freshness
+    // Most recent ingest for freshness
     supabase
       .from('events')
-      .select('published_at,occurred_at,created_at')
+      .select('ingested_at')
       .eq('is_humanitarian_report', false)
-      .order('published_at', { ascending: false, nullsFirst: false })
+      .order('ingested_at', { ascending: false, nullsFirst: false })
       .limit(1)
       .single(),
 
@@ -276,13 +309,13 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .select('id', { count: 'exact', head: true })
       .eq('read', false),
 
-    // Top stories (conflict/news) — exclude disaster sources so they don't crowd out conflict news
+    // Top stories (conflict/news) — freshness-first shortlist from last 6h, then 24h fallback
     // Use ingested_at NOT occurred_at: news articles are published 24-48h ago but ingested NOW
     // Exclude: noaa (weather), nasa_eonet (natural fires), usgs (earthquakes) — these go in weather bucket
     supabase
       .from('events')
       .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,published_at,created_at,ingested_at,location::text,provenance_raw,outlet_name,location_confidence,key_actors,source_url,corroboration_count,is_humanitarian_report,significance_score,summary_short')
-      .gte('ingested_at', since)
+      .gte('ingested_at', topStoriesSince6h)
       .eq('is_humanitarian_report', false)
       .gte('occurred_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .not('source', 'in', '("noaa","nasa_eonet","nasa-eonet","usgs")')
@@ -291,12 +324,30 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .not('title', 'ilike', '%guidance on child marriage%')
       .not('event_type', 'eq', 'natural_disaster')
       .order('ingested_at', { ascending: false })
-      .limit(100),
+      .limit(20),
   ])
 
   const hasOrg = !!(orgRes.data?.org_id)
   const allEvents = (windowEvents.data ?? []) as EventRow[]
-  const conflictCandidates = (topStories.data ?? []) as EventRow[]
+  let conflictCandidates = (topStories.data ?? []) as EventRow[]
+
+  if (conflictCandidates.length < 5) {
+    const topStories24hRes = await supabase
+      .from('events')
+      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,published_at,created_at,ingested_at,location::text,provenance_raw,outlet_name,location_confidence,key_actors,source_url,corroboration_count,is_humanitarian_report,significance_score,summary_short')
+      .gte('ingested_at', topStoriesSince24h)
+      .eq('is_humanitarian_report', false)
+      .gte('occurred_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      .not('source', 'in', '("noaa","nasa_eonet","nasa-eonet","usgs")')
+      .not('title', 'ilike', '%forest fire notification%')
+      .not('title', 'ilike', '%prescribed fire%')
+      .not('title', 'ilike', '%guidance on child marriage%')
+      .not('event_type', 'eq', 'natural_disaster')
+      .order('ingested_at', { ascending: false })
+      .limit(20)
+
+    conflictCandidates = (topStories24hRes.data ?? []) as EventRow[]
+  }
 
   // Fetch disaster sources separately — cap at 3 total in Top Stories
   // Only show severity >= 2 NOAA alerts and severity >= 3 EONET/USGS events
@@ -316,20 +367,24 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   // Filter out blocklisted titles from top stories
   const filteredConflict = conflictCandidates.filter(e => !isBlocklisted(e.title ?? ''))
 
-  // Build top stories: NEWEST FIRST with lightweight significance tie-break
-  // Primary sort: ingested_at DESC (freshness dominates)
-  // Tie-break within same 30-min bucket: higher severity first
+  // Build top stories: freshness-first ranking with severity/significance bonuses
   const sortedConflict = [...filteredConflict].sort((a, b) => {
-    const ta = new Date(a.ingested_at ?? a.occurred_at ?? 0).getTime()
-    const tb = new Date(b.ingested_at ?? b.occurred_at ?? 0).getTime()
-    // 30-min bucket for tie-breaking
-    const bucketA = Math.floor(ta / (30 * 60 * 1000))
-    const bucketB = Math.floor(tb / (30 * 60 * 1000))
-    if (bucketA !== bucketB) return bucketB - bucketA
-    return (b.severity ?? 1) - (a.severity ?? 1)  // tie-break by severity
+    const scoreDiff = computeFreshnessScore({
+      ingested_at: b.ingested_at ?? b.occurred_at ?? new Date(0).toISOString(),
+      severity: b.severity,
+      significance_score: b.significance_score ?? null,
+    }) - computeFreshnessScore({
+      ingested_at: a.ingested_at ?? a.occurred_at ?? new Date(0).toISOString(),
+      severity: a.severity,
+      significance_score: a.significance_score ?? null,
+    })
+
+    if (scoreDiff !== 0) return scoreDiff
+    return new Date(b.ingested_at ?? b.occurred_at ?? 0).getTime() - new Date(a.ingested_at ?? a.occurred_at ?? 0).getTime()
   })
   const sortedWeather = [...weatherCandidates].sort((a, b) => {
-    if ((b.severity ?? 1) !== (a.severity ?? 1)) return (b.severity ?? 1) - (a.severity ?? 1)
+    const severityDiff = Number(b.severity ?? 1) - Number(a.severity ?? 1)
+    if (severityDiff !== 0) return severityDiff
     return new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() - new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
   })
   // Dedup by title — remove near-identical events (e.g. 3x "Green forest fire in Thailand")
@@ -349,13 +404,13 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
 
   const DISASTER_CAP = 3
   const weatherSlots = Math.min(dedupedWeather.length, DISASTER_CAP)
-  const conflictSlots = 20 - weatherSlots
+  const conflictSlots = 5 - weatherSlots
   const stories: EventRow[] = [
     ...dedupedConflict.slice(0, conflictSlots),
     ...dedupedWeather.slice(0, weatherSlots),
   ]
 
-  const lastIngested = ((freshRes.data?.published_at ?? freshRes.data?.occurred_at ?? freshRes.data?.created_at) as string | null) ?? null
+  const lastIngested = (freshRes.data?.ingested_at as string | null) ?? null
   const freshness = computeFreshness(lastIngested)
 
   const distinctSources = new Set(allEvents.map((e) => sanitizeEventForClient(e as unknown as Record<string, unknown>).outlet_name).filter(Boolean)).size
@@ -389,8 +444,8 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       ...story,
       ...sanitizeEventForClient(story as unknown as Record<string, unknown>),
       source: sanitizeEventForClient(story as unknown as Record<string, unknown>).outlet_name,
-      ingested_at: sanitizeEventForClient(story as unknown as Record<string, unknown>).published_at,
-      occurred_at: sanitizeEventForClient(story as unknown as Record<string, unknown>).published_at,
+      ingested_at: story.ingested_at,
+      occurred_at: story.occurred_at,
       provenance_raw: null,
     })),
     hotRegions,
