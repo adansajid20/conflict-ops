@@ -78,6 +78,34 @@ const RSS_FEEDS = [
   { url: 'https://www.laprensa.hn/rss', outlet: 'La Prensa Honduras', trust: 67, region: 'latin_america' },
   { url: 'https://venezuelanalysis.com/feed/', outlet: 'Venezuela Analysis', trust: 68, region: 'latin_america' },
   { url: 'https://www.dialogo-americas.com/feed/', outlet: 'Diálogo Americas', trust: 72, region: 'latin_america' },
+
+  // Global intelligence & defence think-tanks
+  { url: 'https://foreignpolicy.com/feed/', outlet: 'Foreign Policy', trust: 85, region: null },
+  { url: 'https://warontherocks.com/feed/', outlet: 'War on the Rocks', trust: 84, region: null },
+  { url: 'https://www.crisisgroup.org/rss.xml', outlet: 'Crisis Group', trust: 88, region: null },
+  { url: 'https://www.bellingcat.com/feed/', outlet: 'Bellingcat', trust: 83, region: null },
+  { url: 'https://theintercept.com/feed/?rss', outlet: 'The Intercept', trust: 74, region: null },
+  { url: 'https://www.sipri.org/news/feed', outlet: 'SIPRI', trust: 87, region: null },
+  { url: 'https://www.defensenews.com/arc/outboundfeeds/rss/', outlet: 'Defense News', trust: 82, region: null },
+  { url: 'https://breakingdefense.com/feed/', outlet: 'Breaking Defense', trust: 80, region: null },
+  { url: 'https://www.janes.com/feeds/news', outlet: "Jane's", trust: 88, region: null },
+  { url: 'https://rss.app/feeds/tLCXMDsWCPIbx8pR.xml', outlet: 'ACLED', trust: 92, region: null },
+  { url: 'https://www.worldpoliticsreview.com/rss/', outlet: 'World Politics Review', trust: 82, region: null },
+  { url: 'https://www.justsecurity.org/feed/', outlet: 'Just Security', trust: 81, region: null },
+  { url: 'https://www.stimson.org/feed/', outlet: 'Stimson Center', trust: 84, region: null },
+
+  // Middle East — expanded
+  { url: 'https://www.iranintl.com/en/rss.xml', outlet: 'Iran International', trust: 78, region: 'middle_east' },
+  { url: 'https://www.timesofisrael.com/feed/', outlet: 'Times of Israel', trust: 75, region: 'middle_east' },
+  { url: 'https://www.haaretz.com/cmlink/1.4466871', outlet: 'Haaretz', trust: 78, region: 'middle_east' },
+  { url: 'https://english.alarabiya.net/rss.xml', outlet: 'Al Arabiya', trust: 73, region: 'middle_east' },
+  { url: 'https://www.arabnews.com/rss.xml', outlet: 'Arab News', trust: 72, region: 'middle_east' },
+  { url: 'https://www.al-monitor.com/rss', outlet: 'Al-Monitor', trust: 80, region: 'middle_east' },
+  { url: 'https://english.wafa.ps/rss.xml', outlet: 'WAFA (Palestine)', trust: 65, region: 'middle_east' },
+  { url: 'https://www.aa.com.tr/en/rss/default?cat=world', outlet: 'Anadolu Agency', trust: 70, region: 'middle_east' },
+  { url: 'https://www.rudaw.net/english/feed', outlet: 'Rudaw (Kurdistan)', trust: 74, region: 'middle_east' },
+  { url: 'https://english.enabbaladi.net/feed/', outlet: 'Enab Baladi (Syria)', trust: 72, region: 'middle_east' },
+  { url: 'https://www.libya-al-ahrar.tv/en/feed/', outlet: 'Libya Al-Ahrar', trust: 65, region: 'middle_east' },
 ] as const
 
 const CONFLICT_KEYWORDS = [
