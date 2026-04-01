@@ -26,6 +26,58 @@ const RSS_FEEDS = [
   { url: 'https://timesofindia.indiatimes.com/rssfeeds/296589292.cms', outlet: 'Times of India', trust: 72, region: 'south_asia' },
   { url: 'https://www.theeastafrican.co.ke/rss', outlet: 'The East African', trust: 71, region: 'sub_saharan_africa' },
   { url: 'https://www.channelnewsasia.com/rssfeeds/8395986', outlet: 'CNA', trust: 74, region: 'southeast_asia' },
+
+  // Eastern Europe — conflict specialists
+  { url: 'https://kyivindependent.com/feed/', outlet: 'Kyiv Independent', trust: 80, region: 'eastern_europe' },
+  { url: 'https://www.pravda.com.ua/eng/rss/view_news/', outlet: 'Ukrainska Pravda', trust: 78, region: 'eastern_europe' },
+  { url: 'https://meduza.io/en/rss/all', outlet: 'Meduza', trust: 77, region: 'eastern_europe' },
+  { url: 'https://english.nv.ua/rss/allnews.xml', outlet: 'NV Ukraine', trust: 74, region: 'eastern_europe' },
+  { url: 'https://www.ukrinform.net/rss/block-lastnews', outlet: 'Ukrinform', trust: 75, region: 'eastern_europe' },
+  { url: 'https://en.interfax.com.ua/news/general.rss', outlet: 'Interfax Ukraine', trust: 76, region: 'eastern_europe' },
+  { url: 'https://www.osw.waw.pl/en/rss.xml', outlet: 'OSW (Warsaw)', trust: 82, region: 'eastern_europe' },
+  { url: 'https://jamestown.org/feed/', outlet: 'Jamestown Foundation', trust: 80, region: 'eastern_europe' },
+  { url: 'https://georgiatoday.ge/feed/', outlet: 'Georgia Today', trust: 70, region: 'eastern_europe' },
+  { url: 'https://www.azatutyun.am/api/zpoqpqiput', outlet: 'RFE/RL Armenia', trust: 79, region: 'eastern_europe' },
+
+  // Sub-Saharan Africa
+  { url: 'https://www.dailymaverick.co.za/feed/', outlet: 'Daily Maverick', trust: 77, region: 'sub_saharan_africa' },
+  { url: 'https://www.theafricareport.com/feed/', outlet: 'The Africa Report', trust: 75, region: 'sub_saharan_africa' },
+  { url: 'https://addisstandard.com/feed/', outlet: 'Addis Standard', trust: 74, region: 'sub_saharan_africa' },
+  { url: 'https://www.rfi.fr/en/rss', outlet: 'RFI English', trust: 76, region: 'sub_saharan_africa' },
+  { url: 'https://www.voanews.com/api/z_mqp_oum', outlet: 'VOA Africa', trust: 78, region: 'sub_saharan_africa' },
+  { url: 'https://www.sudantribune.com/spip.php?page=backend', outlet: 'Sudan Tribune', trust: 72, region: 'sub_saharan_africa' },
+  { url: 'https://www.africanews.com/feed/rss2/', outlet: 'Africanews', trust: 70, region: 'sub_saharan_africa' },
+  { url: 'https://www.thecivilian.net/feed/', outlet: 'The Civilian (Sudan)', trust: 68, region: 'sub_saharan_africa' },
+  { url: 'https://en.som1.com/feed/', outlet: 'SOM1 (Somalia)', trust: 67, region: 'sub_saharan_africa' },
+  { url: 'https://www.radiotamazuj.org/en/rss.xml', outlet: 'Radio Tamazuj (Sudan)', trust: 71, region: 'sub_saharan_africa' },
+  { url: 'https://www.maliactu.net/feed/', outlet: 'Mali Actu', trust: 66, region: 'sub_saharan_africa' },
+
+  // South Asia
+  { url: 'https://gandhara.rferl.org/api/zpqmiretle', outlet: 'RFE/RL Gandhara', trust: 81, region: 'south_asia' },
+  { url: 'https://tolonews.com/rss.xml', outlet: 'Tolo News (Afghan)', trust: 74, region: 'south_asia' },
+  { url: 'https://www.thenews.com.pk/rss/1/8', outlet: 'The News Pakistan', trust: 72, region: 'south_asia' },
+  { url: 'https://www.geo.tv/rss/1', outlet: 'Geo News', trust: 71, region: 'south_asia' },
+  { url: 'https://www.thehindu.com/news/international/feeder/default.rss', outlet: 'The Hindu', trust: 78, region: 'south_asia' },
+  { url: 'https://www.khaama.com/feed/', outlet: 'Khaama Press', trust: 70, region: 'south_asia' },
+  { url: 'https://www.rferl.org/api/zrqpurqp', outlet: 'RFE/RL Central Asia', trust: 80, region: 'south_asia' },
+
+  // Southeast Asia
+  { url: 'https://www.bangkokpost.com/rss/data/topstories.xml', outlet: 'Bangkok Post', trust: 72, region: 'southeast_asia' },
+  { url: 'https://www.irrawaddy.com/feed', outlet: 'The Irrawaddy (Myanmar)', trust: 77, region: 'southeast_asia' },
+  { url: 'https://www.benarnews.org/rss/english/top-stories', outlet: 'BenarNews', trust: 76, region: 'southeast_asia' },
+
+  // East Asia
+  { url: 'https://focustaiwan.tw/rss', outlet: 'Focus Taiwan', trust: 74, region: 'east_asia' },
+  { url: 'https://www.scmp.com/rss/91/feed', outlet: 'South China Morning Post', trust: 76, region: 'east_asia' },
+  { url: 'https://en.yna.co.kr/RSS/news.xml', outlet: 'Yonhap (Korea)', trust: 78, region: 'east_asia' },
+  { url: 'https://www3.nhk.or.jp/nhkworld/en/news/feeds/', outlet: 'NHK World', trust: 80, region: 'east_asia' },
+  { url: 'https://www.rfa.org/english/RSS', outlet: 'RFA (Asia)', trust: 79, region: 'east_asia' },
+
+  // Latin America
+  { url: 'https://insightcrime.org/feed/', outlet: 'InSight Crime', trust: 80, region: 'latin_america' },
+  { url: 'https://www.laprensa.hn/rss', outlet: 'La Prensa Honduras', trust: 67, region: 'latin_america' },
+  { url: 'https://venezuelanalysis.com/feed/', outlet: 'Venezuela Analysis', trust: 68, region: 'latin_america' },
+  { url: 'https://www.dialogo-americas.com/feed/', outlet: 'Diálogo Americas', trust: 72, region: 'latin_america' },
 ] as const
 
 const CONFLICT_KEYWORDS = [
