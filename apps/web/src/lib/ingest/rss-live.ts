@@ -116,7 +116,7 @@ async function parseFeed(
       }
 
       const pubDate = item.pubDate ? new Date(item.pubDate) : new Date()
-      if (Number.isNaN(pubDate.getTime()) || (Date.now() - pubDate.getTime()) > 6 * 60 * 60 * 1000) {
+      if (Number.isNaN(pubDate.getTime()) || (Date.now() - pubDate.getTime()) > 24 * 60 * 60 * 1000) {
         skipped += 1
         continue
       }
