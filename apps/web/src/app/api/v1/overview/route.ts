@@ -264,7 +264,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .not('source', 'ilike', '%eonet%')
       .not('source', 'ilike', '%nasa%')
       .not('event_type', 'in', '("natural_disaster","wildfire","earthquake")')
-      .not('region', 'in', '("north_america","oceania")')
+      .not('region', 'in', '("North America","Oceania","Global")')
       .order('severity', { ascending: false })
       .order('occurred_at', { ascending: false })
       .limit(500),
