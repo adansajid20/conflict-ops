@@ -126,12 +126,34 @@ function computeHotRegions(events: EventRow[]): HotRegion[] {
     { count: number; sev4: number; sev3: number; sev2: number; geoSev4: number; geoSev3: number; types: Map<string, number>; countries: Set<string> }
   >()
 
-  const GEO_PLACEHOLDER_REGIONS = new Set(['Global', 'World', '', 'UN', 'United Nations'])
+  const GEO_PLACEHOLDER_REGIONS = new Set(['global', 'world', '', 'un', 'united_nations', 'north_america', 'oceania'])
+
+  const REGION_DISPLAY: Record<string, string> = {
+    'middle_east': 'Middle East',
+    'eastern_europe': 'Eastern Europe',
+    'south_asia': 'South Asia',
+    'east_asia': 'East Asia',
+    'sub_saharan_africa': 'Sub-Saharan Africa',
+    'southeast_asia': 'Southeast Asia',
+    'latin_america': 'Latin America',
+    'north_africa': 'North Africa',
+    'central_asia': 'Central Asia',
+    'west_africa': 'West Africa',
+    'east_africa': 'East Africa',
+    'central_africa': 'Central Africa',
+    'europe': 'Europe',
+    'asia_pacific': 'Asia Pacific',
+    'africa': 'Africa',
+    'asia': 'Asia',
+  }
 
   for (const e of events) {
-    const region = e.region || 'Global'
-    // Skip Global/placeholder regions — they clutter the output with aggregate noise
-    if (GEO_PLACEHOLDER_REGIONS.has(region)) continue
+    // Normalize to snake_case for dedup key
+    const rawRegion = e.region || 'global'
+    const regionSlug = rawRegion.toLowerCase().replace(/\s+/g, '_')
+    const region = REGION_DISPLAY[regionSlug] ?? rawRegion
+    // Skip placeholder regions
+    if (GEO_PLACEHOLDER_REGIONS.has(regionSlug)) continue
 
     const entry = map.get(region) ?? {
       count: 0, sev4: 0, sev3: 0, sev2: 0, geoSev4: 0, geoSev3: 0,
@@ -149,7 +171,7 @@ function computeHotRegions(events: EventRow[]): HotRegion[] {
     }
     if (e.event_type) entry.types.set(e.event_type, (entry.types.get(e.event_type) ?? 0) + 1)
     if (e.country_code) entry.countries.add(e.country_code)
-    map.set(region, entry)
+    map.set(region, entry)  // key is display name — already deduped via slug normalization
   }
 
   const regions: HotRegion[] = []
@@ -402,7 +424,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
 
   const DISASTER_CAP = 3
   const weatherSlots = Math.min(dedupedWeather.length, DISASTER_CAP)
-  const conflictSlots = 5 - weatherSlots
+  const conflictSlots = 20 - weatherSlots
   const stories: EventRow[] = [
     ...dedupedConflict.slice(0, conflictSlots),
     ...dedupedWeather.slice(0, weatherSlots),

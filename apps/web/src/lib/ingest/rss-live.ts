@@ -5,6 +5,7 @@ import { isBlocklisted, classifyByTitle, inferRegionFromTitle } from '../classif
 const RSS_FEEDS = [
   { url: 'https://rsshub.app/reuters/world', outlet: 'Reuters', trust: 95, region: null },
   { url: 'https://rsshub.app/reuters/us', outlet: 'Reuters', trust: 95, region: null },
+  { url: 'https://rsshub.app/apnews/topics/apf-topnews', outlet: 'AP News', trust: 93, region: null },
   { url: 'https://rsshub.app/apnews/topics/apf-intlnews', outlet: 'AP News', trust: 92, region: null },
   { url: 'https://rsshub.app/apnews/topics/apf-africa', outlet: 'AP News', trust: 92, region: 'sub_saharan_africa' },
   { url: 'https://rsshub.app/apnews/topics/apf-asiapac', outlet: 'AP News', trust: 92, region: 'south_asia' },
@@ -214,6 +215,15 @@ async function parseFeed(
       const externalId = link ?? item.guid ?? title
       const region = feed.region ?? inferRegionFromTitle(title)
 
+      // Pre-score severity by keyword before AI heavy lane runs
+      function prescore(t: string): number {
+        const tl = t.toLowerCase()
+        if (/nuclear|invasion|coup|assassination|mass.?casualt|genocide|chemical.?weapon/.test(tl)) return 4
+        if (/killed|dead|airstrike|air.?strike|missile|explosion|bomb|massacre|siege|hostage/.test(tl)) return 3
+        if (/tension|warning|sanctions|protest|arrested|detained|crackdown|blockade|displaced/.test(tl)) return 2
+        return 1
+      }
+
       batch.push({
         title,
         description: snippet || null,
@@ -223,7 +233,7 @@ async function parseFeed(
         event_type: classifyByTitle(title),
         external_id: externalId,
         region,
-        severity: 1,
+        severity: prescore(title),
         is_humanitarian_report: false,
         raw: {
           outlet: feed.outlet,
