@@ -11,7 +11,7 @@ import { detectEventType, isBlocklisted } from './utils'
 import { resolveOutletName } from '@/lib/outlet-resolver'
 
 // Free tier: no quoted phrases allowed — single words only
-const CONFLICT_KEYWORDS = 'war OR airstrike OR bombing OR ceasefire OR invasion OR siege OR coup OR casualties OR offensive OR airstrike OR missile OR troops OR military OR killed OR attack OR rebel OR terrorist'
+const CONFLICT_KEYWORDS = 'war OR airstrike OR bombing OR ceasefire OR invasion OR siege OR coup OR casualties OR offensive OR airstrike OR missile OR troops OR military OR killed OR attack OR rebel OR terrorist NOT (sports OR football OR soccer OR basketball OR movie OR celebrity)'
 
 interface NewsAPIArticle {
   source: { id: string | null; name: string }

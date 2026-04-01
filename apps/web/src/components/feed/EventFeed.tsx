@@ -114,6 +114,8 @@ export function EventFeed() {
   const [focusedIndex, setFocusedIndex] = useState(-1)
   const [countdown, setCountdown] = useState(60)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [newCount, setNewCount] = useState(0)
+  const [lastSeenAt, setLastSeenAt] = useState<string>(new Date().toISOString())
   const listRef = useRef<HTMLDivElement>(null)
 
   const fetchEvents = useCallback(async (reset = false) => {
@@ -130,9 +132,9 @@ export function EventFeed() {
       const response = await fetch(`/api/v1/events?${params.toString()}`, { cache: 'no-store' })
       const json = (await response.json()) as { data?: FeedEvent[]; nextCursor?: string | null }
       const incoming = json.data ?? []
-      setEvents(reset ? incoming : incoming)
+      setEvents(incoming)
       setNextCursor(json.nextCursor ?? null)
-      setCountdown(60)
+      setCountdown(30)
     } finally {
       setLoading(false)
     }
@@ -140,10 +142,22 @@ export function EventFeed() {
 
   useEffect(() => { void fetchEvents(true) }, [fetchEvents])
   useEffect(() => {
-    const interval = setInterval(() => setCountdown((value) => (value <= 1 ? 60 : value - 1)), 1000)
+    const interval = setInterval(() => setCountdown((value) => (value <= 1 ? 30 : value - 1)), 1000)
     return () => clearInterval(interval)
   }, [])
   useEffect(() => { if (countdown === 1) void fetchEvents(true) }, [countdown, fetchEvents])
+  useEffect(() => {
+    const interval = setInterval(() => { void fetchEvents(true) }, 30000)
+    return () => clearInterval(interval)
+  }, [fetchEvents])
+  useEffect(() => {
+    if (events.length === 0) return
+    const nextNewCount = events.filter((event) => {
+      const eventTs = event.occurred_at ?? event.ingested_at
+      return typeof eventTs === 'string' && eventTs > lastSeenAt
+    }).length
+    setNewCount(nextNewCount)
+  }, [events, lastSeenAt])
   useEffect(() => {
     if (events.length === 0) return
     const params = new URLSearchParams(window.location.search)
@@ -174,7 +188,7 @@ export function EventFeed() {
       return sorted
     }
 
-    sorted.sort((left, right) => new Date(right.ingested_at ?? right.occurred_at ?? 0).getTime() - new Date(left.ingested_at ?? left.occurred_at ?? 0).getTime())
+    sorted.sort((left, right) => new Date(right.occurred_at ?? right.ingested_at ?? 0).getTime() - new Date(left.occurred_at ?? left.ingested_at ?? 0).getTime())
     return sorted
   }, [categoryFilter, events, languageFilter, searchQuery, severityFilter, sortOrder])
 
@@ -266,6 +280,14 @@ export function EventFeed() {
       </div>
 
       <div className="flex-1 overflow-y-auto" ref={listRef}>
+        {newCount > 0 && (
+          <div
+            className="cursor-pointer bg-blue-600 px-4 py-2 text-center text-sm text-white"
+            onClick={() => { setLastSeenAt(new Date().toISOString()); setNewCount(0); window.scrollTo(0, 0) }}
+          >
+            ↑ {newCount} new event{newCount > 1 ? 's' : ''} — click to refresh
+          </div>
+        )}
         {loading && events.length === 0 ? (
           <div className="p-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="mb-1 flex animate-pulse gap-3 border-b p-4" style={{ borderColor: 'var(--border)' }}><div className="w-1 self-stretch rounded" style={{ background: 'var(--border)' }} /><div className="flex-1 space-y-2"><div className="h-4 w-3/4 rounded" style={{ background: 'rgba(255,255,255,0.08)' }} /><div className="h-3 w-1/2 rounded" style={{ background: 'rgba(255,255,255,0.05)' }} /></div></div>)}</div>
         ) : filteredEvents.length === 0 ? (
@@ -292,7 +314,7 @@ export function EventFeed() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
                       {sLabel && <span style={{ fontSize: '9px', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', padding: '1px 5px', borderRadius: '3px', background: `${sColor}22`, color: sColor, border: `1px solid ${sColor}44`, letterSpacing: '0.05em' }}>{sLabel}</span>}
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>{country !== 'Location unknown' ? `${country} · ` : ''}{safeRelativeTime(event.ingested_at ?? event.occurred_at)}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>{country !== 'Location unknown' ? `${country} · ` : ''}{safeRelativeTime(event.occurred_at ?? event.ingested_at)}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tier.bgColor} ${tier.color}`}>{tier.label}</span>
                       {sourceName ? <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--text-secondary)' }}>{sourceName}{sourceCount > 1 ? ` +${sourceCount - 1}` : ''}</span> : null}
                     </div>
@@ -332,7 +354,7 @@ export function EventFeed() {
 
       <div className="flex items-center justify-between border-t px-4 py-3 text-sm" style={{ borderColor: 'var(--border)' }}>
         <button disabled={loading || !nextCursor} className="btn-ghost rounded-md border px-3 py-1.5 disabled:opacity-40" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)', fontSize: '12px' }}>{loading ? 'Loading…' : nextCursor ? 'Load more' : `End of feed — ${filteredEvents.length} events displayed`}</button>
-        <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{filteredEvents.length}/{events.length} events · Refreshing in {countdown}s</div>
+        <div style={{ color: (() => { const latest = filteredEvents[0]?.occurred_at ?? filteredEvents[0]?.ingested_at ?? null; if (!latest) return 'var(--text-muted)'; return Date.now() - new Date(latest).getTime() > 30 * 60 * 1000 ? '#f59e0b' : 'var(--text-muted)' })(), fontSize: '11px' }}>{filteredEvents.length}/{events.length} events · Latest {filteredEvents[0] ? safeRelativeTime(filteredEvents[0]?.occurred_at ?? filteredEvents[0]?.ingested_at) : 'n/a'} · Refreshing in {countdown}s</div>
       </div>
 
       <ErrorBoundary>

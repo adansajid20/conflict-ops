@@ -12,6 +12,7 @@
     }
   ],
   "crons": [
+    { "path": "/api/cron/rss", "schedule": "* * * * *" },
     { "path": "/api/cron/analyze", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/forecast", "schedule": "0 2 * * *" }
   ]

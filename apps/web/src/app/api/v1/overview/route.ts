@@ -19,7 +19,6 @@ interface EventRow {
   region: string | null
   country_code: string | null
   severity: number | null
-  significance_score?: number | null
   status: string | null
   occurred_at: string | null
   ingested_at: string | null
@@ -86,8 +85,8 @@ function computeCoverage(distinctSourceCount: number, eventCount: number): {
   return { label: 'Low', tooltip: 'Limited source diversity. Tracking may be incomplete.' }
 }
 
-function computeFreshnessScore(event: { ingested_at: string; severity?: string | number | null; significance_score?: number | null }): number {
-  const ageMs = Date.now() - new Date(event.ingested_at).getTime()
+function computeFreshnessScore(event: { occurred_at: string; severity?: string | number | null }): number {
+  const ageMs = Date.now() - new Date(event.occurred_at).getTime()
   const ageHours = ageMs / (1000 * 60 * 60)
 
   const freshnessScore =
@@ -111,9 +110,7 @@ function computeFreshnessScore(event: { ingested_at: string; severity?: string |
     normalizedSeverity === 'high' ? 20 :
     normalizedSeverity === 'medium' ? 10 : 0
 
-  const significanceBonus = (event.significance_score ?? 0) * 0.2
-
-  return freshnessScore + severityBonus + significanceBonus
+  return freshnessScore + severityBonus
 }
 
 const RISK_ORDER: Record<HotRegion['riskLevel'], number> = {
@@ -260,7 +257,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     // All events in window (for hot regions + coverage)
     supabase
       .from('events')
-      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,published_at,created_at,ingested_at,location::text,provenance_raw,outlet_name,location_confidence,key_actors,source_url,corroboration_count,is_humanitarian_report,significance_score,summary_short')
+      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw,summary_short')
       .gte('occurred_at', since)
       .eq('is_humanitarian_report', false)
       .order('severity', { ascending: false })
@@ -310,12 +307,12 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .eq('read', false),
 
     // Top stories (conflict/news) — freshness-first shortlist from last 6h, then 24h fallback
-    // Use ingested_at NOT occurred_at: news articles are published 24-48h ago but ingested NOW
+    // Use occurred_at: this is the article publish time in the actual schema.
     // Exclude: noaa (weather), nasa_eonet (natural fires), usgs (earthquakes) — these go in weather bucket
     supabase
       .from('events')
-      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,published_at,created_at,ingested_at,location::text,provenance_raw,outlet_name,location_confidence,key_actors,source_url,corroboration_count,is_humanitarian_report,significance_score,summary_short')
-      .gte('ingested_at', topStoriesSince6h)
+      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw,summary_short')
+      .gte('occurred_at', topStoriesSince6h)
       .eq('is_humanitarian_report', false)
       .gte('occurred_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .not('source', 'in', '("noaa","nasa_eonet","nasa-eonet","usgs")')
@@ -323,7 +320,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .not('title', 'ilike', '%prescribed fire%')
       .not('title', 'ilike', '%guidance on child marriage%')
       .not('event_type', 'eq', 'natural_disaster')
-      .order('ingested_at', { ascending: false })
+      .order('occurred_at', { ascending: false })
       .limit(20),
   ])
 
@@ -334,8 +331,8 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   if (conflictCandidates.length < 5) {
     const topStories24hRes = await supabase
       .from('events')
-      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,published_at,created_at,ingested_at,location::text,provenance_raw,outlet_name,location_confidence,key_actors,source_url,corroboration_count,is_humanitarian_report,significance_score,summary_short')
-      .gte('ingested_at', topStoriesSince24h)
+      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw,summary_short')
+      .gte('occurred_at', topStoriesSince24h)
       .eq('is_humanitarian_report', false)
       .gte('occurred_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .not('source', 'in', '("noaa","nasa_eonet","nasa-eonet","usgs")')
@@ -343,7 +340,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .not('title', 'ilike', '%prescribed fire%')
       .not('title', 'ilike', '%guidance on child marriage%')
       .not('event_type', 'eq', 'natural_disaster')
-      .order('ingested_at', { ascending: false })
+      .order('occurred_at', { ascending: false })
       .limit(20)
 
     conflictCandidates = (topStories24hRes.data ?? []) as EventRow[]
@@ -353,7 +350,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   // Only show severity >= 2 NOAA alerts and severity >= 3 EONET/USGS events
   const disasterRes = await supabase
     .from('events')
-    .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,published_at,created_at,ingested_at,location::text,provenance_raw,outlet_name,location_confidence,key_actors,source_url,corroboration_count,is_humanitarian_report,significance_score,summary_short')
+    .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw,summary_short')
     .gte('occurred_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString())  // last 12h only
     .eq('is_humanitarian_report', false)
     .in('source', ['noaa'])                        // NOAA only — usgs/eonet too noisy for top stories
@@ -367,20 +364,18 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   // Filter out blocklisted titles from top stories
   const filteredConflict = conflictCandidates.filter(e => !isBlocklisted(e.title ?? ''))
 
-  // Build top stories: freshness-first ranking with severity/significance bonuses
+  // Build top stories: freshness-first ranking with severity bonuses
   const sortedConflict = [...filteredConflict].sort((a, b) => {
     const scoreDiff = computeFreshnessScore({
-      ingested_at: b.ingested_at ?? b.occurred_at ?? new Date(0).toISOString(),
+      occurred_at: b.occurred_at ?? b.ingested_at ?? new Date(0).toISOString(),
       severity: b.severity,
-      significance_score: b.significance_score ?? null,
     }) - computeFreshnessScore({
-      ingested_at: a.ingested_at ?? a.occurred_at ?? new Date(0).toISOString(),
+      occurred_at: a.occurred_at ?? a.ingested_at ?? new Date(0).toISOString(),
       severity: a.severity,
-      significance_score: a.significance_score ?? null,
     })
 
     if (scoreDiff !== 0) return scoreDiff
-    return new Date(b.ingested_at ?? b.occurred_at ?? 0).getTime() - new Date(a.ingested_at ?? a.occurred_at ?? 0).getTime()
+    return new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() - new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
   })
   const sortedWeather = [...weatherCandidates].sort((a, b) => {
     const severityDiff = Number(b.severity ?? 1) - Number(a.severity ?? 1)
@@ -413,7 +408,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   const lastIngested = (freshRes.data?.ingested_at as string | null) ?? null
   const freshness = computeFreshness(lastIngested)
 
-  const distinctSources = new Set(allEvents.map((e) => sanitizeEventForClient(e as unknown as Record<string, unknown>).outlet_name).filter(Boolean)).size
+  const distinctSources = new Set(allEvents.map((e) => e.source).filter(Boolean)).size
   const coverage = computeCoverage(distinctSources, allEvents.length)
 
   const hotRegions = computeHotRegions(allEvents)

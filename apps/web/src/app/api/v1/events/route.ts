@@ -93,9 +93,9 @@ export async function GET(req: Request): Promise<NextResponse> {
 
   let query = supabase
     .from('events')
-    .select('id,source,source_id,event_type,title,description,description_translated,description_lang,region,country_code,severity,status,occurred_at,published_at,created_at,ingested_at,provenance_raw,provenance_inferred,location::text,significance_score,intelligence_summary,summary_short,summary_full,content,entities,analyzed_at,escalation_indicator,cluster_id,outlet_name,location_confidence,key_actors,source_url,corroboration_count,is_humanitarian_report')
+    .select('id,source,source_id,event_type,title,description,description_translated,description_lang,region,country_code,severity,status,occurred_at,ingested_at,provenance_raw,provenance_inferred,location::text,intelligence_summary,summary_short,summary_full,content,entities,analyzed_at,escalation_indicator,cluster_id,is_humanitarian_report')
     .not('status', 'eq', 'clustered')
-    .order('ingested_at', { ascending: false })
+    .order('occurred_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
   const historyDays = user?.org_id
@@ -122,9 +122,8 @@ export async function GET(req: Request): Promise<NextResponse> {
   if (!source) {
     query = query.not('source', 'in', '("noaa","usgs","nasa-eonet","nasa_eonet")')
   }
-  // Use ingested_at for time window filtering — news articles are published hours/days ago
-  // but ingested NOW. Filtering by occurred_at would exclude all news from the 1h/6h window.
-  if (sinceParam) query = query.gte('ingested_at', sinceParam)
+  // Use occurred_at for feed freshness — in the actual schema this stores article publish time.
+  if (sinceParam) query = query.gte('occurred_at', sinceParam)
   // Also require occurred_at within 30 days — prevents heartbeat-corrupted old events
   // (forest fires from March 22, WHO Nov 2025) from appearing in short time windows
   if (sinceParam) {
@@ -322,8 +321,8 @@ export async function GET(req: Request): Promise<NextResponse> {
       _corroborated_by: corroborated_by.map((entry) => sanitizeEventForClient({ source: entry, title: entry }).outlet_name),
       _source_count: source_count,
       _confidence: confidence,
-      ingested_at: typeof base.published_at === 'string' ? base.published_at : (typeof base.occurred_at === 'string' ? base.occurred_at : (typeof base.created_at === 'string' ? base.created_at : null)),
-      occurred_at: typeof base.published_at === 'string' ? base.published_at : (typeof base.occurred_at === 'string' ? base.occurred_at : (typeof base.created_at === 'string' ? base.created_at : null)),
+      ingested_at: typeof base.ingested_at === 'string' ? base.ingested_at : null,
+      occurred_at: typeof base.occurred_at === 'string' ? base.occurred_at : null,
       description_lang: null,
       provenance_raw: null,
       entities: { actors: Array.isArray(base.key_actors) ? base.key_actors : [] },

@@ -43,6 +43,7 @@ export async function GET(req: Request) {
     }
   }
 
+  await runSource('rss_live', async () => { const { ingestRSSLive } = await import('@/lib/ingest/rss-live'); return ingestRSSLive() })
   await runSource('news_rss', async () => { const { ingestNewsRSS } = await import('@/lib/ingest/news-rss'); return ingestNewsRSS() })
   await runSource('gdelt', async () => { const { ingestGDELT } = await import('@/lib/ingest/gdelt'); return ingestGDELT() })
   await runSource('acled', async () => { const { ingestACLED } = await import('@/lib/ingest/acled'); return ingestACLED() })
