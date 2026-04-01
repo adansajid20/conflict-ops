@@ -12,9 +12,7 @@ import type { ApiResponse, ConflictEvent } from '@conflict-ops/shared'
 
 export async function GET(req: Request): Promise<NextResponse> {
   const { userId } = await auth()
-  if (!userId) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  // Public access allowed — userId null means unauthenticated (anonymous feed view)
 
   const url = new URL(req.url)
   const countryCode = url.searchParams.get('country')
@@ -63,11 +61,11 @@ export async function GET(req: Request): Promise<NextResponse> {
 
   const supabase = createServiceClient()
 
-  const { data: user } = await supabase
+  const { data: user } = userId ? await supabase
     .from('users')
     .select('org_id')
     .eq('clerk_user_id', userId)
-    .single()
+    .single() : { data: null }
 
   if (user?.org_id) {
     const requestIp = extractRequestIp(req)

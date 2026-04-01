@@ -194,7 +194,7 @@ const WINDOW_MS: Record<string, number> = {
 
 export async function GET(req: Request): Promise<NextResponse<OverviewResponse | { error: string }>> {
   const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Public access allowed — userId null means unauthenticated (anonymous feed view)
 
   const url = new URL(req.url)
   const win = url.searchParams.get('window') ?? '24h'
@@ -298,12 +298,10 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .limit(1)
       .single(),
 
-    // User's org
-    supabase
-      .from('users')
-      .select('org_id')
-      .eq('clerk_user_id', userId)
-      .single(),
+    // User's org (null for unauthenticated)
+    userId
+      ? supabase.from('users').select('org_id').eq('clerk_user_id', userId).single()
+      : Promise.resolve({ data: null, error: null }),
 
     // Active alerts (only if org exists — handled below)
     supabase
