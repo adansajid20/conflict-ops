@@ -98,7 +98,7 @@ function extractOutletFromTitle(title: string): string | null {
   return candidate
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line 
 export function getPublicSourceName(source: string | null | undefined, provenanceRaw?: Record<string, any> | null, title?: string | null): string {
   const src = source ?? ''
 

@@ -1,28 +1,28 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { getCachedSnapshot, setCachedSnapshot, TTL } from '@/lib/cache/redis'
+import { isSafeMode } from '@/lib/doctor/safe-mode-check'
 import { createServiceClient } from '@/lib/supabase/server'
-import { isSafeMode, getCachedSnapshot, setCachedSnapshot, TTL } from '@/lib/cache/redis'
 import type { ApiResponse, DashboardStats } from '@conflict-ops/shared'
 
-export async function GET(): Promise<NextResponse<ApiResponse<DashboardStats>>> {
+function safeModeHeaders(): HeadersInit {
+  return { 'X-Safe-Mode': 'true' }
+}
+
+export async function GET(): Promise<NextResponse<ApiResponse<DashboardStats | { safe_mode: true; data: [] }>>> {
   const { userId } = await auth()
   if (!userId) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  const cacheKey = `dashboard:${userId}`
+  const cacheKey = `cache:dashboard:${userId}`
 
-  // Safe mode: serve snapshot
-  const safe = await isSafeMode()
-  if (safe) {
+  if (await isSafeMode()) {
     const cached = await getCachedSnapshot<DashboardStats>(cacheKey)
     if (cached) {
-      return NextResponse.json({
-        success: true,
-        data: cached,
-        meta: { safe_mode: true, snapshot_age: 'unknown' },
-      })
+      return NextResponse.json({ success: true, data: cached, meta: { safe_mode: true, cached: true } }, { headers: safeModeHeaders() })
     }
+    return NextResponse.json({ success: true, data: { safe_mode: true, data: [] }, meta: { safe_mode: true, cached: false } }, { headers: safeModeHeaders() })
   }
 
   const supabase = createServiceClient()
@@ -34,12 +34,11 @@ export async function GET(): Promise<NextResponse<ApiResponse<DashboardStats>>> 
     supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', today.toISOString()),
     supabase.from('alerts').select('id', { count: 'exact', head: true }).eq('read', false),
     supabase.from('missions').select('id', { count: 'exact', head: true }),
-    // Count distinct sources ingested in last 3h (no circuit_breakers table needed)
     supabase.from('events').select('source').gte('ingested_at', h3),
   ])
 
   const distinctSources = sourcesResult.status === 'fulfilled'
-    ? new Set((sourcesResult.value.data ?? []).map((r: { source: string }) => r.source)).size
+    ? new Set((sourcesResult.value.data ?? []).map((row: { source: string | null }) => row.source).filter(Boolean)).size
     : 0
 
   const stats: DashboardStats = {

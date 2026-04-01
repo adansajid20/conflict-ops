@@ -20,6 +20,7 @@ export function APIKeysManager() {
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
   const [newKey, setNewKey] = useState<string | null>(null)
+  const [rotatingId, setRotatingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [noOrg, setNoOrg] = useState(false)
   const [planError, setPlanError] = useState<string | null>(null)
@@ -63,6 +64,27 @@ export function APIKeysManager() {
   const revoke = async (id: string) => {
     await fetch(`/api/v1/apikeys?id=${id}`, { method: 'DELETE' })
     await load()
+  }
+
+  const rotate = async (id: string) => {
+    setRotatingId(id)
+    setError(null)
+    try {
+      const res = await fetch('/api/v1/apikeys/rotate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key_id: id }),
+      })
+      const json = await res.json() as { success?: boolean; data?: APIKey; error?: string }
+      if (json.data?.key) {
+        setNewKey(json.data.key)
+        await load()
+      } else if (json.error) {
+        setError(json.error)
+      }
+    } finally {
+      setRotatingId(null)
+    }
   }
 
   if (loading) return <div className="text-xs mono p-4" style={{ color: 'var(--text-muted)' }}>LOADING...</div>
@@ -134,11 +156,19 @@ export function APIKeysManager() {
                   {k.last_used && ` · Last used ${new Date(k.last_used).toLocaleDateString()}`}
                 </div>
               </div>
-              <button onClick={() => { if (confirm('Revoke this key?')) void revoke(k.id) }}
-                className="px-3 py-1 text-xs mono rounded border"
-                style={{ borderColor: '#EF4444', color: '#EF4444' }}>
-                REVOKE
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => void rotate(k.id)}
+                  disabled={rotatingId === k.id}
+                  className="px-3 py-1 text-xs mono rounded border"
+                  style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
+                  {rotatingId === k.id ? 'ROTATING...' : 'ROTATE'}
+                </button>
+                <button onClick={() => { if (confirm('Revoke this key?')) void revoke(k.id) }}
+                  className="px-3 py-1 text-xs mono rounded border"
+                  style={{ borderColor: '#EF4444', color: '#EF4444' }}>
+                  REVOKE
+                </button>
+              </div>
             </div>
           ))}
         </div>

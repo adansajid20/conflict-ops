@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
+import { InviteMembersCard } from '@/components/settings/InviteMembersCard'
 
 export default async function TeamPage() {
   const { userId } = await auth()
@@ -91,6 +92,8 @@ export default async function TeamPage() {
           </tbody>
         </table>
       </div>
+
+      <InviteMembersCard isAdmin={isAdmin} />
 
       {/* SSO section — Enterprise only */}
       {limits.ssoSaml && isAdmin && (

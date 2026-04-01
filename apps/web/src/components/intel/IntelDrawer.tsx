@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useCallback, useRef, useState, useMemo } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { safeTimeAgo, severityLabel, severityColor, type IntelItem } from '@/types/intel-item'
 import { safeAbsoluteTime, getFreshness, safeRelativeTime, type FreshnessLevel } from '@/lib/utils/time'
 import { COUNTRY_NAMES } from '@/lib/utils/location'
-import { getPublicSourceName } from '@/lib/utils/source-display'
-import { getLocationDisplay, getBestDescription } from '@/lib/event-presentation'
+import { getBestDescription, getLocationConfidenceLabel, getLocationDisplay, getSignificanceTier, sanitizeSourceDisplay } from '@/lib/event-presentation'
+import { EventComments } from '@/components/intel/EventComments'
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   armed_conflict:      'Armed Conflict',
@@ -188,6 +188,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
   const [related, setRelated] = useState<RelatedEvent[]>([])
   const [relatedOpen, setRelatedOpen] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState(false)
+  const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details')
 
   const currentIndex = item ? items.findIndex(i => i.id === item.id) : -1
 
@@ -232,8 +233,10 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
 
   const coordInfo = getIntelCoords(item)
   const coords = coordInfo
-  const sourceLabel = item.provenance_source ?? getPublicSourceName(item.source, null, item.title ?? null)
+  const sourceLabel = sanitizeSourceDisplay(item.provenance_source ?? item.source)
   const freshness = getFreshness(item.ingested_at)
+  const significanceTier = getSignificanceTier((item as IntelItem & { significance_score?: number | null }).significance_score)
+  const locationConfidence = getLocationConfidenceLabel((item as IntelItem & { location_confidence?: number | null }).location_confidence ?? null)
 
   const handleViewOnMap = () => {
     if (!coordInfo) return
@@ -282,10 +285,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
   const locationDisplay = getLocationDisplay(item)
 
   // Detect mobile
-  const isMobile = useMemo(() => {
-    if (typeof window === 'undefined') return false
-    return window.innerWidth < 768
-  }, [])
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
 
   return (
     <>
@@ -347,6 +347,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
               className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
               style={{ color: 'var(--text-muted)' }}
               title="Close (Esc)">✕</button>
+
             {items.length > 1 && (
               <>
                 <button onClick={navigatePrev} disabled={currentIndex <= 0}
@@ -360,16 +361,16 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
           </div>
         </div>
 
+        <div className="border-b px-4 py-2 flex gap-2" style={{ borderColor: 'var(--border)' }}><button onClick={() => setActiveTab('details')} className="rounded px-3 py-1 text-xs mono" style={{ background: activeTab === 'details' ? 'var(--primary-dim)' : 'transparent', color: activeTab === 'details' ? 'var(--primary)' : 'var(--text-muted)' }}>DETAILS</button><button onClick={() => setActiveTab('comments')} className="rounded px-3 py-1 text-xs mono" style={{ background: activeTab === 'comments' ? 'var(--primary-dim)' : 'transparent', color: activeTab === 'comments' ? 'var(--primary)' : 'var(--text-muted)' }}>COMMENTS</button></div>
+
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
+          {activeTab === 'comments' ? <EventComments eventId={item.id} /> : <>
           {/* INTEL HEADER */}
           <div>
             <SectionHeader label="INTEL HEADER" />
             <div className="space-y-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              <div className="grid grid-cols-[100px_1fr] gap-1">
-                <span style={{ color: 'var(--text-muted)' }}>Location</span>
-                <span style={{ color: 'var(--text-primary)' }}>{locationDisplay}</span>
-              </div>
+              {locationDisplay !== 'Location unknown' && <div className="grid grid-cols-[100px_1fr] gap-1"><span style={{ color: 'var(--text-muted)' }}>Location</span><span style={{ color: 'var(--text-primary)' }}>{locationDisplay} · {locationConfidence.icon} {locationConfidence.label}</span></div>}
               <div className="grid grid-cols-[100px_1fr] gap-1">
                 <span style={{ color: 'var(--text-muted)' }}>Coordinates</span>
                 <span className="mono" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
@@ -386,10 +387,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
                   {item.event_type ? item.event_type.replace(/_/g, ' ') : '—'}
                 </span>
               </div>
-              <div className="grid grid-cols-[100px_1fr] gap-1">
-                <span style={{ color: 'var(--text-muted)' }}>Severity</span>
-                <SeverityBadge severity={item.severity} />
-              </div>
+              <div className="grid grid-cols-[100px_1fr] gap-1"><span style={{ color: 'var(--text-muted)' }}>Significance</span><span title="Significance tier based on source corroboration, recency, and strategic impact" className={`inline-flex w-fit rounded-full px-2 py-0.5 text-xs font-medium ${significanceTier.bgColor} ${significanceTier.color}`}>{significanceTier.label}</span></div>
               <div className="grid grid-cols-[100px_1fr] gap-1">
                 <span style={{ color: 'var(--text-muted)' }}>Source</span>
                 <span style={{ color: 'var(--text-primary)' }}>{sourceLabel}</span>
@@ -414,32 +412,12 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
             </div>
           </div>
 
-          {/* TIMELINE */}
           <div>
-            <SectionHeader label="TIMELINE" />
+            <SectionHeader label="TIMING" />
             <div className="space-y-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              <div className="grid grid-cols-[100px_1fr] gap-1">
-                <span style={{ color: 'var(--text-muted)' }}>First Seen</span>
-                <span className="mono" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
-                  {safeAbsoluteTime(item.occurred_at)}
-                </span>
-              </div>
-              <div className="grid grid-cols-[100px_1fr] gap-1">
-                <span style={{ color: 'var(--text-muted)' }}>Age</span>
-                <span className="mono" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
-                  {safeRelativeTime(item.occurred_at)}
-                </span>
-              </div>
-              <div className="grid grid-cols-[100px_1fr] gap-1">
-                <span style={{ color: 'var(--text-muted)' }}>Ingested</span>
-                <span className="mono" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
-                  {safeTimeAgo(item.ingested_at)}
-                </span>
-              </div>
-              <div className="grid grid-cols-[100px_1fr] gap-1 items-center">
-                <span style={{ color: 'var(--text-muted)' }}>Freshness</span>
-                <FreshnessBadge freshness={freshness} />
-              </div>
+              <div className="grid grid-cols-[100px_1fr] gap-1"><span style={{ color: 'var(--text-muted)' }}>Published</span><span className="mono" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{safeAbsoluteTime(item.occurred_at)}</span></div>
+              <div className="grid grid-cols-[100px_1fr] gap-1"><span style={{ color: 'var(--text-muted)' }}>Relative</span><span className="mono" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{safeRelativeTime(item.occurred_at)}</span></div>
+              <div className="grid grid-cols-[100px_1fr] gap-1 items-center"><span style={{ color: 'var(--text-muted)' }}>Freshness</span><FreshnessBadge freshness={freshness} /></div>
             </div>
           </div>
 
@@ -594,10 +572,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
                   {related.map(r => (
                     <div key={r.id} className="flex items-start gap-2 text-xs p-2 rounded-lg"
                       style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border)' }}>
-                      <span className="shrink-0 text-[10px] mono px-1.5 py-0.5 rounded"
-                        style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
-                        {r.source.replace(/_/g, ' ').toUpperCase()}
-                      </span>
+                      <span className="shrink-0 text-[10px] mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>{sanitizeSourceDisplay(r.source)}</span>
                       <span className="flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{r.title}</span>
                       <span className="shrink-0 mono" style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
                         {safeTimeAgo(r.occurred_at)}
@@ -610,6 +585,8 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
           )}
 
           {/* Footer metadata — navigation hints only, no raw IDs */}
+          </>}
+
           {items.length > 1 && (
             <div className="text-[10px] mono pt-3 border-t"
               style={{ borderColor: 'var(--border)', color: 'var(--text-disabled)', fontFamily: 'JetBrains Mono, monospace' }}>

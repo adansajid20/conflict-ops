@@ -236,3 +236,19 @@ export function getEventCategory(eventType: string | null | undefined): string {
   if (!eventType) return 'Intel'
   return EVENT_TYPE_TO_CATEGORY[eventType] ?? 'Intel'
 }
+
+export function isHumanitarianBureaucracy(event: { title: string; description?: string | null }): boolean {
+  const bureaucraticPatterns = [
+    /situation report no\.\s*\d+/i,
+    /flash update no\.\s*\d+/i,
+    /humanitarian bulletin/i,
+    /emergency appeal/i,
+    /operational update/i,
+    /information bulletin no\.\s*\d+/i,
+    /inter-agency/i,
+    /ocha reports/i,
+    /\bunhcr\b.*\breport\b/i,
+  ]
+  const text = `${event.title} ${event.description ?? ''}`
+  return bureaucraticPatterns.some((p) => p.test(text))
+}

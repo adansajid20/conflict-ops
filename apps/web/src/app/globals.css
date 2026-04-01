@@ -355,3 +355,9 @@ body {
 .row-hover:hover {
   background-color: var(--bg-hover);
 }
+
+@media print {
+  aside, .no-print { display: none !important; }
+  .print-surface { border: none !important; box-shadow: none !important; background: #fff !important; color: #000 !important; }
+  body { background: #fff !important; }
+}

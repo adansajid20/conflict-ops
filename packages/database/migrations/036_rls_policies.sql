@@ -32,7 +32,7 @@ CREATE POLICY "deny_anon_audit_log" ON audit_log FOR ALL TO anon USING (false);
 CREATE POLICY "deny_anon_geo_verifications" ON geo_verifications FOR ALL TO anon USING (false);
 
 -- Public read-only for non-sensitive tables (vessel/flight tracks are OK for authenticated users)
-ALTER TABLE vessel_tracks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE maritime_tracks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE flight_tracks ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "deny_anon_vessel_tracks" ON vessel_tracks FOR ALL TO anon USING (false);
+CREATE POLICY "deny_anon_maritime_tracks" ON maritime_tracks FOR ALL TO anon USING (false);
 CREATE POLICY "deny_anon_flight_tracks" ON flight_tracks FOR ALL TO anon USING (false);

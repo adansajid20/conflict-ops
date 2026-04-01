@@ -2,37 +2,43 @@ import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCachedSnapshot, setCachedSnapshot, TTL } from '@/lib/cache/redis'
-import type { ApiResponse, Forecast } from '@conflict-ops/shared'
 
-export async function GET(req: Request): Promise<NextResponse<ApiResponse<Forecast[]>>> {
+type ForecastApiData = {
+  forecasts: unknown[]
+  signals: unknown[]
+  countryRiskScores: unknown[]
+}
+
+export async function GET(req: Request): Promise<NextResponse<{ success: boolean; data?: ForecastApiData; error?: string }>> {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const url = new URL(req.url)
   const countryCode = url.searchParams.get('country')
   const horizon = url.searchParams.get('horizon') ?? '30'
-
-  const cacheKey = `forecasts:${countryCode ?? 'all'}:${horizon}`
-  const cached = await getCachedSnapshot<Forecast[]>(cacheKey)
-  if (cached) {
-    return NextResponse.json({ success: true, data: cached, meta: { cached: true } })
-  }
+  const cacheKey = `forecasts:${countryCode ?? 'all'}:${horizon}:intel`
+  const cached = await getCachedSnapshot<ForecastApiData>(cacheKey)
+  if (cached) return NextResponse.json({ success: true, data: cached })
 
   const supabase = createServiceClient()
-  let query = supabase
-    .from('forecasts')
-    .select('*')
-    .eq('horizon_days', parseInt(horizon))
-    .order('score', { ascending: false, nullsFirst: false })
-    .limit(50)
+  let forecastQuery = supabase.from('forecasts').select('*').eq('horizon_days', Number.parseInt(horizon, 10)).order('score', { ascending: false, nullsFirst: false }).limit(50)
+  if (countryCode) forecastQuery = forecastQuery.eq('country_code', countryCode)
 
-  if (countryCode) query = query.eq('country_code', countryCode)
+  const [forecastsResult, signalsResult, countryRiskResult] = await Promise.all([
+    forecastQuery,
+    supabase.from('forecast_signals').select('*').gte('valid_until', new Date().toISOString()).order('created_at', { ascending: false }).limit(50),
+    supabase.from('country_risk_scores').select('*').order('risk_score', { ascending: false }).limit(100),
+  ])
 
-  const { data, error } = await query
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  if (forecastsResult.error) return NextResponse.json({ success: false, error: forecastsResult.error.message }, { status: 500 })
+  if (signalsResult.error) return NextResponse.json({ success: false, error: signalsResult.error.message }, { status: 500 })
+  if (countryRiskResult.error) return NextResponse.json({ success: false, error: countryRiskResult.error.message }, { status: 500 })
 
-  const forecasts = (data ?? []) as unknown as Forecast[]
-  await setCachedSnapshot(cacheKey, forecasts, TTL.FORECAST)
-
-  return NextResponse.json({ success: true, data: forecasts })
+  const payload: ForecastApiData = {
+    forecasts: forecastsResult.data ?? [],
+    signals: signalsResult.data ?? [],
+    countryRiskScores: countryRiskResult.data ?? [],
+  }
+  await setCachedSnapshot(cacheKey, payload, TTL.FORECAST)
+  return NextResponse.json({ success: true, data: payload })
 }

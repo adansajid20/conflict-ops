@@ -1,5 +1,7 @@
 export const dynamic = 'force-dynamic'
+
 import { EventFeed } from '@/components/feed/EventFeed'
+import { DisinfoShield } from '@/components/intel/DisinfoShield'
 
 export default function FeedPage() {
   return (
@@ -15,8 +17,14 @@ export default function FeedPage() {
           AUTO-REFRESHES EVERY 60S
         </div>
       </div>
-      <div className="flex-1 overflow-hidden">
-        <EventFeed />
+      <div className="flex-1 overflow-hidden grid lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="overflow-hidden">
+          <EventFeed />
+        </div>
+        <div className="border-l p-4 overflow-y-auto" style={{ borderColor: 'var(--border)' }}>
+          <div className="text-xs uppercase tracking-[0.16em] mb-3" style={{ color: 'var(--text-muted)' }}>Disinfo</div>
+          <DisinfoShield />
+        </div>
       </div>
     </div>
   )

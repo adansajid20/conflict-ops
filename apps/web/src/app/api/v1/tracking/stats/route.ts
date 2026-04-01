@@ -16,10 +16,10 @@ export async function GET() {
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
   const [vessels, flights, thermal, dark, emergency] = await Promise.allSettled([
-    supabase.from('vessel_tracks').select('mmsi', { count: 'exact', head: true }).gte('last_seen', sixHoursAgo),
+    supabase.from('maritime_tracks').select('mmsi', { count: 'exact', head: true }).gte('last_seen', sixHoursAgo),
     supabase.from('flight_tracks').select('icao24', { count: 'exact', head: true }).gte('last_seen', sixHoursAgo),
     supabase.from('events').select('id', { count: 'exact', head: true }).in('event_type', ['thermal_anomaly', 'thermal_anomaly_high']).gte('occurred_at', oneDayAgo),
-    supabase.from('vessel_tracks').select('mmsi', { count: 'exact', head: true }).lt('last_seen', sixHoursAgo),
+    supabase.from('maritime_tracks').select('mmsi', { count: 'exact', head: true }).lt('last_seen', sixHoursAgo),
     supabase.from('flight_tracks').select('icao24', { count: 'exact', head: true }).in('squawk', ['7700','7600','7500']).gte('last_seen', sixHoursAgo),
   ])
 

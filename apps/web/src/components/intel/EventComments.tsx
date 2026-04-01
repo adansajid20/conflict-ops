@@ -1,0 +1,98 @@
+'use client'
+
+import { useEffect, useMemo, useState } from 'react'
+
+type CommentRecord = {
+  id: string
+  event_id: string
+  body: string
+  mentions: string[]
+  created_at: string
+  user?: { id: string; email: string | null; name: string | null } | null
+}
+
+type MemberRecord = {
+  id: string
+  email: string | null
+  name: string | null
+}
+
+export function EventComments({ eventId }: { eventId: string }) {
+  const [comments, setComments] = useState<CommentRecord[]>([])
+  const [members, setMembers] = useState<MemberRecord[]>([])
+  const [body, setBody] = useState('')
+
+  const suggestions = useMemo(() => {
+    const match = body.match(/@([a-zA-Z0-9._-]*)$/)
+    const needle = (match?.[1] ?? '').toLowerCase()
+    if (!needle) return []
+    return members.filter((member) => {
+      const email = ((member.email ?? '').split('@')[0] ?? '').toLowerCase()
+      const name = (member.name ?? '').toLowerCase().replace(/\s+/g, '')
+      return email.includes(needle) || name.includes(needle)
+    }).slice(0, 5)
+  }, [body, members])
+
+  const load = async () => {
+    const [commentsRes, orgRes] = await Promise.all([
+      fetch(`/api/v1/events/comments?event_id=${encodeURIComponent(eventId)}`, { cache: 'no-store' }),
+      fetch('/api/v1/enterprise/org', { cache: 'no-store' }),
+    ])
+    const commentsJson = await commentsRes.json() as { data?: CommentRecord[] }
+    const orgJson = await orgRes.json() as { data?: { members?: MemberRecord[] } }
+    setComments(commentsJson.data ?? [])
+    setMembers(orgJson.data?.members ?? [])
+  }
+
+  useEffect(() => { void load() }, [eventId])
+
+  const submit = async () => {
+    if (!body.trim()) return
+    await fetch('/api/v1/events/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event_id: eventId, body: body.trim() }),
+    })
+    setBody('')
+    void load()
+  }
+
+  const applyMention = (value: string) => {
+    setBody((current) => current.replace(/@([a-zA-Z0-9._-]*)$/, `@${value} `))
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={3} placeholder="Add comment… Use @username to mention teammates."
+          className="w-full rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)', resize: 'vertical' }} />
+        {suggestions.length > 0 && (
+          <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+            {suggestions.map((member) => {
+              const handle = (member.email ?? 'user').split('@')[0] ?? 'user'
+              return (
+                <button key={member.id} onClick={() => applyMention(handle)} className="block w-full px-3 py-2 text-left text-xs hover:bg-white/5" style={{ color: 'var(--text-primary)' }}>
+                  @{handle} <span style={{ color: 'var(--text-muted)' }}>· {member.name ?? member.email}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+      <div className="flex justify-end">
+        <button onClick={() => void submit()} className="rounded px-4 py-2 text-xs mono font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>POST COMMENT</button>
+      </div>
+      <div className="space-y-2">
+        {comments.map((comment) => (
+          <div key={comment.id} className="rounded border p-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <div className="text-xs mono" style={{ color: 'var(--primary)' }}>{comment.user?.name ?? comment.user?.email ?? 'Operator'}</div>
+              <div className="text-[10px] mono" style={{ color: 'var(--text-muted)' }}>{new Date(comment.created_at).toLocaleString()}</div>
+            </div>
+            <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{comment.body}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}

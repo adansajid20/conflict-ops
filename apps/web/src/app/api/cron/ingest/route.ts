@@ -12,13 +12,24 @@ export async function GET(req: Request) {
   const validSecret = process.env['INTERNAL_SECRET'] ?? ''
 
   if (!token || token !== validSecret) {
-    return new Response('Unauthorized', { status: 401 })
+    return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 
   // Write heartbeat to Redis — Redis only, never touch event ingested_at (corrupts timestamps)
   const heartbeatTs = new Date().toISOString()
   try {
-    const { setCachedSnapshot } = await import('@/lib/cache/redis')
+    const { getCachedSnapshot, setCachedSnapshot } = await import('@/lib/cache/redis')
+    const lastRetentionRun = await getCachedSnapshot<{ ts: string }>('retention:last_run_at')
+    const lastRunTs = lastRetentionRun?.ts ? new Date(lastRetentionRun.ts).getTime() : 0
+    const shouldRunRetention = !lastRunTs || (Date.now() - lastRunTs) > (23 * 60 * 60 * 1000)
+    if (shouldRunRetention) {
+      const { createServiceClient } = await import('@/lib/supabase/server')
+      const { enforceRetention } = await import('@/lib/compliance/retention')
+      const supabase = createServiceClient()
+      const { data: orgs } = await supabase.from('orgs').select('id')
+      await Promise.all((orgs ?? []).map(async (org) => enforceRetention(org.id)))
+      await setCachedSnapshot('retention:last_run_at', { ts: heartbeatTs }, 24 * 3600)
+    }
     await setCachedSnapshot('ingest:last_run_at', { ts: heartbeatTs }, 3600)
   } catch { /* best effort */ }
 
@@ -32,15 +43,34 @@ export async function GET(req: Request) {
     }
   }
 
-  await runSource('newsapi', async () => { const { ingestNewsAPI } = await import('@/lib/ingest/newsapi'); return ingestNewsAPI() })
-  await runSource('gdelt', async () => { const { ingestGDELT } = await import('@/lib/ingest/gdelt'); return ingestGDELT() })
-  await runSource('reliefweb', async () => { const { ingestReliefWeb } = await import('@/lib/ingest/reliefweb'); return ingestReliefWeb() })
-  await runSource('gdacs', async () => { const { ingestGDACS } = await import('@/lib/ingest/gdacs'); return ingestGDACS() })
-  await runSource('unhcr', async () => { const { ingestUNHCR } = await import('@/lib/ingest/unhcr'); return ingestUNHCR() })
-  await runSource('nasa-eonet', async () => { const { ingestNASAEONET } = await import('@/lib/ingest/nasa-eonet'); return ingestNASAEONET() })
   await runSource('news_rss', async () => { const { ingestNewsRSS } = await import('@/lib/ingest/news-rss'); return ingestNewsRSS() })
+  await runSource('gdelt', async () => { const { ingestGDELT } = await import('@/lib/ingest/gdelt'); return ingestGDELT() })
+  await runSource('acled', async () => { const { ingestACLED } = await import('@/lib/ingest/acled'); return ingestACLED() })
+  await runSource('reliefweb', async () => { const { ingestReliefWeb } = await import('@/lib/ingest/reliefweb'); return ingestReliefWeb() })
+  await runSource('unhcr', async () => { const { ingestUNHCR } = await import('@/lib/ingest/unhcr'); return ingestUNHCR() })
   await runSource('usgs', async () => { const { ingestUSGS } = await import('@/lib/ingest/usgs'); return ingestUSGS() })
+  await runSource('nasa-eonet', async () => { const { ingestNASAEONET } = await import('@/lib/ingest/nasa-eonet'); return ingestNASAEONET() })
+  await runSource('gdacs', async () => { const { ingestGDACS } = await import('@/lib/ingest/gdacs'); return ingestGDACS() })
   await runSource('noaa', async () => { const { ingestNOAA } = await import('@/lib/ingest/noaa'); return ingestNOAA() })
+  await runSource('cloudflare-radar', async () => { const { ingestCloudflareRadar } = await import('@/lib/ingest/tracking/cloudflare-radar'); return ingestCloudflareRadar() })
+
+  let newsApiSkipped = false
+  try {
+    const { getCachedSnapshot, setCachedSnapshot } = await import('@/lib/cache/redis')
+    const lastNewsApiRun = await getCachedSnapshot<{ ts: string }>('newsapi:last_run')
+    const lastRunMs = lastNewsApiRun?.ts ? new Date(lastNewsApiRun.ts).getTime() : 0
+    const shouldRunNewsApi = !lastRunMs || (Date.now() - lastRunMs) > (6 * 60 * 60 * 1000)
+
+    if (shouldRunNewsApi) {
+      await runSource('newsapi', async () => { const { ingestNewsAPI } = await import('@/lib/ingest/newsapi'); return ingestNewsAPI() })
+      await setCachedSnapshot('newsapi:last_run', { ts: new Date().toISOString() }, 6 * 60 * 60)
+    } else {
+      newsApiSkipped = true
+      results['newsapi'] = { skipped: true, reason: '6h guard active' }
+    }
+  } catch {
+    await runSource('newsapi', async () => { const { ingestNewsAPI } = await import('@/lib/ingest/newsapi'); return ingestNewsAPI() })
+  }
 
   // Final heartbeat with completed timestamp
   try {
@@ -56,5 +86,5 @@ export async function GET(req: Request) {
     }
   }
 
-  return Response.json({ ok: true, totalInserted, results })
+  return Response.json({ success: true, data: { totalInserted, results, newsApiSkipped } })
 }

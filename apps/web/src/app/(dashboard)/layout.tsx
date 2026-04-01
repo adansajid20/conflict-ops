@@ -27,6 +27,8 @@ import {
 } from 'lucide-react'
 import { CommandPalette } from '@/components/layout/CommandPalette'
 import { FreshnessBanner } from '@/components/layout/FreshnessBanner'
+import { NotificationBell } from '@/components/layout/NotificationBell'
+import { IntelCopilot } from '@/components/copilot/IntelCopilot'
 import { useHealthStatus } from '@/hooks/useHealthStatus'
 import { safeTimeAgo } from '@/types/intel-item'
 
@@ -56,17 +58,21 @@ const ADMIN_NAV: NavItem[] = [
 
 // Secondary nav — coming soon or deprioritized
 const SECONDARY_NAV: NavItem[] = [
-  { href: '/missions', label: 'Missions', section: 'secondary', icon: Target, comingSoon: true },
-  { href: '/workbench', label: 'Workbench', section: 'secondary', icon: FlaskConical, comingSoon: true },
-  { href: '/markets', label: 'Markets', section: 'secondary', icon: TrendingUp, comingSoon: true },
-  { href: '/geoverify', label: 'Geoverify', section: 'secondary', icon: ScanSearch, comingSoon: true },
-  { href: '/travel', label: 'Travel Risk', section: 'secondary', icon: Plane, comingSoon: true },
+  { href: '/missions', label: 'Missions', section: 'secondary', icon: Target },
+  { href: '/reports', label: 'Reports', section: 'secondary', icon: Globe },
+  { href: '/workbench', label: 'Workbench', section: 'secondary', icon: FlaskConical },
+  { href: '/workbench/evidence', label: 'Evidence Vault', section: 'secondary', icon: FlaskConical },
+  { href: '/markets', label: 'Markets', section: 'secondary', icon: TrendingUp },
+  { href: '/geoverify', label: 'Geoverify', section: 'secondary', icon: ScanSearch },
+  { href: '/travel', label: 'Travel Risk', section: 'secondary', icon: Plane },
   { href: '/map', label: 'Globe View', section: 'secondary', icon: Globe },
 ]
 
 // Settings always at bottom
 const SETTINGS_NAV: NavItem[] = [
   { href: '/settings/org', label: 'Workspace', section: 'settings', icon: Building2 },
+  { href: '/settings/integrations', label: 'Integrations', section: 'settings', icon: Bell },
+  { href: '/settings/privacy', label: 'Privacy', section: 'settings', icon: Shield },
   { href: '/settings/api', label: 'API Keys', section: 'settings', icon: KeyRound },
   { href: '/settings/webhooks', label: 'Webhooks', section: 'settings', icon: Webhook },
   { href: '/settings/billing', label: 'Billing', section: 'settings', icon: CreditCard },
@@ -156,6 +162,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { health } = useHealthStatus(60_000)
   const [unreadAlerts, setUnreadAlerts] = useState(0)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [branding, setBranding] = useState<{ logo_url?: string; primary_color?: string; accent_color?: string; app_name?: string } | null>(null)
 
   // Admin mode: ?admin=1 OR env var
   const isAdminMode = useMemo(() => {
@@ -172,6 +179,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .then(res => res.json())
       .then((json: { data?: unknown[] }) => setUnreadAlerts(json.data?.length ?? 0))
       .catch(() => setUnreadAlerts(0))
+    fetch('/api/v1/enterprise/branding', { cache: 'no-store' })
+      .then(res => res.json())
+      .then((json: { data?: { logo_url?: string; primary_color?: string; accent_color?: string; app_name?: string } }) => setBranding(json.data ?? null))
+      .catch(() => setBranding(null))
   }, [pathname])
 
   // Auto-open "More" if current path is in secondary nav
@@ -191,7 +202,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const liveFeeds = health?.sources?.live ?? health?.enabledSources?.filter(s => s.ok).length ?? 0
 
   return (
-    <div className="flex h-screen flex-col" style={{ background: 'var(--bg-base)' }}>
+    <div className="flex h-screen flex-col" style={{ background: 'var(--bg-base)', ['--primary' as string]: branding?.primary_color ?? 'var(--primary)', ['--accent' as string]: branding?.accent_color ?? 'var(--accent)' } as React.CSSProperties}>
       <CommandPalette />
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-[240px] shrink-0 flex-col border-r" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
@@ -202,7 +213,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {(() => { const ShieldIcon = Shield as React.ElementType; return <ShieldIcon className="h-4 w-4" style={{ color: 'var(--primary-text)' }} /> })()}
               </div>
               <div>
-                <div className="text-sm font-semibold tracking-[0.04em]" style={{ color: 'var(--text-primary)' }}>CONFLICT OPS</div>
+                <div className="text-sm font-semibold tracking-[0.04em]" style={{ color: 'var(--text-primary)' }}>{branding?.app_name ?? 'CONFLICT OPS'}</div>
                 <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Intelligence Platform</div>
               </div>
             </Link>
@@ -294,9 +305,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className="flex min-w-0 flex-1 flex-col">
           <FreshnessBanner />
+          <div className="flex justify-end border-b px-4 py-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}><NotificationBell /></div>
           <main className="min-h-0 flex-1 overflow-auto">{children}</main>
         </div>
       </div>
+      <IntelCopilot />
       <StatusBar />
     </div>
   )

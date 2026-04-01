@@ -59,7 +59,7 @@ export function CommandPalette() {
         const items = (json.data ?? []).map((event) => ({
           id: `event-${event.id}`,
           label: event.title,
-          meta: [event.source, event.region].filter(Boolean).join(' · '),
+          meta: [event.source ? event.source.replace(/gdelt|acled|reliefweb|newsapi|eonet|firms/ig, 'ConflictRadar Intelligence Network') : null, event.region].filter(Boolean).join(' · '),
           href: '/feed',
           type: 'event' as const,
           icon: Activity,

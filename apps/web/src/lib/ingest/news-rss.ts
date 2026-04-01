@@ -1,182 +1,66 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { titleFingerprint } from './dedup'
 import { cleanDescription, detectEventType } from './utils'
+import { isHumanitarianBureaucracy } from '@/lib/classification'
 
-const NEWS_SOURCES = [
-  // === TIER A — Wire services & UN (highest reliability) ===
-  { name: 'Reuters World',            url: 'https://feeds.reuters.com/reuters/worldNews',                                                                    tier: 'A',  region: null },
-  { name: 'Reuters Conflicts',        url: 'https://feeds.reuters.com/reuters/topNews',                                                                      tier: 'A',  region: null },
-  { name: 'AFP (via Google News)',     url: 'https://news.google.com/rss/search?q=AFP+conflict+OR+war+OR+attack&hl=en-US&gl=US&ceid=US:en',                  tier: 'A',  region: null },
-  { name: 'Radio Free Europe',        url: 'https://www.rferl.org/api/zv-pvtqpnpi',                                                                         tier: 'A',  region: 'Eastern Europe' },
-  { name: 'AP News',                  url: 'https://apnews.com/hub/world-news?format=rss',                                                                   tier: 'A',  region: null },
-  { name: 'AP Breaking News',         url: 'https://apnews.com/hub/ap-top-news?format=rss',                                                                  tier: 'A',  region: null },
-  { name: 'WHO News',                 url: 'https://www.who.int/rss-feeds/news-english.xml',                                                                 tier: 'A',  region: null },
-  { name: 'UN News',                  url: 'https://news.un.org/feed/subscribe/en/news/all/rss.xml',                                                         tier: 'A',  region: null },
-  { name: 'UN Peace & Security',      url: 'https://news.un.org/feed/subscribe/en/news/topic/peace-and-security/rss.xml',                                    tier: 'A',  region: null },
-  { name: 'UN Humanitarian',          url: 'https://news.un.org/feed/subscribe/en/news/topic/humanitarian-affairs/rss.xml',                                  tier: 'A',  region: null },
-  { name: 'Bellingcat',               url: 'https://www.bellingcat.com/feed/',                                                                               tier: 'A',  region: null },
-  { name: 'Crisis Group',             url: 'https://www.crisisgroup.org/rss-0',                                                                              tier: 'A',  region: null },
+type FeedTier = 'A' | 'B+' | 'B' | 'C'
 
-  // === TIER A — Major international broadcasters ===
-  { name: 'BBC World',                url: 'https://feeds.bbci.co.uk/news/world/rss.xml',                                                                    tier: 'A',  region: null },
-  { name: 'BBC Africa',               url: 'https://www.bbc.co.uk/news/world/africa/rss.xml',                                                                tier: 'A',  region: 'Africa' },
-  { name: 'BBC Asia',                 url: 'https://www.bbc.co.uk/news/world/asia/rss.xml',                                                                  tier: 'A',  region: 'Asia' },
-  { name: 'BBC Europe',               url: 'https://www.bbc.co.uk/news/world/europe/rss.xml',                                                                tier: 'A',  region: 'Europe' },
-  { name: 'BBC Middle East',          url: 'https://www.bbc.co.uk/news/world/middle_east/rss.xml',                                                           tier: 'A',  region: 'Middle East' },
-  { name: 'BBC Latin America',        url: 'https://www.bbc.co.uk/news/world/latin_america/rss.xml',                                                         tier: 'A',  region: 'Latin America' },
-  { name: 'Al Jazeera',              url: 'https://www.aljazeera.com/xml/rss/all.xml',                                                                      tier: 'A',  region: null },
-  { name: 'France 24',                url: 'https://www.france24.com/en/rss',                                                                                tier: 'A',  region: null },
-  { name: 'NPR World',                url: 'https://feeds.npr.org/1004/rss.xml',                                                                             tier: 'A',  region: null },
+interface NewsSource {
+  name: string
+  url: string
+  tier: FeedTier
+  region: string | null
+  official?: boolean
+}
 
-  // === TIER B+ — Quality international news ===
-  { name: 'Deutsche Welle',           url: 'https://rss.dw.com/rdf/rss-en-top',                                                                              tier: 'B+', region: null },
-  { name: 'DW Africa',                url: 'https://rss.dw.com/rdf/rss-en-africa',                                                                           tier: 'B+', region: 'Africa' },
-  { name: 'DW Middle East',           url: 'https://rss.dw.com/rdf/rss-en-middle-east',                                                                      tier: 'B+', region: 'Middle East' },
-  { name: 'The Guardian World',       url: 'https://www.theguardian.com/world/rss',                                                                          tier: 'B+', region: null },
-  { name: 'Sky News World',           url: 'https://feeds.skynews.com/feeds/rss/world.xml',                                                                  tier: 'B+', region: null },
-  { name: 'Financial Times World',    url: 'https://www.ft.com/world?format=rss',                                                                            tier: 'B+', region: null },
-  { name: 'New York Times World',     url: 'https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/world/rss.xml',              tier: 'B+', region: null },
-  { name: 'Le Monde International',   url: 'https://www.lemonde.fr/international/rss_full.xml',                                                              tier: 'B+', region: null },
-
-  // === TIER B — Analysis & specialist ===
-  { name: 'Foreign Policy',           url: 'https://foreignpolicy.com/feed/',                                                                                tier: 'B',  region: null },
-  { name: 'The Diplomat',             url: 'https://thediplomat.com/feed/',                                                                                  tier: 'B',  region: 'Asia' },
-  { name: 'Geopolitical Futures',     url: 'https://www.geopoliticalfutures.com/feed/',                                                                      tier: 'B',  region: null },
-  { name: 'Global Voices',            url: 'https://globalvoices.org/feed/',                                                                                 tier: 'B',  region: null },
-
-  // === Defense & Security ===
-  { name: 'Defense World',            url: 'https://www.defenseworld.net/news/rss',                                                                          tier: 'B',  region: null },
-  { name: 'Breaking Defense',         url: 'https://breakingdefense.com/feed/',                                                                              tier: 'B',  region: null },
-
-  // === Middle East / MENA ===
-  { name: 'Middle East Eye',          url: 'https://www.middleeasteye.net/rss',                                                                              tier: 'B+', region: 'Middle East' },
-  { name: 'Al-Monitor',               url: 'https://www.al-monitor.com/rss.xml',                                                                             tier: 'B+', region: 'Middle East' },
-  { name: 'Anadolu Agency',           url: 'https://www.aa.com.tr/en/rss/default?cat=world',                                                                 tier: 'B',  region: null },
-  { name: 'Naharnet (Lebanon)',        url: 'https://www.naharnet.com/rss',                                                                                   tier: 'B',  region: 'Middle East' },
-
-  // === South Asia ===
-  { name: 'Dawn (Pakistan)',           url: 'https://www.dawn.com/feeds/home',                                                                                tier: 'B+', region: 'South Asia' },
-  { name: 'The Print (India)',         url: 'https://theprint.in/feed/',                                                                                      tier: 'B',  region: 'South Asia' },
-  { name: 'The Hindu',                 url: 'https://www.thehindu.com/news/international/feeder/default.rss',                                                 tier: 'B',  region: 'South Asia' },
-  { name: 'Times of India',           url: 'https://timesofindia.indiatimes.com/rssfeedstopstories.cms',                                                      tier: 'B',  region: 'South Asia' },
-
-  // === East Asia / Pacific ===
-  { name: 'South China Morning Post', url: 'https://www.scmp.com/rss/91/feed',                                                                               tier: 'B+', region: 'East Asia' },
-  { name: 'ABC Australia',            url: 'https://www.abc.net.au/news/feed/51120/rss.xml',                                                                 tier: 'B',  region: 'Asia Pacific' },
-  { name: 'Sydney Morning Herald',    url: 'https://www.smh.com.au/rss/world.xml',                                                                           tier: 'B',  region: 'Asia Pacific' },
-
-  // === Eastern Europe ===
-  { name: 'Kyiv Post',                url: 'https://kyivpost.com/feed',                                                                                      tier: 'B+', region: 'Eastern Europe' },
-
-  // === Energy / Resources (for conflict angle) ===
-  { name: 'OilPrice.com',             url: 'https://oilprice.com/rss/main',                                                                                  tier: 'B',  region: null },
-
-  // === Additional BBC Regional ===
-  { name: 'BBC Americas',              url: 'https://www.bbc.co.uk/news/world/us_and_canada/rss.xml',          tier: 'A',  region: 'North America' },
-
-  // === DW Additional Regional ===
-  { name: 'DW Asia',                   url: 'https://rss.dw.com/rdf/rss-en-asia',                               tier: 'B+', region: 'Asia' },
-  { name: 'DW Europe',                 url: 'https://rss.dw.com/rdf/rss-en-europe',                             tier: 'B+', region: 'Europe' },
-  { name: 'DW Americas',               url: 'https://rss.dw.com/rdf/rss-en-americas',                           tier: 'B+', region: 'Latin America' },
-
-  // === France 24 Regional ===
-  { name: 'France 24 Africa',          url: 'https://www.france24.com/en/africa/rss',                           tier: 'A',  region: 'Africa' },
-  { name: 'France 24 Middle East',     url: 'https://www.france24.com/en/middle-east/rss',                      tier: 'A',  region: 'Middle East' },
-  { name: 'France 24 Asia-Pacific',    url: 'https://www.france24.com/en/asia-pacific/rss',                     tier: 'A',  region: 'Asia' },
-  { name: 'France 24 Europe',          url: 'https://www.france24.com/en/europe/rss',                           tier: 'A',  region: 'Europe' },
-  { name: 'France 24 Americas',        url: 'https://www.france24.com/en/americas/rss',                         tier: 'A',  region: 'Latin America' },
-
-  // === Official / Institutional ===
-  { name: 'US State Dept',             url: 'https://www.state.gov/feed/',                                      tier: 'A',  region: null },
-  { name: 'State Dept Press',          url: 'https://www.state.gov/press-releases/feed/',                       tier: 'A',  region: null },
-  { name: 'OCHA',                      url: 'https://www.unocha.org/rss.xml',                                   tier: 'A',  region: null },
-  { name: 'IAEA',                      url: 'https://www.iaea.org/feeds/news',                                  tier: 'A',  region: null },
-  { name: 'Amnesty International',     url: 'https://www.amnesty.org/en/feed/',                                 tier: 'A',  region: null },
-  { name: 'PassBlue (UN)',             url: 'https://www.passblue.com/feed/',                                   tier: 'B+', region: null },
-
-  // === MENA Regional ===
-  { name: 'Asharq Al-Awsat',           url: 'https://english.aawsat.com/feed',                                  tier: 'B+', region: 'Middle East' },
-  { name: 'Jerusalem Post',            url: 'https://www.jpost.com/rss/rssfeedsfrontpage.aspx',                 tier: 'B+', region: 'Middle East' },
-  { name: 'Times of Israel',           url: 'https://www.timesofisrael.com/feed/',                              tier: 'B+', region: 'Middle East' },
-  { name: 'Al Bawaba',                 url: 'https://www.albawaba.com/rss.xml',                                 tier: 'B',  region: 'Middle East' },
-  { name: 'Kurdistan 24',              url: 'https://www.kurdistan24.net/en/rss.xml',                           tier: 'B',  region: 'Middle East' },
-
-  // === Africa ===
-  { name: 'Dabanga Sudan',             url: 'https://www.dabangasudan.org/en/feed',                             tier: 'B+', region: 'Africa' },
-  { name: 'Africanews',                url: 'https://www.africanews.com/feed',                                  tier: 'B',  region: 'Africa' },
-
-  // === Asia-Pacific ===
-  { name: 'Channel NewsAsia',          url: 'https://www.channelnewsasia.com/rssfeeds/8395986',                 tier: 'B+', region: 'Asia' },
-
-  // === Defense & Military ===
-  { name: 'The Defense Post',          url: 'https://www.thedefensepost.com/feed/',                             tier: 'B',  region: null },
-  { name: 'Military Times',            url: 'https://www.militarytimes.com/arc/outboundfeeds/rss/',             tier: 'B',  region: null },
-  { name: 'War on the Rocks',          url: 'https://warontherocks.com/feed/',                                  tier: 'B+', region: null },
-
-  // === Think Tanks / Policy Analysis ===
-  { name: 'Carnegie Endowment',        url: 'https://carnegieendowment.org/rss/solr/articles',                  tier: 'B+', region: null },
-  { name: 'Brookings Institution',     url: 'https://www.brookings.edu/feed/',                                  tier: 'B+', region: null },
-  { name: 'Euronews',                  url: 'https://www.euronews.com/rss?level=theme&name=news',               tier: 'B+', region: 'Europe' },
-  { name: 'Politico Europe',           url: 'https://www.politico.eu/rss',                                      tier: 'B+', region: 'Europe' },
-  { name: 'The Independent',           url: 'https://www.independent.co.uk/news/world/rss',                    tier: 'B+', region: null },
-
-  // === State Media (tagged for transparency — included for perspective diversity) ===
-  // These are state-controlled outlets; included to capture events those govts want publicized.
-  // Confidence scores naturally lower (single source) when only state media reports.
-  { name: 'Xinhua (China)',            url: 'https://www.xinhuanet.com/english/rss/worldrss.xml',              tier: 'C',  region: null },
-  { name: 'RT (Russia)',               url: 'https://www.rt.com/rss/news/',                                     tier: 'C',  region: null },
-  { name: 'PressTV (Iran)',            url: 'https://www.presstv.ir/RSS',                                       tier: 'C',  region: null },
-  { name: 'Global Times (China)',      url: 'https://www.globaltimes.cn/rss/outbrain.xml',                      tier: 'C',  region: null },
+const NEWS_SOURCES: readonly NewsSource[] = [
+  { name: 'Reuters Top News', url: 'https://feeds.reuters.com/reuters/topNews', tier: 'A', region: null },
+  { name: 'Reuters World', url: 'https://feeds.reuters.com/reuters/worldNews', tier: 'A', region: null },
+  { name: 'AP International', url: 'https://apnews.com/apf-intlnews.rss', tier: 'A', region: null },
+  { name: 'AP Middle East', url: 'https://apnews.com/apf-middleeast.rss', tier: 'A', region: 'Middle East' },
+  { name: 'AP Europe', url: 'https://apnews.com/apf-europe.rss', tier: 'A', region: 'Europe' },
+  { name: 'AP Africa', url: 'https://apnews.com/apf-africa.rss', tier: 'A', region: 'Africa' },
+  { name: 'AP Asia Pacific', url: 'https://apnews.com/apf-asiapacific.rss', tier: 'A', region: 'Asia Pacific' },
+  { name: 'Deutsche Welle', url: 'https://www.dw.com/en/rss/umb-news/s-9097/rdf', tier: 'A', region: null },
+  { name: 'France 24', url: 'https://www.france24.com/en/rss', tier: 'A', region: null },
+  { name: 'The New Arab', url: 'https://english.alaraby.co.uk/rss.xml', tier: 'B+', region: 'Middle East' },
+  { name: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml', tier: 'A', region: null },
+  { name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml', tier: 'A', region: null },
+  { name: 'Radio Free Europe', url: 'https://www.rferl.org/api/zbqnrtn_rzvy/news/1', tier: 'A', region: 'Eastern Europe' },
+  { name: 'Voice of America', url: 'https://www.voanews.com/api/epiqq$vrgbfp/news/1', tier: 'A', region: null },
+  { name: 'ReliefWeb OCHA', url: 'https://reliefweb.int/updates/rss.xml?source=UN+OCHA', tier: 'A', region: null, official: true },
+  { name: 'ICRC', url: 'https://www.icrc.org/en/rss/news', tier: 'A', region: null, official: true },
+  { name: 'UNHCR', url: 'https://www.unhcr.org/rss/news', tier: 'A', region: null, official: true },
+  { name: 'UN Press', url: 'https://press.un.org/en/rss.xml', tier: 'A', region: null, official: true },
+  { name: 'IISS Analysis', url: 'https://www.iiss.org/publications/analysis/rss', tier: 'B+', region: null },
+  { name: 'Foreign Policy', url: 'https://foreignpolicy.com/feed/', tier: 'B', region: null },
 ] as const
 
-// Keyword → severity scoring
 const CRITICAL_KEYWORDS = ['killed', 'airstrike', 'bombing', 'missile', 'explosion', 'massacre', 'mass casualty', 'war declaration', 'invasion', 'offensive', 'siege', 'genocide', 'chemical weapon']
-const HIGH_KEYWORDS     = ['attack', 'troops', 'military', 'armed', 'casualties', 'wounded', 'occupied', 'conflict', 'fighting', 'combat', 'gunfire', 'clashes']
-const MEDIUM_KEYWORDS   = ['protest', 'tension', 'sanctions', 'displaced', 'humanitarian', 'refugee', 'crisis', 'coup', 'arrested', 'detained', 'border', 'blockade', 'ceasefire', 'negotiations']
+const HIGH_KEYWORDS = ['attack', 'troops', 'military', 'armed', 'casualties', 'wounded', 'occupied', 'conflict', 'fighting', 'combat', 'gunfire', 'clashes']
+const MEDIUM_KEYWORDS = ['protest', 'tension', 'sanctions', 'displaced', 'humanitarian', 'refugee', 'crisis', 'coup', 'arrested', 'detained', 'border', 'blockade', 'ceasefire', 'negotiations']
 
 function scoreSeverity(text: string): 1 | 2 | 3 | 4 {
   const lower = text.toLowerCase()
-  if (CRITICAL_KEYWORDS.some(k => lower.includes(k))) return 4
-  if (HIGH_KEYWORDS.some(k => lower.includes(k))) return 3
-  if (MEDIUM_KEYWORDS.some(k => lower.includes(k))) return 2
+  if (CRITICAL_KEYWORDS.some((keyword) => lower.includes(keyword))) return 4
+  if (HIGH_KEYWORDS.some((keyword) => lower.includes(keyword))) return 3
+  if (MEDIUM_KEYWORDS.some((keyword) => lower.includes(keyword))) return 2
   return 1
 }
 
-// Country/region keyword detection
-const COUNTRY_HINTS: Array<{ keywords: string[]; country: string; code: string; region: string }> = [
-  { keywords: ['ukraine', 'ukrainian', 'kyiv', 'zelenskyy', 'donbas', 'kharkiv', 'odesa'],                          country: 'Ukraine',       code: 'UA', region: 'Eastern Europe' },
-  { keywords: ['russia', 'russian', 'moscow', 'kremlin', 'putin'],                                                    country: 'Russia',        code: 'RU', region: 'Eastern Europe' },
-  { keywords: ['israel', 'israeli', 'gaza', 'hamas', 'tel aviv', 'west bank', 'netanyahu', 'idf'],                   country: 'Israel',        code: 'IL', region: 'Middle East' },
-  { keywords: ['iran', 'iranian', 'tehran', 'irgc', 'khamenei'],                                                      country: 'Iran',          code: 'IR', region: 'Middle East' },
-  { keywords: ['syria', 'syrian', 'damascus', 'aleppo'],                                                              country: 'Syria',         code: 'SY', region: 'Middle East' },
-  { keywords: ['iraq', 'iraqi', 'baghdad', 'mosul'],                                                                  country: 'Iraq',          code: 'IQ', region: 'Middle East' },
-  { keywords: ['yemen', 'yemeni', 'houthi', 'sanaa'],                                                                 country: 'Yemen',         code: 'YE', region: 'Middle East' },
-  { keywords: ['saudi arabia', 'saudi', 'riyadh'],                                                                    country: 'Saudi Arabia',  code: 'SA', region: 'Middle East' },
-  { keywords: ['sudan', 'sudanese', 'khartoum', 'darfur', 'rsf'],                                                    country: 'Sudan',         code: 'SD', region: 'Africa' },
-  { keywords: ['ethiopia', 'ethiopian', 'addis ababa', 'tigray', 'amhara'],                                          country: 'Ethiopia',      code: 'ET', region: 'Africa' },
-  { keywords: ['somalia', 'somali', 'mogadishu', 'al-shabaab'],                                                      country: 'Somalia',       code: 'SO', region: 'Africa' },
-  { keywords: ['nigeria', 'nigerian', 'abuja', 'lagos', 'boko haram'],                                               country: 'Nigeria',       code: 'NG', region: 'Africa' },
-  { keywords: ['sahel', 'mali', 'malian', 'burkina faso', 'niger', 'niamey'],                                        country: 'Mali',          code: 'ML', region: 'Africa' },
-  { keywords: ['congo', 'drc', 'kinshasa', 'eastern congo', 'm23'],                                                  country: 'DR Congo',      code: 'CD', region: 'Africa' },
-  { keywords: ['myanmar', 'burma', 'burmese', 'yangon', 'naypyidaw', 'junta'],                                      country: 'Myanmar',       code: 'MM', region: 'Southeast Asia' },
-  { keywords: ['china', 'chinese', 'beijing', 'xi jinping', 'taiwan strait'],                                        country: 'China',         code: 'CN', region: 'East Asia' },
-  { keywords: ['taiwan', 'taiwanese', 'taipei'],                                                                      country: 'Taiwan',        code: 'TW', region: 'East Asia' },
-  { keywords: ['north korea', 'dprk', 'pyongyang', 'kim jong'],                                                      country: 'North Korea',   code: 'KP', region: 'East Asia' },
-  { keywords: ['pakistan', 'pakistani', 'islamabad', 'lahore', 'ttp'],                                              country: 'Pakistan',      code: 'PK', region: 'South Asia' },
-  { keywords: ['afghanistan', 'afghan', 'kabul', 'taliban'],                                                          country: 'Afghanistan',   code: 'AF', region: 'South Asia' },
-  { keywords: ['india', 'indian', 'new delhi', 'kashmir', 'modi'],                                                  country: 'India',         code: 'IN', region: 'South Asia' },
-  { keywords: ['venezuela', 'venezuelan', 'caracas', 'maduro'],                                                      country: 'Venezuela',     code: 'VE', region: 'Latin America' },
-  { keywords: ['haiti', 'haitian', 'port-au-prince', 'gang'],                                                        country: 'Haiti',         code: 'HT', region: 'Latin America' },
-  { keywords: ['colombia', 'colombian', 'bogota', 'farc', 'eln'],                                                    country: 'Colombia',      code: 'CO', region: 'Latin America' },
-  { keywords: ['lebanon', 'lebanese', 'beirut', 'hezbollah'],                                                        country: 'Lebanon',       code: 'LB', region: 'Middle East' },
-  { keywords: ['turkey', 'turkish', 'ankara', 'erdogan', 'pkk'],                                                    country: 'Turkey',        code: 'TR', region: 'Middle East' },
-  { keywords: ['libya', 'libyan', 'tripoli', 'benghazi'],                                                            country: 'Libya',         code: 'LY', region: 'Middle East' },
+const COUNTRY_HINTS: Array<{ keywords: string[]; code: string; region: string }> = [
+  { keywords: ['ukraine', 'ukrainian', 'kyiv', 'zelenskyy', 'donbas', 'kharkiv', 'odesa'], code: 'UA', region: 'Eastern Europe' },
+  { keywords: ['russia', 'russian', 'moscow', 'kremlin', 'putin'], code: 'RU', region: 'Eastern Europe' },
+  { keywords: ['israel', 'israeli', 'gaza', 'hamas', 'tel aviv', 'west bank', 'netanyahu', 'idf'], code: 'IL', region: 'Middle East' },
+  { keywords: ['iran', 'iranian', 'tehran', 'irgc', 'khamenei'], code: 'IR', region: 'Middle East' },
+  { keywords: ['sudan', 'sudanese', 'khartoum', 'darfur', 'rsf'], code: 'SD', region: 'Africa' },
+  { keywords: ['myanmar', 'burma', 'burmese', 'yangon', 'naypyidaw', 'junta'], code: 'MM', region: 'Southeast Asia' },
 ]
 
 function detectLocation(text: string): { country_code: string | null; region: string | null } {
   const lower = text.toLowerCase()
   for (const hint of COUNTRY_HINTS) {
-    if (hint.keywords.some(k => lower.includes(k))) {
+    if (hint.keywords.some((keyword) => lower.includes(keyword))) {
       return { country_code: hint.code, region: hint.region }
     }
   }
@@ -199,210 +83,152 @@ interface RssItem {
   title: string
   link: string
   pubDate: string | null
+  isoDate: string | null
   description: string
   sourceName: string
 }
 
 function parseRSS(xml: string, sourceName: string): RssItem[] {
   const items: RssItem[] = []
-  const itemBlocks = [...xml.matchAll(/<item[^>]*>([\s\S]*?)<\/item>/gi)].map(m => m[1] ?? '')
+  const itemBlocks = [...xml.matchAll(/<(item|entry)[^>]*>([\s\S]*?)<\/\1>/gi)].map((match) => match[2] ?? '')
 
   for (const block of itemBlocks) {
-    // title — handle CDATA and plain
-    const titleMatch =
-      block.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) ??
-      block.match(/<title>([\s\S]*?)<\/title>/)
-    const title = titleMatch ? stripTags(titleMatch[1]!) : ''
+    const titleMatch = block.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/i) ?? block.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+    const title = titleMatch ? stripTags(titleMatch[1] ?? '') : ''
     if (!title) continue
 
-    // link
-    const linkMatch =
-      block.match(/<link>([\s\S]*?)<\/link>/) ??
-      block.match(/<link[^>]+href="([^"]+)"/)
-    const link = linkMatch ? linkMatch[1]!.trim() : ''
-    if (!link || link.startsWith('<') || link.length < 10) continue
+    const linkMatch = block.match(/<link>([\s\S]*?)<\/link>/i) ?? block.match(/<link[^>]+href="([^"]+)"/i) ?? block.match(/<id>(https?:[^<]+)<\/id>/i)
+    const link = (linkMatch?.[1] ?? '').trim()
+    if (!link || link.length < 10 || link.startsWith('<')) continue
 
-    // pubDate
-    const pubMatch =
-      block.match(/<pubDate>([\s\S]*?)<\/pubDate>/) ??
-      block.match(/<dc:date>([\s\S]*?)<\/dc:date>/) ??
-      block.match(/<published>([\s\S]*?)<\/published>/)
-    const pubDate = pubMatch ? pubMatch[1]!.trim() : null
+    const pubDate = (block.match(/<pubDate>([\s\S]*?)<\/pubDate>/i)?.[1] ?? block.match(/<published>([\s\S]*?)<\/published>/i)?.[1] ?? block.match(/<dc:date>([\s\S]*?)<\/dc:date>/i)?.[1] ?? '').trim() || null
+    const isoDate = (block.match(/<isoDate>([\s\S]*?)<\/isoDate>/i)?.[1] ?? block.match(/<updated>([\s\S]*?)<\/updated>/i)?.[1] ?? '').trim() || null
 
-    // description — prefer content:encoded (full article) over description (short snippet)
-    const fullContentMatch =
-      block.match(/<content:encoded><!\[CDATA\[([\s\S]*?)\]\]><\/content:encoded>/) ??
-      block.match(/<content:encoded>([\s\S]*?)<\/content:encoded>/) ??
-      block.match(/<media:description><!\[CDATA\[([\s\S]*?)\]\]><\/media:description>/)
-    const shortDescMatch =
-      block.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) ??
-      block.match(/<description>([\s\S]*?)<\/description>/)
-    const rawDescText = fullContentMatch
-      ? stripTags(fullContentMatch[1]!).slice(0, 2000)   // full article up to 2000 chars
-      : shortDescMatch
-        ? stripTags(shortDescMatch[1]!).slice(0, 800)
-        : ''
-    const description = rawDescText
+    const fullContentMatch = block.match(/<content:encoded><!\[CDATA\[([\s\S]*?)\]\]><\/content:encoded>/i) ?? block.match(/<content:encoded>([\s\S]*?)<\/content:encoded>/i) ?? block.match(/<summary[^>]*>([\s\S]*?)<\/summary>/i)
+    const shortDescMatch = block.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/i) ?? block.match(/<description>([\s\S]*?)<\/description>/i)
+    const rawDesc = fullContentMatch ? stripTags(fullContentMatch[1] ?? '').slice(0, 2000) : shortDescMatch ? stripTags(shortDescMatch[1] ?? '').slice(0, 800) : ''
 
-    items.push({ title, link, pubDate, description, sourceName })
+    items.push({ title, link, pubDate, isoDate, description: rawDesc, sourceName })
   }
 
   return items
 }
 
-// Allowlist of event_types that are conflict/security relevant
-const RELEVANT_EVENT_TYPES = new Set([
-  'airstrike', 'armed_conflict', 'terrorism', 'political_crisis',
-  'civil_unrest', 'displacement', 'humanitarian', 'wmd_threat',
-  'natural_disaster', 'economic',
-])
-
-// Conflict-relevant keyword gate — drops pure entertainment/tech/lifestyle news
-const RELEVANCE_KEYWORDS = [
-  'war', 'conflict', 'attack', 'kill', 'dead', 'wound', 'bomb', 'missile',
-  'strike', 'soldier', 'troop', 'military', 'army', 'navy', 'air force',
-  'refugee', 'displaced', 'evacuation', 'humanitarian', 'aid', 'famine',
-  'coup', 'protest', 'riot', 'uprising', 'rebel', 'militia', 'terrorist',
-  'sanction', 'embargo', 'ceasefire', 'peace', 'treaty', 'diplomacy',
-  'earthquake', 'flood', 'cyclone', 'hurricane', 'wildfire', 'disaster',
-  'nuclear', 'chemical', 'weapon', 'ammunition', 'artillery', 'drone',
-  'border', 'blockade', 'siege', 'hostage', 'captured', 'prisoner',
-  'genocide', 'massacre', 'ethnic', 'occupation', 'annexation',
-  'nato', 'un ', 'united nations', 'security council', 'iaea',
-  'iran', 'russia', 'ukraine', 'gaza', 'israel', 'hamas', 'hezbollah',
-  'sudan', 'myanmar', 'somalia', 'yemen', 'syria', 'iraq', 'afghanistan',
-  'north korea', 'taiwan strait', 'south china sea',
-]
-
-// Block economics/energy articles that aren't conflict-related
+const RELEVANT_EVENT_TYPES = new Set(['airstrike', 'armed_conflict', 'terrorism', 'political_crisis', 'civil_unrest', 'displacement', 'humanitarian', 'wmd_threat', 'natural_disaster', 'economic'])
+const RELEVANCE_KEYWORDS = ['war', 'conflict', 'attack', 'kill', 'dead', 'wound', 'bomb', 'missile', 'strike', 'soldier', 'troop', 'military', 'army', 'navy', 'air force', 'refugee', 'displaced', 'evacuation', 'humanitarian', 'aid', 'famine', 'coup', 'protest', 'riot', 'uprising', 'rebel', 'militia', 'terrorist', 'sanction', 'embargo', 'ceasefire', 'peace', 'treaty', 'diplomacy', 'earthquake', 'flood', 'cyclone', 'hurricane', 'wildfire', 'disaster', 'nuclear', 'chemical', 'weapon', 'ammunition', 'artillery', 'drone', 'border', 'blockade', 'siege', 'hostage', 'captured', 'prisoner', 'genocide', 'massacre', 'ethnic', 'occupation', 'annexation', 'nato', 'un ', 'united nations', 'security council', 'iaea', 'iran', 'russia', 'ukraine', 'gaza', 'israel', 'hamas', 'hezbollah', 'sudan', 'myanmar', 'somalia', 'yemen', 'syria', 'iraq', 'afghanistan', 'north korea', 'taiwan strait', 'south china sea']
 const ECON_BLOCK_PATTERNS = /\b(energy\s+crunch|energy\s+prices?|energy\s+market|power\s+grid\s+shortage|utility\s+rates?|electricity\s+prices?|oil\s+prices?|gas\s+prices?|stock\s+market|inflation\s+rate|recession|gdp\s+growth|trade\s+deficit|central\s+bank\s+rate|interest\s+rates?|weathering\s+europe|energy\s+transition)\b/i
-
-// Conflict keywords that would save an otherwise-blocked econ article (e.g. "oil fields attacked")
 const CONFLICT_OVERRIDE = /\b(attack|strike|airstrike|missile|bomb|kill|dead|wound|troops|military|war|conflict|rebel|coup|terror|threat|weapon|sanction|invad)\b/i
 
 function isConflictRelevant(title: string, description: string, eventType: string): boolean {
-  // Always keep explicitly typed events (scored above 'news')
   if (RELEVANT_EVENT_TYPES.has(eventType)) return true
-  // For generic 'news' type, require at least one conflict keyword
   const combined = `${title} ${description}`.toLowerCase()
-
-  // Block economics/energy articles unless they have clear conflict context
-  if (ECON_BLOCK_PATTERNS.test(combined) && !CONFLICT_OVERRIDE.test(combined)) {
-    return false
-  }
-
-  return RELEVANCE_KEYWORDS.some(kw => combined.includes(kw))
+  if (ECON_BLOCK_PATTERNS.test(combined) && !CONFLICT_OVERRIDE.test(combined)) return false
+  return RELEVANCE_KEYWORDS.some((keyword) => combined.includes(keyword))
 }
 
-// detectEventType imported from ./utils — more precise classification
+function parsePublishedAt(item: RssItem): Date | null {
+  const raw = item.pubDate ?? item.isoDate
+  if (!raw) return null
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed
+}
 
 export async function ingestNewsRSS(): Promise<{
   stored: number
   skipped: number
+  skipped_stale: number
   errors: number
   sources_ok: number
 }> {
   const supabase = createServiceClient()
-  let stored = 0, skipped = 0, errors = 0, sources_ok = 0
+  let stored = 0
+  let skipped = 0
+  let skipped_stale = 0
+  let errors = 0
+  let sources_ok = 0
   const toUpsert: Array<Record<string, unknown>> = []
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000)
+  const recentFingerprintSet = new Set<string>()
 
-  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000) // 48h lookback window
-
-  // NOTE: In-memory title fingerprint removed — it was causing false positives.
-  // normalizeTitle() replaces numbers with NUM + sorts words alphabetically, so
-  // "5 killed in Gaza" and "12 killed in Gaza" get identical fingerprints and
-  // the second article was being silently dropped. DB-level dedup (source,source_id)
-  // handles true duplicates reliably. Cross-source duplicate detection via fingerprint
-  // was blocking legitimate new events.
-  const recentFingerprintSet = new Set<string>() // kept as empty — no pre-seeding
-
-  // Fetch all feeds in parallel with timeout
   const fetchResults = await Promise.allSettled(
     NEWS_SOURCES.map(async (src) => {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 12000)
       try {
-        const res = await fetch(src.url, {
+        const response = await fetch(src.url, {
           headers: {
             'User-Agent': 'ConflictOps/1.0 (conflictradar.co; RSS reader)',
-            'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+            Accept: 'application/rss+xml, application/xml, text/xml, */*',
           },
           signal: controller.signal,
         })
         clearTimeout(timeout)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const xml = await res.text()
-        return { src, xml }
-      } catch (e) {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return { src, xml: await response.text() }
+      } finally {
         clearTimeout(timeout)
-        throw e
       }
-    })
+    }),
   )
 
-  // Process each feed result
   for (const result of fetchResults) {
-    if (result.status === 'rejected') { errors++; continue }
+    if (result.status === 'rejected') {
+      errors++
+      continue
+    }
 
     const { src, xml } = result.value
     sources_ok++
     const items = parseRSS(xml, src.name)
 
     for (const item of items) {
-      // Parse date
-      let occurredAt: string
-      if (item.pubDate) {
-        const d = new Date(item.pubDate)
-        if (isNaN(d.getTime()) || d < cutoff) continue
-        occurredAt = d.toISOString()
-      } else {
-        occurredAt = new Date().toISOString()
+      const publishedAt = parsePublishedAt(item)
+      if (publishedAt && publishedAt < cutoff) continue
+
+      if (!src.official && publishedAt) {
+        const ageHours = (Date.now() - publishedAt.getTime()) / (60 * 60 * 1000)
+        if (ageHours > 6) {
+          skipped_stale++
+          continue
+        }
       }
 
-      if (new Date(occurredAt) < cutoff) continue
-
-      // Cross-source dedup: skip if a similar title was already ingested in the last 24h
-      const fp = titleFingerprint(item.title)
-      if (recentFingerprintSet.has(fp)) {
+      const occurredAt = publishedAt?.toISOString() ?? new Date().toISOString()
+      const fingerprint = titleFingerprint(item.title)
+      if (recentFingerprintSet.has(fingerprint)) {
         skipped++
         continue
       }
-      // Add to set so we don't ingest duplicates within this run either
-      recentFingerprintSet.add(fp)
+      recentFingerprintSet.add(fingerprint)
 
       const fullText = `${item.title} ${item.description}`
-
-      // Conflict relevance gate — drop PS5 pricing, iPhone hacking, etc.
-      const evType = detectEventType(fullText)
-      if (!isConflictRelevant(item.title, item.description, evType)) {
+      const eventType = detectEventType(fullText)
+      if (!isConflictRelevant(item.title, item.description, eventType)) {
         skipped++
         continue
       }
 
-      // Cap severity at 2 for unverified news — CRITICAL/HIGH only from GDACS, UNHCR, ACLED etc.
       const severity = Math.min(scoreSeverity(fullText), 2) as 1 | 2
-      // Don't guess country_code from article text — too error-prone (Spain article → UA)
-      // Region is OK (less specific); country is set only by authoritative ingest sources
-      const loc = detectLocation(fullText)
-      const region = loc.region ?? src.region ?? null
-
-      // Deterministic source_id from URL
-      const cleanUrl = item.link.split('?')[0]!.split('#')[0]!
-      const source_id = `news_rss:${src.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}:${Buffer.from(cleanUrl).toString('base64').slice(0, 32)}`
-
+      const location = detectLocation(fullText)
+      const region = location.region ?? src.region ?? null
+      const cleanUrl = item.link.split('?')[0]?.split('#')[0] ?? item.link
+      const sourceId = `news_rss:${src.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}:${Buffer.from(cleanUrl).toString('base64').slice(0, 32)}`
       const snippet = cleanDescription(item.description, item.title)
 
+      const isHumanitarianReport = isHumanitarianBureaucracy({ title: item.title, description: snippet })
       toUpsert.push({
         source: 'news_rss',
-        source_id,
-        event_type: evType,
+        source_id: sourceId,
+        event_type: eventType,
         title: item.title.slice(0, 500),
         description: snippet,
         region,
-        country_code: null,  // Don't guess — wrong geo (e.g. Spain article tagged UA) is worse than null
+        country_code: null,
         severity,
         status: 'developing',
         occurred_at: occurredAt,
+        is_humanitarian_report: isHumanitarianReport,
         heavy_lane_processed: false,
         provenance_raw: {
           source: src.name,
@@ -410,31 +236,31 @@ export async function ingestNewsRSS(): Promise<{
           url: item.link,
           tier: src.tier,
           state_media: src.tier === 'C',
+          official: Boolean(src.official),
         } as Record<string, unknown>,
         raw: {
           title: item.title,
           link: item.link,
           pubDate: item.pubDate,
+          isoDate: item.isoDate,
           sourceName: src.name,
         } as Record<string, unknown>,
       })
     }
   }
 
-  // Batch-upsert collected items in parallel chunks of 20
-  const BATCH_SIZE = 20
-  for (let i = 0; i < toUpsert.length; i += BATCH_SIZE) {
-    const batch = toUpsert.slice(i, i + BATCH_SIZE)
+  const batchSize = 20
+  for (let index = 0; index < toUpsert.length; index += batchSize) {
+    const batch = toUpsert.slice(index, index + batchSize)
     const batchResults = await Promise.allSettled(
-      batch.map(record =>
-        supabase.from('events').upsert(record, { onConflict: 'source,source_id', ignoreDuplicates: true })
-      )
+      batch.map((record) => supabase.from('events').upsert(record, { onConflict: 'source,source_id', ignoreDuplicates: true })),
     )
-    for (const r of batchResults) {
-      if (r.status === 'fulfilled' && !r.value.error) stored++
+
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled' && !result.value.error) stored++
       else skipped++
     }
   }
 
-  return { stored, skipped, errors, sources_ok }
+  return { stored, skipped, skipped_stale, errors, sources_ok }
 }

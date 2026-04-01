@@ -399,7 +399,7 @@ Layout: map on left (60%), data panels on right (40%)
 
 **If no live data (sources not ingesting):** show last known data with a "stale" banner, and a "Refresh" button that calls /api/v1/admin/run-ingest with tracking sources only.
 
-API routes — check and fix /api/v1/tracking/vessels and /api/v1/tracking/flights to return real DB data from vessel_tracks and flight_tracks tables. If tables are empty, return demo data (5 fake vessels near conflict zones) so the UI is never empty.
+API routes — check and fix /api/v1/tracking/vessels and /api/v1/tracking/flights to return real DB data from maritime_tracks and flight_tracks tables. If tables are empty, return demo data (5 fake vessels near conflict zones) so the UI is never empty.
 
 ---
 

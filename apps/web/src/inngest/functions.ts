@@ -9,13 +9,24 @@ import { computeEscalationLevel } from '@/lib/alerts/escalation'
 import { ingestAISVessels, detectDarkVessels } from '@/lib/ingest/tracking/ais'
 import { ingestFIRMS } from '@/lib/ingest/tracking/firms'
 import { ingestADSB } from '@/lib/ingest/tracking/adsb'
+import { ingestCloudflareRadar } from '@/lib/ingest/tracking/cloudflare-radar'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email/client'
+import { runDoctorChecks } from '@/lib/doctor/checks'
+import { runSelfHeal } from '@/lib/doctor/self-heal'
+import { Redis } from '@upstash/redis'
 
 // High-conflict countries for escalation monitoring (was in acled.ts)
 const HIGH_CONFLICT_COUNTRIES = [
   'UA','RU','SY','YE','SD','SS','ET','LY','IQ','AF','MM','CD','SO','ML','BF','NE','CF','MZ','NG','CM','PS','IL','LB','IR','PK',
 ]
+
+function getDoctorRedis(): Redis | null {
+  const url = process.env['UPSTASH_REDIS_REST_URL']
+  const token = process.env['UPSTASH_REDIS_REST_TOKEN']
+  if (!url || !token) return null
+  return new Redis({ url, token })
+}
 
 // ============================================
 // FAST LANE — every 15 minutes
@@ -133,19 +144,20 @@ export const forecastRecompute = inngest.createFunction(
 
 // ============================================
 // TRACKING LAYER — every 30 minutes
-// AIS vessels + ADS-B flights + FIRMS thermal
+// AIS vessels + ADS-B flights + FIRMS thermal + internet outages
 // No LLM cost — rule-based signals only
 // ============================================
 
 export const trackingIngest = inngest.createFunction(
-  { id: 'tracking-ingest', name: 'Tracking Layer: AIS + ADS-B + FIRMS', concurrency: { limit: 1 }, retries: 0 },
+  { id: 'tracking-ingest', name: 'Tracking Layer: AIS + ADS-B + FIRMS + Radar', concurrency: { limit: 1 }, retries: 0 },
   { cron: '*/30 * * * *' },
   async ({ step }) => {
-    const [aisResult, adsbResult, firmsResult, darkResult] = await Promise.allSettled([
+    const [aisResult, adsbResult, firmsResult, darkResult, radarResult] = await Promise.allSettled([
       step.run('ingest-ais', () => ingestAISVessels()),
       step.run('ingest-adsb', () => ingestADSB()),
       step.run('ingest-firms', () => ingestFIRMS(1)),
       step.run('detect-dark-vessels', () => detectDarkVessels()),
+      step.run('ingest-cloudflare-radar', () => ingestCloudflareRadar()),
     ])
 
     return {
@@ -153,6 +165,7 @@ export const trackingIngest = inngest.createFunction(
       adsb: adsbResult.status === 'fulfilled' ? adsbResult.value : { error: String((adsbResult as PromiseRejectedResult).reason) },
       firms: firmsResult.status === 'fulfilled' ? firmsResult.value : { error: String((firmsResult as PromiseRejectedResult).reason) },
       dark_vessels: darkResult.status === 'fulfilled' ? darkResult.value : 0,
+      radar: radarResult.status === 'fulfilled' ? radarResult.value : { error: String((radarResult as PromiseRejectedResult).reason) },
       timestamp: new Date().toISOString(),
     }
   }
@@ -262,6 +275,42 @@ async function computeCountryForecast(countryCode: string): Promise<void> {
     { onConflict: 'region,forecast_type,horizon_days' }
   )
 }
+
+// ============================================
+// DOCTOR HEALTH CHECK — every 2 minutes
+// ============================================
+
+export const doctorHealthCheck = inngest.createFunction(
+  { id: 'doctor-health-check', name: 'Doctor: Health Check + Self Heal', concurrency: { limit: 1 }, retries: 0 },
+  { cron: '*/2 * * * *' },
+  async () => {
+    const checks = await runDoctorChecks()
+    const actions = await runSelfHeal(checks)
+    const payload = {
+      checks,
+      actions,
+      last_updated: new Date().toISOString(),
+    }
+
+    const redis = getDoctorRedis()
+    if (redis) {
+      await redis.set('doctor:last_run', JSON.stringify(payload), { ex: 300 })
+    }
+
+    if (checks.some((check) => check.status === 'error')) {
+      await inngest.send({
+        name: 'doctor/alert',
+        data: {
+          checks,
+          actions,
+          last_updated: payload.last_updated,
+        },
+      })
+    }
+
+    return payload
+  },
+)
 
 // ============================================
 // WEEKLY BRIEF — every Monday 08:00 UTC

@@ -22,7 +22,7 @@ export async function GET(req: Request) {
 
   const supabase = createServiceClient()
   let query = supabase
-    .from('vessel_tracks')
+    .from('maritime_tracks')
     .select('mmsi,ship_name,ship_type,latitude,longitude,speed,flag,zone_name,last_seen')
     .order('last_seen', { ascending: false })
     .limit(limit)

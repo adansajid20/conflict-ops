@@ -1,22 +1,23 @@
 export const dynamic = 'force-dynamic'
 
 import { MarketsPanel } from '@/components/markets/MarketsPanel'
+import { EconomicWarfarePanel } from '@/components/markets/EconomicWarfarePanel'
+import { PredictionMarketsPanel } from '@/components/markets/PredictionMarketsPanel'
 
 export default function MarketsPage() {
   return (
     <div className="p-6 h-full">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold mono tracking-wide" style={{ color: 'var(--text-primary)' }}>
-            PREDICTION MARKETS
-          </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-            Real-money and crowd-sourced probability estimates for geopolitical events.
-            Calibrated forecasts from Metaculus and Polymarket.
-          </p>
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold mono tracking-wide" style={{ color: 'var(--text-primary)' }}>PREDICTION MARKETS</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Real-money and crowd-sourced probability estimates for geopolitical events, now with a dedicated predictions tab.</p>
         </div>
-        <div className="rounded border" style={{ borderColor: 'var(--border)', height: '70vh' }}>
-          <MarketsPanel />
+        <div className="grid gap-6">
+          <div><div className="mb-2 text-xs uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>Markets</div><div className="rounded border" style={{ borderColor: 'var(--border)', height: '50vh' }}><MarketsPanel /></div></div>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <div><div className="mb-2 text-xs uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>Predictions</div><PredictionMarketsPanel /></div>
+            <div><div className="mb-2 text-xs uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>Economic</div><EconomicWarfarePanel /></div>
+          </div>
         </div>
       </div>
     </div>

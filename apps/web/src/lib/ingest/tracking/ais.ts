@@ -119,7 +119,7 @@ export async function ingestAISVessels(): Promise<VesselIngestResult> {
   // Upsert vessel positions
   for (const vessel of vessels) {
     const sourceId = `${vessel.mmsi}`
-    const { error } = await supabase.from('vessel_tracks').upsert(
+    const { error } = await supabase.from('maritime_tracks').upsert(
       {
         mmsi: vessel.mmsi,
         source_id: sourceId,
@@ -182,7 +182,7 @@ export async function detectDarkVessels(): Promise<number> {
   const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
 
   const { data: recentVessels } = await supabase
-    .from('vessel_tracks')
+    .from('maritime_tracks')
     .select('mmsi, ship_name, zone_name, last_seen')
     .lt('last_seen', sixHoursAgo)
     .not('zone_name', 'is', null)

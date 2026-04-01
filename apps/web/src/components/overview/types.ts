@@ -12,6 +12,10 @@ export interface OverviewEvent {
   ingested_at: string | null
   location: string | null
   provenance_raw: { url?: string; attribution?: string; source?: string } | null
+  // Phase 2: extended fields (optional for backward-compat)
+  outlet_name?: string | null
+  location_confidence?: string | null
+  corroboration_count?: number | null
 }
 
 export interface HotRegion {
@@ -42,4 +46,6 @@ export interface OverviewData {
   notices: string[]
   hasOrg: boolean
   window: string
+  // Phase 2: pre-computed severity distribution from API (optional for compat)
+  severityCounts?: { critical: number; high: number; medium: number; low: number }
 }

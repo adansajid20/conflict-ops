@@ -81,7 +81,7 @@ export async function computeTravelRisk(countryCode: string): Promise<{
   risk_score: number
   key_threats: string[]
 } | null> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line 
   const { createServiceClient } = require('@/lib/supabase/server') as typeof import('@/lib/supabase/server')
   const supabase = createServiceClient()
 

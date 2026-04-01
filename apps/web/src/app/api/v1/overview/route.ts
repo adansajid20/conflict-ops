@@ -2,8 +2,9 @@ import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCachedSnapshot, setCachedSnapshot } from '@/lib/cache/redis'
+import { isSafeMode } from '@/lib/doctor/safe-mode-check'
 import { isBlocklisted } from '@/lib/classification'
-import { humanizeDriver, isGeopoliticalType, computeSeverityCounts } from '@/lib/event-presentation'
+import { humanizeDriver, isGeopoliticalType, computeSeverityCounts, sanitizeEventForClient } from '@/lib/event-presentation'
 
 export const dynamic = 'force-dynamic'
 
@@ -171,7 +172,38 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   const win = url.searchParams.get('window') ?? '24h'
   if (!WINDOW_MS[win]) return NextResponse.json({ error: 'Invalid window' }, { status: 400 })
 
-  const cacheKey = `overview:${win}`
+  const cacheKey = `cache:overview:${win}`
+
+  if (await isSafeMode()) {
+    const safeCached = await getCachedSnapshot<OverviewResponse>(cacheKey)
+    if (safeCached) {
+      return NextResponse.json(safeCached, { headers: { 'X-Safe-Mode': 'true' } })
+    }
+
+    return NextResponse.json({
+      lastUpdatedAt: null,
+      freshnessStatus: 'Offline',
+      freshnessDescription: 'Safe mode active',
+      freshnessColor: 'red',
+      coverageLevel: 'Low',
+      coverageTooltip: 'Safe mode is serving fallback data.',
+      kpis: {
+        eventsWindow: 0,
+        events7d: 0,
+        hotRegionCount: 0,
+        criticalHighCount: 0,
+        developingCount: 0,
+        activeAlertsCount: 0,
+      },
+      topStories: [],
+      hotRegions: [],
+      notices: ['Safe mode active. Showing fallback overview.'],
+      hasOrg: false,
+      window: win,
+      severityCounts: { critical: 0, high: 0, medium: 0, low: 0 },
+    }, { headers: { 'X-Safe-Mode': 'true' } })
+  }
+
   const cached = await getCachedSnapshot<OverviewResponse>(cacheKey)
   if (cached) {
     return NextResponse.json(cached)
@@ -195,8 +227,9 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     // All events in window (for hot regions + coverage)
     supabase
       .from('events')
-      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw')
+      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,published_at,created_at,ingested_at,location::text,provenance_raw,outlet_name,location_confidence,key_actors,source_url,corroboration_count,is_humanitarian_report,significance_score,summary_short')
       .gte('occurred_at', since)
+      .eq('is_humanitarian_report', false)
       .order('severity', { ascending: false })
       .order('occurred_at', { ascending: false })
       .limit(500),
@@ -221,11 +254,12 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .gte('occurred_at', since)
       .in('status', ['developing', 'pending']),
 
-    // Most recent ingested_at for freshness
+    // Most recent published_at for freshness
     supabase
       .from('events')
-      .select('ingested_at')
-      .order('ingested_at', { ascending: false })
+      .select('published_at,occurred_at,created_at')
+      .eq('is_humanitarian_report', false)
+      .order('published_at', { ascending: false, nullsFirst: false })
       .limit(1)
       .single(),
 
@@ -247,8 +281,9 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     // Exclude: noaa (weather), nasa_eonet (natural fires), usgs (earthquakes) — these go in weather bucket
     supabase
       .from('events')
-      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw')
+      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,published_at,created_at,ingested_at,location::text,provenance_raw,outlet_name,location_confidence,key_actors,source_url,corroboration_count,is_humanitarian_report,significance_score,summary_short')
       .gte('ingested_at', since)
+      .eq('is_humanitarian_report', false)
       .gte('occurred_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .not('source', 'in', '("noaa","nasa_eonet","nasa-eonet","usgs")')
       .not('title', 'ilike', '%forest fire notification%')
@@ -267,8 +302,9 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   // Only show severity >= 2 NOAA alerts and severity >= 3 EONET/USGS events
   const disasterRes = await supabase
     .from('events')
-    .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw')
+    .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,published_at,created_at,ingested_at,location::text,provenance_raw,outlet_name,location_confidence,key_actors,source_url,corroboration_count,is_humanitarian_report,significance_score,summary_short')
     .gte('occurred_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString())  // last 12h only
+    .eq('is_humanitarian_report', false)
     .in('source', ['noaa'])                        // NOAA only — usgs/eonet too noisy for top stories
     .gte('severity', 4)                            // CRITICAL weather events only (Red Flag Warning = 3, skip it)
     .not('title', 'ilike', '%green%')
@@ -319,10 +355,10 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     ...dedupedWeather.slice(0, weatherSlots),
   ]
 
-  const lastIngested = freshRes.data?.ingested_at as string | null
+  const lastIngested = ((freshRes.data?.published_at ?? freshRes.data?.occurred_at ?? freshRes.data?.created_at) as string | null) ?? null
   const freshness = computeFreshness(lastIngested)
 
-  const distinctSources = new Set(allEvents.map((e) => e.source).filter(Boolean)).size
+  const distinctSources = new Set(allEvents.map((e) => sanitizeEventForClient(e as unknown as Record<string, unknown>).outlet_name).filter(Boolean)).size
   const coverage = computeCoverage(distinctSources, allEvents.length)
 
   const hotRegions = computeHotRegions(allEvents)
@@ -349,7 +385,14 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       developingCount: developingRes.count ?? 0,
       activeAlertsCount: hasOrg ? (alertsRes.count ?? 0) : 0,
     },
-    topStories: stories,
+    topStories: stories.map((story) => ({
+      ...story,
+      ...sanitizeEventForClient(story as unknown as Record<string, unknown>),
+      source: sanitizeEventForClient(story as unknown as Record<string, unknown>).outlet_name,
+      ingested_at: sanitizeEventForClient(story as unknown as Record<string, unknown>).published_at,
+      occurred_at: sanitizeEventForClient(story as unknown as Record<string, unknown>).published_at,
+      provenance_raw: null,
+    })),
     hotRegions,
     notices,
     hasOrg,

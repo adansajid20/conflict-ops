@@ -2,13 +2,15 @@ import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
-import { isSafeMode, getCachedSnapshot, setCachedSnapshot, TTL } from '@/lib/cache/redis'
+import { isIPAllowed, extractRequestIp } from '@/lib/security/ip-check'
+import { getCachedSnapshot, setCachedSnapshot, TTL } from '@/lib/cache/redis'
+import { isSafeMode } from '@/lib/doctor/safe-mode-check'
 import { clusterEvents } from '@/lib/ingest/dedup'
 import { isBlocklisted } from '@/lib/classification'
-import { getBestDescription, getEffectiveType, isStaleReliefWebContent } from '@/lib/event-presentation'
+import { getBestDescription, getEffectiveType, isStaleReliefWebContent, sanitizeEventForClient } from '@/lib/event-presentation'
 import type { ApiResponse, ConflictEvent } from '@conflict-ops/shared'
 
-export async function GET(req: Request): Promise<NextResponse<ApiResponse<ConflictEvent[]>>> {
+export async function GET(req: Request): Promise<NextResponse> {
   const { userId } = await auth()
   if (!userId) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
@@ -19,8 +21,12 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
   const source = url.searchParams.get('source')
   const severity = url.searchParams.get('severity')
   const search = url.searchParams.get('search')
+  const language = url.searchParams.get('lang')
   const window = url.searchParams.get('window')
   const since = url.searchParams.get('since')
+  const rawMode = url.searchParams.get('raw') === 'true'
+  const includeHumanitarian = url.searchParams.get('include_humanitarian') === 'true'
+  const humanitarianOnly = url.searchParams.get('type') === 'humanitarian_only'
   const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '50'), 200)
   const offset = parseInt(url.searchParams.get('offset') ?? '0')
 
@@ -31,7 +37,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     sinceParam = new Date(Date.now() - ms).toISOString()
   }
 
-  const cacheKey = `events:${countryCode ?? 'all'}:${source ?? 'all'}:${severity ?? 'all'}:${search ?? ''}:${limit}:${offset}`
+  const cacheKey = `cache:events:${countryCode ?? 'all'}:${source ?? 'all'}:${severity ?? 'all'}:${search ?? ''}:${language ?? 'all'}:${rawMode ? 'raw' : 'intel'}:${limit}:${offset}`
 
   const safe = await isSafeMode()
   if (safe) {
@@ -41,8 +47,18 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
         success: true,
         data: cached,
         meta: { safe_mode: true, cached: true },
+      }, {
+        headers: { 'X-Safe-Mode': 'true' },
       })
     }
+
+    return NextResponse.json({
+      success: true,
+      data: [] as ConflictEvent[],
+      meta: { safe_mode: true, cached: false },
+    }, {
+      headers: { 'X-Safe-Mode': 'true' },
+    })
   }
 
   const supabase = createServiceClient()
@@ -53,9 +69,31 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     .eq('clerk_user_id', userId)
     .single()
 
+  if (user?.org_id) {
+    const requestIp = extractRequestIp(req)
+    const allowed = await isIPAllowed(user.org_id, requestIp)
+    if (!allowed) {
+      return NextResponse.json({ success: false, error: 'IP not allowed for this organization.' }, { status: 403 })
+    }
+
+    const [{ data: orgData }, limits] = await Promise.all([
+      supabase.from('orgs').select('overage_policy').eq('id', user.org_id).single(),
+      getOrgPlanLimits(user.org_id),
+    ])
+
+    const eventCap = limits.dataRetentionDays === -1 ? -1 : limits.dataRetentionDays * 100
+    if (orgData?.overage_policy === 'cap' && eventCap !== -1) {
+      const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString()
+      const { count } = await supabase.from('events').select('id', { count: 'exact', head: true }).gte('ingested_at', monthStart)
+      if ((count ?? 0) >= eventCap) {
+        return NextResponse.json({ success: false, error: 'Event limit reached. Upgrade or change overage policy.' }, { status: 429 })
+      }
+    }
+  }
+
   let query = supabase
     .from('events')
-    .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,provenance_raw,provenance_inferred,location::text')
+    .select('id,source,source_id,event_type,title,description,description_translated,description_lang,region,country_code,severity,status,occurred_at,published_at,created_at,ingested_at,provenance_raw,provenance_inferred,location::text,significance_score,intelligence_summary,summary_short,summary_full,content,entities,analyzed_at,escalation_indicator,cluster_id,outlet_name,location_confidence,key_actors,source_url,corroboration_count,is_humanitarian_report')
     .not('status', 'eq', 'clustered')
     .order('ingested_at', { ascending: false })
     .range(offset, offset + limit - 1)
@@ -75,6 +113,10 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
   if (severityInt) query = query.eq('severity', severityInt)
   if (source) query = query.eq('source', source)
   if (search) query = query.ilike('title', `%${search}%`)
+  if (language) query = query.eq('description_lang', language)
+  if (!rawMode) query = query.or('significance_score.gte.40,significance_score.is.null')
+  if (!includeHumanitarian && !humanitarianOnly) query = query.eq('is_humanitarian_report', false)
+  if (humanitarianOnly) query = query.eq('is_humanitarian_report', true)
   // Exclude weather/earthquake/fire sources from Intel Feed default "All" view —
   // they belong on the globe. Users can still filter by source explicitly.
   if (!source) {
@@ -205,7 +247,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     const src = String(raw.source ?? '')
     // For ReliefWeb/UNHCR: use shared stale content cleaner
     const isReliefSource = src === 'reliefweb' || src === 'unhcr'
-    const desc = (raw.description as string | null | undefined)?.trim() ?? ''
+    const desc = ((raw.description_translated as string | null | undefined) ?? (raw.description as string | null | undefined))?.trim() ?? ''
     const title = String(raw.title ?? '')
 
     let cleanDesc: string
@@ -222,6 +264,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
     return {
       ...raw,
       description: cleanDesc || title,
+      description_lang: (raw.description_lang as string | null | undefined) ?? null,
       snippet,
       // Expose effective_type for category alignment groundwork
       effective_type: getEffectiveType(raw.event_type as string | null),
@@ -252,13 +295,47 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Confli
   } & ConflictEvent>)
 
   // Map back to the expected response format, adding corroboration metadata
-  const events = clustered.map(({ canonical, corroborated_by, source_count, confidence }) => ({
-    ...(canonical as ConflictEvent),
-    _corroborated_by: corroborated_by,
-    _source_count: source_count,
-    _confidence: confidence,
-    _relevance_score: computeRelevanceScore(canonical as unknown as Record<string, unknown>),
-  }))
+  const events = clustered.map(({ canonical, corroborated_by, source_count, confidence }) => {
+    const base = canonical as unknown as Record<string, unknown>
+    if (rawMode) {
+      return {
+        ...base,
+        _corroborated_by: corroborated_by,
+        _source_count: source_count,
+        _confidence: confidence,
+        _relevance_score: computeRelevanceScore(base),
+      }
+    }
+    return {
+      ...sanitizeEventForClient({
+        ...base,
+        corroboration_count: typeof base.corroboration_count === 'number' ? base.corroboration_count : source_count,
+      }),
+      source: sanitizeEventForClient(base).outlet_name,
+      region: base.region ?? null,
+      country_code: base.country_code ?? null,
+      location: base.location ?? null,
+      event_type: base.event_type ?? null,
+      significance_score: undefined,
+      intelligence_summary: base.summary_short ?? base.intelligence_summary ?? null,
+      snippet: sanitizeEventForClient(base).description,
+      _corroborated_by: corroborated_by.map((entry) => sanitizeEventForClient({ source: entry, title: entry }).outlet_name),
+      _source_count: source_count,
+      _confidence: confidence,
+      ingested_at: typeof base.published_at === 'string' ? base.published_at : (typeof base.occurred_at === 'string' ? base.occurred_at : (typeof base.created_at === 'string' ? base.created_at : null)),
+      occurred_at: typeof base.published_at === 'string' ? base.published_at : (typeof base.occurred_at === 'string' ? base.occurred_at : (typeof base.created_at === 'string' ? base.created_at : null)),
+      description_lang: null,
+      provenance_raw: null,
+      entities: { actors: Array.isArray(base.key_actors) ? base.key_actors : [] },
+      location_confidence: sanitizeEventForClient(base).location_confidence_label,
+      outlet_name: sanitizeEventForClient(base).outlet_name,
+      source_url: sanitizeEventForClient(base).source_url,
+      summary_short: base.summary_short ?? null,
+      key_actors: Array.isArray(base.key_actors) ? base.key_actors : null,
+      corroboration_count: typeof base.corroboration_count === 'number' ? base.corroboration_count : source_count,
+      is_humanitarian_report: Boolean(base.is_humanitarian_report),
+    }
+  })
 
   await setCachedSnapshot(cacheKey, events, TTL.FEED)
 

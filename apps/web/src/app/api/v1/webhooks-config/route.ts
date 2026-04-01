@@ -16,6 +16,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
 import { z } from 'zod'
 import crypto from 'crypto'
+import { writeAuditLog } from '@/lib/audit/log'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,7 +99,8 @@ export async function POST(req: Request) {
     .select('id,url,event_types,active,description,created_at')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  await writeAuditLog(supabase, { orgId: user.org_id, userId: user.id, action: 'webhook.create', resourceType: 'webhook', resourceId: data.id, metadata: { url: data.url, event_types: data.event_types } })
 
   // Return signing secret ONCE — never shown again
   return NextResponse.json({
@@ -121,6 +123,7 @@ export async function DELETE(req: Request) {
 
   const supabase = createServiceClient()
   await supabase.from('webhooks').delete().eq('id', webhookId).eq('org_id', user.org_id)
+  await writeAuditLog(supabase, { orgId: user.org_id, userId: user.id, action: 'webhook.delete', resourceType: 'webhook', resourceId: webhookId, metadata: {} })
 
   return NextResponse.json({ success: true, data: null })
 }

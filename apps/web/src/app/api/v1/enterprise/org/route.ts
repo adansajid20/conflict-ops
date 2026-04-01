@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
 import { z } from 'zod'
+import { writeAuditLog } from '@/lib/audit/log'
 
 export const dynamic = 'force-dynamic'
 
@@ -78,6 +79,7 @@ export async function PATCH(req: Request) {
     if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 })
 
     await supabase.from('users').update({ role: parsed.data.role }).eq('id', parsed.data.user_id).eq('org_id', admin.org_id)
+    await writeAuditLog(supabase, { orgId: admin.org_id, userId: admin.id, action: 'member.role.update', resourceType: 'user', resourceId: parsed.data.user_id, metadata: { role: parsed.data.role } })
     return NextResponse.json({ success: true, data: null })
   }
 

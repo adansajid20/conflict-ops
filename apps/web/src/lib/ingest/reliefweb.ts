@@ -5,6 +5,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
+import { isHumanitarianBureaucracy } from '@/lib/classification'
 import { cleanDescription, humanitarianSeverity, isBlocklisted } from './utils'
 
 // rss2json proxies reliefweb RSS to bypass Cloudflare bot protection on cloud IPs
@@ -169,6 +170,7 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
       const description = cleanDescription(item.description, title)
       const sourceName = item.author || extractSourceName(item.description ?? '') || null
       const text = `${title} ${description} ${countryName ?? ''}`
+      const isHumanitarianReport = isHumanitarianBureaucracy({ title, description })
 
       const { error } = await supabase.from('events').upsert(
         {
@@ -188,6 +190,7 @@ export async function ingestReliefWeb(): Promise<{ stored: number; skipped: numb
           status: 'pending',
           occurred_at: occurredAt,
           heavy_lane_processed: false,
+          is_humanitarian_report: isHumanitarianReport,
           outlet_name: sourceName ?? 'ReliefWeb',
           language: 'en',
           location_confidence: countryCode ? 'approximate' : 'unknown',

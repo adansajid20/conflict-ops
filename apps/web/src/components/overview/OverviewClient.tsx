@@ -19,14 +19,15 @@ import { safeRelativeTime } from '@/lib/utils/time'
 import { KpiStrip } from './KpiStrip'
 import { HotRegionsTable } from './HotRegionsTable'
 import { EventDetailPanel } from './EventDetailPanel'
-import { getPublicSourceName } from '@/lib/utils/source-display'
 import {
   getEffectiveType,
   getBestDescription,
   getLocationDisplay,
+  getSignificanceTier,
   isBreaking,
   UI_CATEGORY_TYPES,
   computeSeverityCounts,
+  sanitizeSourceDisplay,
 } from '@/lib/event-presentation'
 import type { OverviewData, OverviewEvent } from './types'
 
@@ -394,11 +395,12 @@ function TopStoriesList({
     const status = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG['pending']!
     const rel = safeRelativeTime(event.ingested_at ?? event.occurred_at)
     const displayTitle = formatEventTitle(event.title ?? '', event.source)
-    const sourceName = getPublicSourceName(event.source, event.provenance_raw ?? null, event.title ?? null)
+    const sourceName = event.source ? sanitizeSourceDisplay(event.source) : ''
     const locationText = getLocationDisplay(event)
     const subtitle = getBestDescription(event, 120)
     const breaking = isBreaking(event)
     const corroboration = event.corroboration_count ?? 0
+    const tier = getSignificanceTier((event as OverviewEvent & { significance_score?: number | null }).significance_score)
 
     return (
       <button
@@ -414,12 +416,7 @@ function TopStoriesList({
               Breaking
             </span>
           )}
-          <span
-            className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide flex-shrink-0"
-            style={{ background: sev.bg, color: sev.color }}
-          >
-            {sev.label}
-          </span>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold flex-shrink-0 ${tier.bgColor} ${tier.color}`}>{tier.label}</span>
           <span
             className="rounded-full px-2 py-0.5 text-[10px] font-medium flex-shrink-0"
             style={{ background: 'rgba(255,255,255,0.06)', color: status.color }}
@@ -430,7 +427,7 @@ function TopStoriesList({
             <span className="rounded-full px-2 py-0.5 text-[10px] font-medium flex-shrink-0" style={{ background: 'rgba(59,130,246,0.12)', color: '#60a5fa' }}>📡 {corroboration} sources</span>
           )}
           <span className="text-xs truncate flex-1" style={{ color: 'var(--text-muted)' }}>
-            {sourceName} · {locationText}
+            {[sourceName, locationText !== 'Location unknown' ? locationText : null].filter(Boolean).join(' · ')}
           </span>
           <span
             className="text-[11px] flex-shrink-0 ml-auto tabular-nums"
@@ -673,6 +670,8 @@ export function OverviewClient() {
 
   const freshnessColor = data ? FRESHNESS_COLORS[data.freshnessColor] : 'var(--text-muted)'
   const coverageColor = data ? COVERAGE_COLORS[data.coverageLevel] : 'var(--text-muted)'
+  const displayCount = data ? Math.min(20, data.topStories.length) : 0
+  const countText = !data ? '' : displayCount === data.topStories.length ? `Showing ${data.topStories.length} events` : `Showing top ${displayCount} of ${data.topStories.length} events`
 
   return (
     <div className="mx-auto max-w-[1400px] p-6">
@@ -700,9 +699,9 @@ export function OverviewClient() {
             <div className="mt-1 flex items-center gap-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
               <span>Last update: {data.freshnessDescription}</span>
               <span>·</span>
-              <span style={{ color: coverageColor }}>Coverage: {data.coverageLevel}</span>
+              <span style={{ color: coverageColor }}>Global monitoring across all major conflict zones</span>
               <span>·</span>
-              <span>Showing top 20 of {data.topStories.length} events</span>
+              <span>{countText}</span>
             </div>
           )}
         </div>

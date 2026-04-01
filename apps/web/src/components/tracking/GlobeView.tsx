@@ -279,7 +279,7 @@ export default function GlobeView({
   showISS,
 }: GlobeViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line 
   const globeRef = useRef<any>(null)
   const [aircraft, setAircraft] = useState<Aircraft[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -340,11 +340,11 @@ export default function GlobeView({
     const fetchISS = async () => {
       try {
         const res = await fetch('https://api.wheretheiss.at/v1/satellites/25544', {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line 
           signal: (AbortSignal as any).timeout ? (AbortSignal as any).timeout(5000) : undefined,
         })
         if (!res.ok) return
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         const data = await res.json() as any
         setISSPosition({
           latitude: data.latitude,
@@ -365,7 +365,7 @@ export default function GlobeView({
   // ── Initialize globe ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line 
     let globe: any = null
     let destroyed = false
 
@@ -389,7 +389,7 @@ export default function GlobeView({
         .pointAltitude('altitude')
         .pointRadius('radius')
         .pointColor('color')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .pointLabel((d: any) => {
           const e = d.event as GlobeIntelEvent
           const color = d.color as string
@@ -398,7 +398,7 @@ export default function GlobeView({
             <span style="color:#94a3b8;font-size:11px">${e.region ?? e.country_code ?? 'Unknown location'}</span>
           </div>`
         })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .onPointClick((d: any) => {
           onEventClick(d.event as GlobeIntelEvent)
           if (globe?.controls) {
@@ -412,16 +412,16 @@ export default function GlobeView({
         .ringsData([])
         .ringLat('lat')
         .ringLng('lng')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .ringColor((d: any) => {
           if (d.type === 'conflict') return (t: number) => `rgba(239,68,68,${Math.max(0, 1 - t)})`
           return (t: number) => `rgba(56,189,248,${Math.max(0, 0.8 - t * 0.8)})`
         })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .ringMaxRadius((d: any) => d.type === 'conflict' ? 3 : 0.5)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .ringPropagationSpeed((d: any) => d.type === 'conflict' ? 1 : 0.5)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .ringRepeatPeriod((d: any) => d.type === 'conflict' ? 2000 : 3000)
         // ── Arcs (shipping lanes + attack vectors) ──
         .arcsData([])
@@ -429,7 +429,7 @@ export default function GlobeView({
         .arcStartLng('startLng')
         .arcEndLat('endLat')
         .arcEndLng('endLng')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .arcColor((d: any) => {
           if (d.type === 'attack') {
             const color = d.color as string
@@ -437,15 +437,15 @@ export default function GlobeView({
           }
           return ['rgba(59,130,246,0.3)', 'rgba(59,130,246,0.08)', 'rgba(59,130,246,0.3)']
         })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .arcStroke((d: any) => d.type === 'attack' ? 0.3 + (d.severity as number) * 0.2 : 0.5)
         .arcDashLength(0.4)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .arcDashGap((d: any) => d.type === 'attack' ? 0.15 : 0.2)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .arcDashAnimateTime((d: any) => d.type === 'attack' ? 1400 : 3000)
         .arcAltitudeAutoScale(0.35)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .arcLabel((d: any) => {
           if (d.type !== 'attack' || !d.label) return ''
           return `<div style="background:rgba(0,0,0,0.85);padding:6px 10px;border-radius:4px;font-size:12px;max-width:220px;font-family:Inter,sans-serif">
@@ -456,28 +456,28 @@ export default function GlobeView({
         .labelsData([])
         .labelLat('lat')
         .labelLng('lng')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .labelAltitude((d: any) => (d.altitude as number) ?? 0)
         .labelText('text')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .labelSize(() => 1.2)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .labelColor(() => '#a78bfa')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .labelDotRadius(() => 0.5)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .labelDotOrientation(() => 'right')
         // ── Choropleth polygons ──
         .polygonsData([])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .polygonAltitude(() => 0.005)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .polygonCapColor(() => 'rgba(0,0,0,0)')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .polygonSideColor(() => 'rgba(0,0,0,0)')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .polygonStrokeColor(() => 'rgba(255,255,255,0.05)')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line 
         .polygonLabel(() => '')
 
       // Auto-rotate
@@ -553,7 +553,7 @@ export default function GlobeView({
     const riskMap = computeCountryRisk(events)
     globeRef.current
       .polygonsData(countriesGeoJSON.features)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line 
       .polygonCapColor((feature: any) => {
         const props = feature.properties as Record<string, string>
         const name = props.name ?? props.NAME ?? ''
@@ -563,11 +563,11 @@ export default function GlobeView({
         const score = riskMap.get(code) ?? 0
         return riskToColor(score)
       })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line 
       .polygonSideColor(() => 'rgba(0,0,0,0)')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line 
       .polygonStrokeColor(() => 'rgba(255,255,255,0.05)')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line 
       .polygonLabel((feature: any) => {
         const props = feature.properties as Record<string, string>
         const name = props.name ?? props.NAME ?? 'Unknown'

@@ -1,6 +1,6 @@
 -- Migration 030: Tracking layer tables (AIS vessels, ADS-B flights, FIRMS thermal)
 
-CREATE TABLE IF NOT EXISTS vessel_tracks (
+CREATE TABLE IF NOT EXISTS maritime_tracks (
   mmsi             BIGINT PRIMARY KEY,
   source_id        TEXT NOT NULL,
   ship_name        TEXT,
@@ -20,9 +20,9 @@ CREATE TABLE IF NOT EXISTS vessel_tracks (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS vessel_tracks_last_seen_idx ON vessel_tracks(last_seen DESC);
-CREATE INDEX IF NOT EXISTS vessel_tracks_location_idx ON vessel_tracks USING GIST(location);
-CREATE INDEX IF NOT EXISTS vessel_tracks_ship_type_idx ON vessel_tracks(ship_type);
+CREATE INDEX IF NOT EXISTS maritime_tracks_last_seen_idx ON maritime_tracks(last_seen DESC);
+CREATE INDEX IF NOT EXISTS maritime_tracks_location_idx ON maritime_tracks USING GIST(location);
+CREATE INDEX IF NOT EXISTS maritime_tracks_ship_type_idx ON maritime_tracks(ship_type);
 
 CREATE TABLE IF NOT EXISTS flight_tracks (
   icao24           TEXT PRIMARY KEY,

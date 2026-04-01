@@ -2,13 +2,13 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertCircle, Download, Search, X } from 'lucide-react'
+import { AlertCircle, ChevronDown, ChevronUp, Download, Search, X } from 'lucide-react'
+import type { ComponentType, CSSProperties } from 'react'
 import { IntelDrawer } from '@/components/intel/IntelDrawer'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { eventToIntelItem } from '@/types/intel-item'
 import { safeRelativeTime } from '@/lib/utils/time'
-import { EVENT_TYPE_TO_CATEGORY, getEffectiveType, getBestDescription, getLocationDisplay } from '@/lib/event-presentation'
-import { getPublicSourceName } from '@/lib/utils/source-display'
+import { EVENT_TYPE_TO_CATEGORY, getBestDescription, getEffectiveType, getLocationDisplay, getSignificanceTier, sanitizeSourceDisplay } from '@/lib/event-presentation'
 
 type FeedEvent = {
   id: string
@@ -22,33 +22,38 @@ type FeedEvent = {
   ingested_at?: string | null
   event_type?: string | null
   country_code?: string | null
+  description_lang?: string | null
   provenance_raw?: Record<string, unknown> | null
   location?: string | null
+  significance_score?: number | null
+  intelligence_summary?: string | null
+  entities?: {
+    actors?: string[]
+    locations?: string[]
+    weapons?: string[]
+    casualties?: string
+  } | null
+  escalation_indicator?: boolean | null
   _corroborated_by?: string[]
   _source_count?: number
   _confidence?: 'confirmed' | 'corroborated' | 'unverified'
 }
 
-// Shorten NOAA titles — strip the full date range, keep alert type + location
 function formatFeedTitle(title: string, source: string): string {
   if (!title) return ''
   if (source === 'noaa') {
-    // "Red Flag Warning issued March 27 at 9:43PM MDT until March 29 at 8:00PM MDT by NWS Grand Junction CO"
-    // → "Red Flag Warning · NWS Grand Junction CO"
     const parts = title.split(/\s+(?:issued|in effect)/i)
     const type = parts.length > 0 && parts[0] ? parts[0].trim() : title
     const locMatch = title.match(/by NWS\s+(.+?)(?:\s+(?:until|$))/i)
-    const locGroup = locMatch ? locMatch[1] : null
-    const loc = locGroup ? ` · NWS ${locGroup.trim()}` : ''
+    const loc = locMatch?.[1] ? ` · NWS ${locMatch[1].trim()}` : ''
     const short = type + loc
-    return short.length > 90 ? short.slice(0, 87) + '…' : short
+    return short.length > 90 ? `${short.slice(0, 87)}…` : short
   }
-  return title.length > 90 ? title.slice(0, 87) + '…' : title
+  return title.length > 110 ? `${title.slice(0, 107)}…` : title
 }
 
 const TIME_WINDOWS = ['1h', '6h', '24h', '7d', '30d'] as const
 type TimeWindow = (typeof TIME_WINDOWS)[number]
-
 const CATEGORIES = [
   { value: 'all', label: 'All' },
   { value: 'Conflict', label: 'Conflict' },
@@ -57,14 +62,13 @@ const CATEGORIES = [
   { value: 'Disasters', label: 'Disasters' },
   { value: 'News', label: 'News' },
 ] as const
-
 const SEV_FILTERS = [
-  { label: 'All',      value: 0, emoji: null },
+  { label: 'All', value: 0, emoji: null },
   { label: 'Critical', value: 4, emoji: '🔴' },
-  { label: 'High',     value: 3, emoji: '🟠' },
-  { label: 'Medium',   value: 2, emoji: '🟡' },
-  { label: 'Low',      value: 1, emoji: '⚫' },
-]
+  { label: 'High', value: 3, emoji: '🟠' },
+  { label: 'Medium', value: 2, emoji: '🟡' },
+  { label: 'Low', value: 1, emoji: '⚫' },
+] as const
 
 function sevColor(severity?: number | string | null) {
   const value = Number(severity ?? 0)
@@ -84,162 +88,122 @@ function sevLabel(severity?: number | string | null) {
   return null
 }
 
-const PILL_ACTIVE: React.CSSProperties = {
-  background: '#2563EB',
-  color: '#fff',
-  border: '1px solid #2563EB',
-  borderRadius: '9999px',
-  padding: '3px 10px',
-  fontSize: '11px',
-  fontWeight: 600,
-  cursor: 'pointer',
-  lineHeight: '1.4',
-  whiteSpace: 'nowrap',
-}
+const AlertCircleIcon = AlertCircle as unknown as ComponentType<{ size?: number; style?: CSSProperties }>
+const ChevronDownIcon = ChevronDown as unknown as ComponentType<{ size?: number; style?: CSSProperties }>
+const ChevronUpIcon = ChevronUp as unknown as ComponentType<{ size?: number; style?: CSSProperties }>
+const DownloadIcon = Download as unknown as ComponentType<{ size?: number; style?: CSSProperties }>
+const SearchIcon = Search as unknown as ComponentType<{ size?: number; className?: string; style?: CSSProperties }>
+const XIcon = X as unknown as ComponentType<{ size?: number; style?: CSSProperties }>
 
-const PILL_INACTIVE: React.CSSProperties = {
-  background: 'transparent',
-  color: 'var(--text-secondary)',
-  border: '1px solid var(--border)',
-  borderRadius: '9999px',
-  padding: '3px 10px',
-  fontSize: '11px',
-  fontWeight: 500,
-  cursor: 'pointer',
-  lineHeight: '1.4',
-  whiteSpace: 'nowrap',
-}
+const PILL_ACTIVE: React.CSSProperties = { background: '#2563EB', color: '#fff', border: '1px solid #2563EB', borderRadius: '9999px', padding: '3px 10px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', lineHeight: '1.4', whiteSpace: 'nowrap' }
+const PILL_INACTIVE: React.CSSProperties = { background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '9999px', padding: '3px 10px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', lineHeight: '1.4', whiteSpace: 'nowrap' }
 
 export function EventFeed() {
-  const AlertCircleIcon = AlertCircle as React.ElementType
-  const DownloadIcon = Download as React.ElementType
-  const SearchIcon = Search as React.ElementType
-  const XIcon = X as React.ElementType
-
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('24h')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [feedTab, setFeedTab] = useState<'all' | 'humanitarian'>('all')
   const [severityFilter, setSeverityFilter] = useState<number>(0)
   const [searchQuery, setSearchQuery] = useState<string>('')
-
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [languageFilter, setLanguageFilter] = useState<string>('all')
+  const [rawFeed, setRawFeed] = useState(false)
+  const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({})
   const [events, setEvents] = useState<FeedEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const [lastRefresh, setLastRefresh] = useState(new Date())
   const [selected, setSelected] = useState<FeedEvent | null>(null)
-  const [focusedIndex, setFocusedIndex] = useState<number>(-1)
+  const [focusedIndex, setFocusedIndex] = useState(-1)
   const [countdown, setCountdown] = useState(60)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const fetchEvents = useCallback(async (reset = false, cursor?: string) => {
+  const fetchEvents = useCallback(async (reset = false) => {
     setLoading(true)
-    const params = new URLSearchParams()
-    params.set('window', timeWindow)
-    params.set('limit', '200')
-    if (cursor) params.set('cursor', cursor)
-    else params.set('offset', '0')
+    const params = new URLSearchParams({ window: timeWindow, limit: '200', offset: '0' })
+    if (languageFilter !== 'all') params.set('lang', languageFilter)
+    if (rawFeed) params.set('raw', 'true')
+    if (feedTab === 'humanitarian') {
+      params.set('include_humanitarian', 'true')
+      params.set('type', 'humanitarian_only')
+    }
 
     try {
-      const res = await fetch(`/api/v1/events?${params.toString()}`, { cache: 'no-store' })
-      const json = await res.json() as { data?: FeedEvent[]; nextCursor?: string | null }
+      const response = await fetch(`/api/v1/events?${params.toString()}`, { cache: 'no-store' })
+      const json = (await response.json()) as { data?: FeedEvent[]; nextCursor?: string | null }
       const incoming = json.data ?? []
+      setEvents(reset ? incoming : incoming)
       setNextCursor(json.nextCursor ?? null)
-      setEvents(reset ? incoming : prev => [...prev, ...incoming])
-      setLastRefresh(new Date())
       setCountdown(60)
     } finally {
       setLoading(false)
     }
-  }, [timeWindow])
+  }, [feedTab, languageFilter, rawFeed, timeWindow])
 
-  // Reset + refetch when time window changes
+  useEffect(() => { void fetchEvents(true) }, [fetchEvents])
   useEffect(() => {
-    setNextCursor(null)
-    void fetchEvents(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeWindow])
-
-  // Auto-refresh countdown
-  useEffect(() => {
-    const interval = setInterval(() => setCountdown(v => (v <= 1 ? 60 : v - 1)), 1000)
+    const interval = setInterval(() => setCountdown((value) => (value <= 1 ? 60 : value - 1)), 1000)
     return () => clearInterval(interval)
   }, [])
-  useEffect(() => {
-    if (countdown === 1) void fetchEvents(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countdown])
-
-  // Deep-link: on mount, read ?eventId and auto-open that event's drawer
+  useEffect(() => { if (countdown === 1) void fetchEvents(true) }, [countdown, fetchEvents])
   useEffect(() => {
     if (events.length === 0) return
     const params = new URLSearchParams(window.location.search)
     const eventId = params.get('eventId')
     if (eventId && !selected) {
-      const found = events.find(e => e.id === eventId)
+      const found = events.find((event) => event.id === eventId)
       if (found) setSelected(found)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events])
+  }, [events, selected])
 
-  // Keyboard navigation: j/k, Enter, Escape
+  const filteredEvents = useMemo(() => {
+    let result = events
+    if (categoryFilter !== 'all') result = result.filter((event) => (EVENT_TYPE_TO_CATEGORY[getEffectiveType(event.event_type)] ?? 'News') === categoryFilter)
+    if (severityFilter > 0) result = result.filter((event) => Number(event.severity ?? 0) >= severityFilter)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter((event) => event.title.toLowerCase().includes(q) || (event.description ?? '').toLowerCase().includes(q))
+    }
+    if (languageFilter !== 'all') result = result.filter((event) => (event.description_lang ?? 'unknown') === languageFilter)
+    return result
+  }, [categoryFilter, events, languageFilter, searchQuery, severityFilter])
+
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement).tagName
+    const handler = (event: KeyboardEvent) => {
+      const tag = (event.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-
-      if (e.key === 'j' || (e.key === 'ArrowDown' && !selected)) {
-        e.preventDefault()
-        setFocusedIndex(i => Math.min(i + 1, filteredEvents.length - 1))
-      } else if (e.key === 'k' || (e.key === 'ArrowUp' && !selected)) {
-        e.preventDefault()
-        setFocusedIndex(i => Math.max(i - 1, 0))
-      } else if (e.key === 'Enter' && focusedIndex >= 0 && !selected) {
-        const evt = filteredEvents[focusedIndex]
-        if (evt) handleEventClick(evt)
-      } else if (e.key === 'Escape' && selected) {
+      if (event.key === 'j' || (event.key === 'ArrowDown' && !selected)) {
+        event.preventDefault()
+        setFocusedIndex((index) => Math.min(index + 1, filteredEvents.length - 1))
+      } else if (event.key === 'k' || (event.key === 'ArrowUp' && !selected)) {
+        event.preventDefault()
+        setFocusedIndex((index) => Math.max(index - 1, 0))
+      } else if (event.key === 'Enter' && focusedIndex >= 0 && !selected) {
+        const current = filteredEvents[focusedIndex]
+        if (current) {
+          setSelected(current)
+          window.history.pushState({}, '', `?eventId=${current.id}`)
+        }
+      } else if (event.key === 'Escape' && selected) {
         setSelected(null)
         window.history.pushState({}, '', window.location.pathname)
       }
     }
-    globalThis.window?.addEventListener('keydown', handler)
-    return () => globalThis.window?.removeEventListener('keydown', handler)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events, focusedIndex, selected])
-
-  // Client-side filtering
-  const filteredEvents = useMemo(() => {
-    let result = events
-    if (categoryFilter !== 'all') {
-      result = result.filter(e => (EVENT_TYPE_TO_CATEGORY[getEffectiveType(e.event_type)] ?? 'News') === categoryFilter)
-    }
-    if (severityFilter > 0) {
-      result = result.filter(e => (Number(e.severity) || 0) >= severityFilter)
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      result = result.filter(e => e.title.toLowerCase().includes(q) || (e.description ?? '').toLowerCase().includes(q))
-    }
-    return result
-  }, [events, categoryFilter, severityFilter, searchQuery])
-
-  function handleEventClick(event: FeedEvent) {
-    setSelected(event)
-    window.history.pushState({}, '', `?eventId=${event.id}`)
-  }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [filteredEvents, focusedIndex, selected])
 
   const drawerItem = useMemo(() => (selected ? eventToIntelItem(selected as never) : null), [selected])
-  const drawerItems = useMemo(() => filteredEvents.map(e => eventToIntelItem(e as never)), [filteredEvents])
+  const drawerItems = useMemo(() => filteredEvents.map((event) => eventToIntelItem(event as never)), [filteredEvents])
+  const languages = useMemo(() => ['all', ...Array.from(new Set(events.map((event) => event.description_lang).filter((value): value is string => Boolean(value)))).sort()], [events])
 
   const exportCsv = () => {
     const header = ['id', 'source', 'title', 'severity', 'country', 'region', 'occurred_at']
-    const rows = filteredEvents.map(event => [
-      event.id, event.source, JSON.stringify(event.title ?? ''), event.severity ?? '',
-      event.country_code ?? '', event.region ?? '', event.occurred_at ?? '',
-    ])
-    const csv = [header.join(','), ...rows.map(row => row.join(','))].join('\n')
+    const rows = filteredEvents.map((event) => [event.id, event.source, JSON.stringify(event.title ?? ''), event.severity ?? '', event.country_code ?? '', event.region ?? '', event.occurred_at ?? ''])
+    const csv = [header.join(','), ...rows.map((row) => row.join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = `conflict-ops-feed-${Date.now()}.csv`; a.click()
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `conflict-ops-feed-${Date.now()}.csv`
+    anchor.click()
     URL.revokeObjectURL(url)
   }
 
@@ -247,225 +211,98 @@ export function EventFeed() {
     setCategoryFilter('all')
     setSeverityFilter(0)
     setSearchQuery('')
+    setLanguageFilter('all')
     setTimeWindow('24h')
+    setRawFeed(false)
   }
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden rounded-xl border"
-      style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-
-      {/* Filter Bar */}
-      <div className="sticky top-0 z-10 border-b px-4 py-3 space-y-2"
-        style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-
-        {/* Row 1: Search + Export */}
+    <div className="relative flex h-full flex-col overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+      <div className="sticky top-0 z-10 space-y-2 border-b px-4 py-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
         <div className="flex items-center gap-2">
-          <div className="relative flex-1 min-w-0">
+          <div className="relative min-w-0 flex-1">
             <SearchIcon size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-            <input
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search events…"
-              style={{
-                width: '100%',
-                background: 'var(--bg-surface-2)',
-                border: '1px solid var(--border)',
-                color: 'var(--text-primary)',
-                borderRadius: '6px',
-                padding: '5px 10px 5px 30px',
-                fontSize: '13px',
-              }}
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2"
-                style={{ color: 'var(--text-muted)' }}>
-                <XIcon size={12} />
-              </button>
-            )}
+            <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search events…" style={{ width: '100%', background: 'var(--bg-surface-2)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 10px 5px 30px', fontSize: '13px' }} />
+            {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}><XIcon size={12} /></button>}
           </div>
-          <button onClick={exportCsv}
-            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs btn-ghost shrink-0"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
-            <DownloadIcon size={12} /> Export
-          </button>
+          <select value={languageFilter} onChange={(event) => setLanguageFilter(event.target.value)} className="shrink-0 rounded-md border px-2 py-1.5 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)', background: 'var(--bg-surface-2)' }}>
+            {languages.map((language) => <option key={language} value={language}>{language === 'all' ? 'All languages' : language}</option>)}
+          </select>
+          <button onClick={() => setRawFeed((value) => !value)} style={rawFeed ? PILL_ACTIVE : PILL_INACTIVE}>Raw Feed</button>
+          <button onClick={exportCsv} className="btn-ghost inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}><DownloadIcon size={12} /> Export</button>
         </div>
 
-        {/* Row 2: Time pills | Category pills | Severity pills */}
         <div className="flex flex-wrap items-center gap-1.5" style={{ fontSize: '11px' }}>
-          {/* Time window */}
-          {TIME_WINDOWS.map(w => (
-            <button key={w} onClick={() => setTimeWindow(w)}
-              style={timeWindow === w ? PILL_ACTIVE : PILL_INACTIVE}>
-              {w}
-            </button>
-          ))}
-
+          <button onClick={() => setFeedTab('all')} style={feedTab === 'all' ? PILL_ACTIVE : PILL_INACTIVE}>Main Feed</button>
+          <button onClick={() => setFeedTab('humanitarian')} style={feedTab === 'humanitarian' ? { ...PILL_ACTIVE, background: '#0f766e', border: '1px solid #0f766e' } : PILL_INACTIVE}>Humanitarian</button>
           <div style={{ width: '1px', height: '16px', background: 'var(--border)', margin: '0 4px' }} />
-
-          {/* Category */}
-          {CATEGORIES.map(cat => (
-            <button key={cat.value} onClick={() => setCategoryFilter(cat.value)}
-              style={categoryFilter === cat.value ? PILL_ACTIVE : PILL_INACTIVE}>
-              {cat.label}
-            </button>
-          ))}
-
+          {TIME_WINDOWS.map((windowValue) => <button key={windowValue} onClick={() => setTimeWindow(windowValue)} style={timeWindow === windowValue ? PILL_ACTIVE : PILL_INACTIVE}>{windowValue}</button>)}
           <div style={{ width: '1px', height: '16px', background: 'var(--border)', margin: '0 4px' }} />
-
-          {/* Severity */}
+          {CATEGORIES.map((category) => <button key={category.value} onClick={() => setCategoryFilter(category.value)} style={categoryFilter === category.value ? PILL_ACTIVE : PILL_INACTIVE}>{category.label}</button>)}
+          <div style={{ width: '1px', height: '16px', background: 'var(--border)', margin: '0 4px' }} />
           <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>SEV:</span>
-          {SEV_FILTERS.map(sf => {
-            const count = sf.value === 0
-              ? events.length
-              : sf.value === 4
-                ? events.filter(e => Number(e.severity ?? 0) === sf.value).length
-                : events.filter(e => Number(e.severity ?? 0) >= sf.value).length
-            return (
-              <button key={sf.value} onClick={() => setSeverityFilter(sf.value)}
-                style={severityFilter === sf.value ? PILL_ACTIVE : PILL_INACTIVE}>
-                {sf.emoji ? `${sf.emoji} ` : ''}{sf.label}
-                <span style={{ opacity: 0.6, marginLeft: '3px' }}>({count})</span>
-              </button>
-            )
+          {SEV_FILTERS.map((filter) => {
+            const count = filter.value === 0 ? events.length : filter.value === 4 ? events.filter((event) => Number(event.severity ?? 0) === 4).length : events.filter((event) => Number(event.severity ?? 0) >= filter.value).length
+            return <button key={filter.value} onClick={() => setSeverityFilter(filter.value)} style={severityFilter === filter.value ? PILL_ACTIVE : PILL_INACTIVE}>{filter.emoji ? `${filter.emoji} ` : ''}{filter.label}<span style={{ opacity: 0.6, marginLeft: '3px' }}>({count})</span></button>
           })}
         </div>
       </div>
 
-      {/* Event list */}
       <div className="flex-1 overflow-y-auto" ref={listRef}>
         {loading && events.length === 0 ? (
-          <div className="p-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="animate-pulse flex gap-3 p-4 border-b mb-1" style={{ borderColor: 'var(--border)' }}>
-                <div className="w-1 self-stretch rounded" style={{ background: 'var(--border)' }} />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 rounded w-3/4" style={{ background: 'rgba(255,255,255,0.08)' }} />
-                  <div className="h-3 rounded w-1/2" style={{ background: 'rgba(255,255,255,0.05)' }} />
-                </div>
-              </div>
-            ))}
-          </div>
+          <div className="p-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="mb-1 flex animate-pulse gap-3 border-b p-4" style={{ borderColor: 'var(--border)' }}><div className="w-1 self-stretch rounded" style={{ background: 'var(--border)' }} /><div className="flex-1 space-y-2"><div className="h-4 w-3/4 rounded" style={{ background: 'rgba(255,255,255,0.08)' }} /><div className="h-3 w-1/2 rounded" style={{ background: 'rgba(255,255,255,0.05)' }} /></div></div>)}</div>
         ) : filteredEvents.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-            <AlertCircleIcon size={32} style={{ color: 'var(--text-muted)' }} />
-            <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>No events match current filters</div>
-            <motion.button whileTap={{ scale: 0.95 }} onClick={clearFilters}
-              className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm btn-ghost"
-              style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
-              <XIcon size={14} /> Clear filters
-            </motion.button>
-          </div>
+          <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center"><AlertCircleIcon size={32} style={{ color: 'var(--text-muted)' }} /><div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>No events match current filters</div><motion.button whileTap={{ scale: 0.95 }} onClick={clearFilters} className="btn-ghost inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}><XIcon size={14} /> Clear filters</motion.button></div>
         ) : (
           <AnimatePresence initial={false}>
             {filteredEvents.map((event, index) => {
-              const isSelected = selected?.id === event.id
-              const isFocused = focusedIndex === index
+              const selectedState = selected?.id === event.id
+              const focused = focusedIndex === index
               const sColor = sevColor(event.severity)
               const sLabel = sevLabel(event.severity)
-              const normalizedEvent = { ...event, severity: typeof event.severity === 'number' ? event.severity : null }
-              const country = getLocationDisplay(normalizedEvent)
-              const sourceName = getPublicSourceName(event.source, event.provenance_raw ?? null, event.title ?? null)
-              const snippet = getBestDescription(normalizedEvent, 180)
+              const tier = getSignificanceTier(event.significance_score)
+              const sourceName = event.source ? sanitizeSourceDisplay(event.source) : ''
+              const country = getLocationDisplay({ ...event, severity: typeof event.severity === 'number' ? event.severity : null })
+              const title = formatFeedTitle(event.title, event.source).toUpperCase()
+              const snippet = getBestDescription({ ...event, severity: typeof event.severity === 'number' ? event.severity : null, description: event.intelligence_summary ?? event.description ?? null, summary_short: event.intelligence_summary ?? undefined }, 220)
+              const actors = Array.isArray(event.entities?.actors) ? event.entities?.actors.filter(Boolean) : []
+              const sourceCount = event._source_count ?? 1
+              const corroborated = event._corroborated_by ?? []
+              const expanded = expandedSources[event.id] ?? false
 
               return (
-                <motion.div
-                  key={event.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.3), ease: 'easeOut' }}
-                  onClick={() => { handleEventClick(event); setFocusedIndex(index) }}
-                  tabIndex={0}
-                  onFocus={() => setFocusedIndex(index)}
-                  onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter') handleEventClick(event) }}
-                  className="flex cursor-pointer items-start gap-0 border-b px-0 py-3 transition-colors hover:bg-white/5 interactive-card outline-none"
-                  style={{
-                    pointerEvents: 'auto',
-                    borderColor: 'var(--border)',
-                    borderLeft: isSelected ? '3px solid #2563EB' : '3px solid transparent',
-                    background: isSelected
-                      ? 'rgba(37,99,235,0.08)'
-                      : isFocused
-                        ? 'rgba(255,255,255,0.04)'
-                        : 'transparent',
-                    boxShadow: isFocused && !isSelected ? 'inset 0 0 0 1px rgba(37,99,235,0.2)' : undefined,
-                    paddingLeft: '13px',
-                    paddingRight: '16px',
-                  }}
-                >
+                <motion.div key={event.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.3), ease: 'easeOut' }} onClick={() => { setSelected(event); setFocusedIndex(index); window.history.pushState({}, '', `?eventId=${event.id}`) }} tabIndex={0} onFocus={() => setFocusedIndex(index)} onKeyDown={(keyEvent: React.KeyboardEvent) => { if (keyEvent.key === 'Enter') { setSelected(event); window.history.pushState({}, '', `?eventId=${event.id}`) } }} className="interactive-card flex cursor-pointer items-start gap-0 border-b px-0 py-3 outline-none transition-colors hover:bg-white/5" style={{ pointerEvents: 'auto', borderColor: 'var(--border)', borderLeft: selectedState ? '3px solid #2563EB' : '3px solid transparent', background: selectedState ? 'rgba(37,99,235,0.08)' : focused ? 'rgba(255,255,255,0.04)' : 'transparent', boxShadow: focused && !selectedState ? 'inset 0 0 0 1px rgba(37,99,235,0.2)' : undefined, paddingLeft: '13px', paddingRight: '16px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {/* Row 1: Severity badge + Country · Time */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                      {sLabel && (
-                        <span style={{
-                          fontSize: '9px',
-                          fontWeight: 700,
-                          fontFamily: 'JetBrains Mono, monospace',
-                          padding: '1px 5px',
-                          borderRadius: '3px',
-                          background: `${sColor}22`,
-                          color: sColor,
-                          border: `1px solid ${sColor}44`,
-                          letterSpacing: '0.05em',
-                        }}>
-                          {sLabel}
-                        </span>
-                      )}
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                        {sourceName} · {country}
-                      </span>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace', marginLeft: 'auto' }}>
-                        {safeRelativeTime(event.ingested_at ?? event.occurred_at)}
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                      {sLabel && <span style={{ fontSize: '9px', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', padding: '1px 5px', borderRadius: '3px', background: `${sColor}22`, color: sColor, border: `1px solid ${sColor}44`, letterSpacing: '0.05em' }}>{sLabel}</span>}
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>{country !== 'Location unknown' ? `${country} · ` : ''}{safeRelativeTime(event.ingested_at ?? event.occurred_at)}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tier.bgColor} ${tier.color}`}>{tier.label}</span>
+                      {sourceName ? <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--text-secondary)' }}>{sourceName}{sourceCount > 1 ? ` +${sourceCount - 1}` : ''}</span> : null}
                     </div>
 
-                    {/* Row 2: Title */}
-                    <div style={{
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      color: 'var(--text-primary)',
-                      lineHeight: 1.4,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical' as const,
-                      overflow: 'hidden',
-                      marginBottom: '4px',
-                    }}>
-                      {formatFeedTitle(event.title, event.source)}
-                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '6px', letterSpacing: '0.04em' }}>{title}</div>
 
-                    {/* Row 3: Snippet */}
-                    <div style={{
-                      fontSize: '11px',
-                      color: 'var(--text-muted)',
-                      lineHeight: 1.5,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical' as const,
-                      overflow: 'hidden',
-                      marginBottom: (event._source_count ?? 1) > 1 ? '6px' : 0,
-                    }}>
-                      {snippet}
-                    </div>
+                    {snippet && snippet !== title ? (
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: sourceCount > 1 ? '6px' : 0 }}>{snippet}</div>
+                    ) : null}
+                    {actors.length > 0 && <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.5 }}><strong style={{ color: 'var(--text-secondary)' }}>Actors:</strong> {actors.join(' · ')}</div>}
 
-                    {/* Row 4: Confidence badge (only if multi-source) */}
-                    {(event._source_count ?? 1) > 1 && (
-                      <div style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontSize: '10px',
-                        fontWeight: 600,
-                        letterSpacing: '0.05em',
-                        textTransform: 'uppercase',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        background: event._confidence === 'confirmed' ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)',
-                        color: event._confidence === 'confirmed' ? '#22c55e' : '#eab308',
-                        border: `1px solid ${event._confidence === 'confirmed' ? 'rgba(34,197,94,0.3)' : 'rgba(234,179,8,0.3)'}`,
-                      }}>
-                        {event._confidence === 'confirmed' ? '✓' : '○'} {event._source_count} sources
+                    {sourceCount > 1 && (
+                      <div style={{ marginTop: '8px' }}>
+                        <button
+                          onClick={(clickEvent) => {
+                            clickEvent.stopPropagation()
+                            setExpandedSources((current) => ({ ...current, [event.id]: !expanded }))
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] uppercase tracking-wide"
+                          style={{ borderColor: 'var(--border)', color: event._confidence === 'confirmed' ? '#22c55e' : '#eab308', background: event._confidence === 'confirmed' ? 'rgba(34,197,94,0.12)' : 'rgba(234,179,8,0.12)' }}
+                        >
+                          {expanded ? <ChevronUpIcon size={12} /> : <ChevronDownIcon size={12} />}
+                          {sourceName} +{sourceCount - 1} sources
+                        </button>
+                        {expanded && corroborated.length > 0 && (
+                          <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--text-muted)' }}>{[sourceName, ...corroborated].join(' · ')}</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -476,35 +313,13 @@ export function EventFeed() {
         )}
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t px-4 py-3 text-sm"
-        style={{ borderColor: 'var(--border)' }}>
-        <button
-          onClick={() => void fetchEvents(false, nextCursor ?? undefined)}
-          disabled={loading || !nextCursor}
-          className="rounded-md border px-3 py-1.5 btn-ghost disabled:opacity-40"
-          style={{ borderColor: 'var(--border)', color: 'var(--text-primary)', fontSize: '12px' }}>
-          {loading ? 'Loading…' : nextCursor ? 'Load more' : `End of feed — ${filteredEvents.length} events displayed`}
-        </button>
-        <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
-          {filteredEvents.length}/{events.length} events · Refreshing in {countdown}s
-        </div>
+      <div className="flex items-center justify-between border-t px-4 py-3 text-sm" style={{ borderColor: 'var(--border)' }}>
+        <button disabled={loading || !nextCursor} className="btn-ghost rounded-md border px-3 py-1.5 disabled:opacity-40" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)', fontSize: '12px' }}>{loading ? 'Loading…' : nextCursor ? 'Load more' : `End of feed — ${filteredEvents.length} events displayed`}</button>
+        <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{filteredEvents.length}/{events.length} events · Refreshing in {countdown}s</div>
       </div>
 
       <ErrorBoundary>
-        <IntelDrawer
-          item={drawerItem}
-          items={drawerItems}
-          onClose={() => {
-            setSelected(null)
-            window.history.pushState({}, '', window.location.pathname)
-          }}
-          onNavigate={newItem => {
-            const evt = events.find(e => e.id === newItem.id)
-            const idx = filteredEvents.findIndex(e => e.id === newItem.id)
-            if (evt) { handleEventClick(evt); setFocusedIndex(idx) }
-          }}
-        />
+        <IntelDrawer item={drawerItem} items={drawerItems} onClose={() => { setSelected(null); window.history.pushState({}, '', window.location.pathname) }} onNavigate={(item) => { const event = events.find((entry) => entry.id === item.id); const index = filteredEvents.findIndex((entry) => entry.id === item.id); if (event) { setSelected(event); setFocusedIndex(index); window.history.pushState({}, '', `?eventId=${event.id}`) } }} />
       </ErrorBoundary>
     </div>
   )

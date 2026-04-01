@@ -10,6 +10,7 @@ type Mission = {
   tags: string[]
   created_at: string
   status?: string
+  visibility?: 'private' | 'org' | 'shared'
 }
 
 type MissionsResponse = {
@@ -39,6 +40,7 @@ export default function MissionsPanel() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [selectedRegions, setSelectedRegions] = useState<string[]>([])
+  const [visibility, setVisibility] = useState<'private' | 'org' | 'shared'>('org')
   const [createError, setCreateError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -79,11 +81,11 @@ export default function MissionsPanel() {
       const res = await fetch('/api/v1/missions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), description: description.trim() || undefined, regions: selectedRegions }),
+        body: JSON.stringify({ name: name.trim(), description: description.trim() || undefined, regions: selectedRegions, visibility }),
       })
       const json = await res.json() as { success?: boolean; error?: string }
       if (json.success) {
-        setName(''); setDescription(''); setSelectedRegions([]); setShowForm(false)
+        setName(''); setDescription(''); setSelectedRegions([]); setVisibility('org'); setShowForm(false)
         void fetchMissions()
       } else {
         setCreateError(json.error ?? 'Failed to create')
@@ -130,6 +132,22 @@ export default function MissionsPanel() {
                 rows={2} placeholder="Optional context..."
                 className="w-full px-3 py-2 rounded border text-sm"
                 style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border)', color: 'var(--text-primary)', outline: 'none', resize: 'none' }} />
+            </div>
+            <div>
+              <label className="text-xs mono mb-2 block" style={{ color: 'var(--text-muted)' }}>VISIBILITY</label>
+              <div className="flex gap-2">
+                {(['private', 'org', 'shared'] as const).map((option) => (
+                  <button key={option} onClick={() => setVisibility(option)}
+                    className="px-2 py-1 rounded text-xs mono border"
+                    style={{
+                      borderColor: visibility === option ? 'var(--primary)' : 'var(--border)',
+                      color: visibility === option ? 'var(--primary)' : 'var(--text-muted)',
+                      backgroundColor: visibility === option ? 'var(--primary-dim)' : 'transparent',
+                    }}>
+                    {option.toUpperCase()}
+                  </button>
+                ))}
+              </div>
             </div>
             <div>
               <label className="text-xs mono mb-2 block" style={{ color: 'var(--text-muted)' }}>REGIONS</label>
@@ -210,7 +228,7 @@ export default function MissionsPanel() {
                 <h3 className="text-sm font-bold mono" style={{ color: 'var(--text-primary)' }}>{m.name}</h3>
                 <span className="text-xs mono px-1.5 py-0.5 rounded"
                   style={{ backgroundColor: 'var(--primary-dim)', color: 'var(--primary)' }}>
-                  {m.status?.toUpperCase() ?? 'ACTIVE'}
+                  {m.visibility?.toUpperCase() ?? m.status?.toUpperCase() ?? 'ACTIVE'}
                 </span>
               </div>
               {m.description && (

@@ -10,6 +10,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
 import { z } from 'zod'
 import crypto from 'crypto'
+import { writeAuditLog } from '@/lib/audit/log'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,7 +64,8 @@ export async function POST(req: Request) {
     .select('id,name,key_prefix,created_at')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  await writeAuditLog(supabase, { orgId: user.org_id, userId: user.id, action: 'apikey.create', resourceType: 'api_key', resourceId: data.id, metadata: { name: data.name } })
 
   return NextResponse.json({
     success: true,
@@ -84,5 +86,6 @@ export async function DELETE(req: Request) {
 
   const supabase = createServiceClient()
   await supabase.from('api_keys').update({ active: false }).eq('id', id).eq('org_id', user.org_id)
+  await writeAuditLog(supabase, { orgId: user.org_id, userId: user.id, action: 'apikey.delete', resourceType: 'api_key', resourceId: id, metadata: {} })
   return NextResponse.json({ success: true, data: null })
 }

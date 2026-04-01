@@ -1,326 +1,270 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Activity, ChevronDown, ChevronUp, Database, RefreshCw, Server, Shield, ToggleLeft, ToggleRight, AlertTriangle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Health = any
+type DoctorStatus = 'ok' | 'warn' | 'error'
 
-function timeAgo(input?: string | null) {
-  if (!input) return 'never'
-  const d = Date.now() - new Date(input).getTime()
-  const m = Math.floor(d / 60000)
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
+type DoctorCheck = {
+  name: string
+  status: DoctorStatus
+  value: number | string
+  threshold: string
+  message: string
+  details?: Record<string, unknown>
 }
 
-function StatusDot({ ok }: { ok: boolean }) {
-  return <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: ok ? '#22C55E' : '#EF4444' }} />
+type AutoAction = {
+  id: string
+  created_at: string
+  resource_id: string | null
+  metadata: Record<string, unknown>
 }
 
-// Freshness badge
-function FreshnessBadge({ lastIngestAt }: { lastIngestAt: string | null }) {
-  if (!lastIngestAt) return <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(100,116,139,0.2)', color: '#64748B' }}>Unknown</span>
-  const mins = (Date.now() - new Date(lastIngestAt).getTime()) / 60000
-  if (mins < 30) return <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E' }}>Fresh</span>
-  if (mins < 120) return <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.15)', color: '#F59E0B' }}>Delayed</span>
-  return <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}>Limited</span>
+type RunbookEntry = {
+  pattern: string
+  symptoms: string[]
+  diagnosis: string
+  recommended_action: string
+  auto_healable: boolean
+}
+
+type DoctorRun = {
+  checks: DoctorCheck[]
+  actions: Array<{ action: string; target: string; status: string; message: string }>
+  last_updated: string
+}
+
+const statusColors: Record<DoctorStatus, string> = {
+  ok: '#22C55E',
+  warn: '#F59E0B',
+  error: '#EF4444',
+}
+
+function formatTimeAgo(value?: string | null): string {
+  if (!value) return 'never'
+  const diffMinutes = Math.floor((Date.now() - new Date(value).getTime()) / 60000)
+  if (diffMinutes < 1) return 'just now'
+  if (diffMinutes < 60) return `${diffMinutes}m ago`
+  const hours = Math.floor(diffMinutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+function normalize(text: string): string {
+  return text.toLowerCase()
+}
+
+function findRecommendations(checks: DoctorCheck[], runbook: RunbookEntry[]): RunbookEntry[] {
+  const badChecks = checks.filter((check) => check.status !== 'ok')
+  const matched = runbook.filter((entry) => {
+    const haystack = `${entry.pattern} ${entry.symptoms.join(' ')} ${entry.diagnosis}`.toLowerCase()
+    return badChecks.some((check) => haystack.includes(normalize(check.name)) || normalize(check.message).split(' ').some((token) => token.length > 5 && haystack.includes(token)))
+  })
+  return matched.length > 0 ? matched : runbook.filter((entry) => entry.auto_healable).slice(0, Math.min(3, runbook.length))
 }
 
 export default function DoctorPage() {
-  const DatabaseIcon = Database as React.ElementType
-  const ServerIcon = Server as React.ElementType
-  const ShieldIcon = Shield as React.ElementType
-  const ActivityIcon = Activity as React.ElementType
-  const RefreshCwIcon = RefreshCw as React.ElementType
-  const ToggleLeftIcon = ToggleLeft as React.ElementType
-  const ToggleRightIcon = ToggleRight as React.ElementType
-  const ChevronDownIcon = ChevronDown as React.ElementType
-  const ChevronUpIcon = ChevronUp as React.ElementType
-  const AlertTriangleIcon = AlertTriangle as React.ElementType
-
-  const [health, setHealth] = useState<Health | null>(null)
-  const [recentEvents, setRecentEvents] = useState<Health[]>([])
-  const [ingestResult, setIngestResult] = useState<Health | null>(null)
-  const [safeMode, setSafeMode] = useState(false)
-  const [showIngestOutput, setShowIngestOutput] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [doctorRun, setDoctorRun] = useState<DoctorRun | null>(null)
+  const [autoActions, setAutoActions] = useState<AutoAction[]>([])
+  const [runbook, setRunbook] = useState<RunbookEntry[]>([])
+  const [tab, setTab] = useState<'dashboard' | 'runbook'>('dashboard')
+  const [loading, setLoading] = useState(true)
+  const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setError(null)
     try {
-      const [healthRes, eventsRes] = await Promise.all([
-        fetch('/api/health', { cache: 'no-store' }),
-        fetch('/api/v1/events?limit=10&window=24h', { cache: 'no-store' }),
+      const [doctorRes, runbookRes] = await Promise.all([
+        fetch('/api/v1/admin/doctor', { cache: 'no-store' }),
+        fetch('/api/v1/admin/doctor?runbook=true', { cache: 'no-store' }),
       ])
-      const h = await healthRes.json()
-      const e = await eventsRes.json()
-      setHealth(h)
-      setSafeMode(h.safe_mode)
-      setRecentEvents(e.data ?? [])
-    } catch (err) {
-      setError(String(err))
+      const doctorJson = await doctorRes.json() as { success: boolean; data?: { last_run: DoctorRun | null; auto_actions: AutoAction[] }; error?: string }
+      const runbookJson = await runbookRes.json() as { success: boolean; data?: RunbookEntry[]; error?: string }
+
+      if (!doctorJson.success) throw new Error(doctorJson.error ?? 'Failed to load doctor data')
+      if (!runbookJson.success) throw new Error(runbookJson.error ?? 'Failed to load runbook')
+
+      setDoctorRun(doctorJson.data?.last_run ?? null)
+      setAutoActions(doctorJson.data?.auto_actions ?? [])
+      setRunbook(runbookJson.data ?? [])
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load doctor dashboard')
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    void load()
+    const interval = window.setInterval(() => { void load() }, 30_000)
+    return () => window.clearInterval(interval)
+  }, [load])
 
-  const runAction = async (url: string, body?: unknown, headers?: Record<string, string>) => {
-    setLoading(true)
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(headers ?? {}) },
-      body: body ? JSON.stringify(body) : undefined,
-    })
-    const json = await res.json().catch(() => ({}))
-    setLoading(false)
-    return json
-  }
+  const runAction = useCallback(async (body: Record<string, unknown>) => {
+    setRunning(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/v1/admin/doctor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await response.json() as { success: boolean; data?: DoctorRun; error?: string }
+      if (!json.success) throw new Error(json.error ?? 'Doctor action failed')
+      if (body['action'] === 'run_now' && json.data) {
+        setDoctorRun(json.data)
+      }
+      await load()
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'Doctor action failed')
+    } finally {
+      setRunning(false)
+    }
+  }, [load])
 
-  const internalSecret = process.env['NEXT_PUBLIC_INTERNAL_SECRET'] ?? 'codev1_3dc26d7b4fb024484b5d8a6d3a4887f0'
+  const recommendations = useMemo(() => findRecommendations(doctorRun?.checks ?? [], runbook), [doctorRun, runbook])
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
+    <div className="mx-auto max-w-7xl p-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-            System Doctor
-          </h1>
-          <div className="mt-1 flex items-center gap-2">
-            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold"
-              style={{ background: 'rgba(139,92,246,0.15)', color: '#A78BFA' }}>
-              Admin Only
-            </span>
-            {health && (
-              <FreshnessBadge lastIngestAt={health.ingest?.last_success_at ?? null} />
-            )}
-          </div>
+          <h1 className="text-[22px] font-semibold" style={{ color: 'var(--text-primary)' }}>Doctor + Self-Healing</h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            Automated platform checks every 2 minutes. Last update: {formatTimeAgo(doctorRun?.last_updated ?? null)}
+          </p>
         </div>
-        <button
-          onClick={() => void load()}
-          className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors"
-          style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)' }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '' }}
-        >
-          <RefreshCwIcon size={14} /> Refresh
-        </button>
-      </div>
-
-      {error && (
-        <div className="mb-4 rounded-xl border px-4 py-3 flex items-center gap-2"
-          style={{ borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#F87171' }}>
-          <AlertTriangleIcon size={14} />
-          <span className="text-sm">{error}</span>
-        </div>
-      )}
-
-      {/* Health cards */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-6">
-        {[
-          { icon: DatabaseIcon, label: 'Database', ok: !!health?.db_ok, meta: `${health?.latency_ms ?? 0}ms` },
-          { icon: ServerIcon,   label: 'Redis',    ok: !!health?.redis_ok, meta: health?.redis_ok ? 'Connected' : 'Error' },
-          { icon: ShieldIcon,   label: 'Auth',     ok: !!health?.auth_ok, meta: health?.auth_ok ? 'OK' : 'Missing key' },
-          { icon: ActivityIcon, label: 'Ingest',   ok: !!health?.ingest?.ok, meta: `Last: ${timeAgo(health?.ingest?.last_success_at)}` },
-        ].map((card, idx) => {
-          const Icon = card.icon
-          return (
-            <div key={idx} className="rounded-xl border p-4"
-              style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-              <div className="mb-3 flex items-center justify-between">
-                <Icon size={18} style={{ color: 'var(--primary)' }} />
-                <StatusDot ok={card.ok} />
-              </div>
-              <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{card.label}</div>
-              <div className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>{card.meta}</div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* KPIs row */}
-      {health && (
-        <div className="grid gap-3 sm:grid-cols-3 mb-6">
-          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-            <div className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{health.events?.total?.toLocaleString() ?? '—'}</div>
-            <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Total events in DB</div>
-          </div>
-          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-            <div className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{health.events?.inserted_24h?.toLocaleString() ?? '—'}</div>
-            <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Inserted last 24h</div>
-          </div>
-          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-            <div className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-              {health.ingest?.sources_live ?? '—'}/{health.ingest?.sources_total ?? '—'}
-            </div>
-            <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Sources live</div>
-          </div>
-        </div>
-      )}
-
-      {/* Source health table */}
-      <div className="rounded-xl border mb-6" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-        <div className="border-b px-4 py-3 text-sm font-semibold" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-          Source Health
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ color: 'var(--text-muted)' }}>
-                <th className="px-4 py-3 text-left">Source</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Last Seen</th>
-                <th className="px-4 py-3 text-left">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(health?.enabledSources ?? health?.sources?.detail ?? []).map((src: { name: string; ok: boolean; last_seen_at?: string | null }) => (
-                <tr key={src.name} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                  <td className="px-4 py-3" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>
-                    {src.name}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1.5 text-xs">
-                      <StatusDot ok={src.ok} />
-                      <span style={{ color: src.ok ? '#22C55E' : '#EF4444' }}>{src.ok ? 'Live' : 'Stale'}</span>
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
-                    {timeAgo(src.last_seen_at)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => void runAction('/api/v1/admin/run-ingest', undefined, { 'x-internal-secret': internalSecret }).then(setIngestResult)}
-                      className="rounded border px-2 py-1 text-xs transition-colors"
-                      style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)' }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '' }}
-                    >
-                      Trigger
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Manual controls */}
-      <div className="rounded-xl border p-4 mb-6" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-        <div className="mb-4 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Manual Controls</div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex gap-2">
+          <button onClick={() => void load()} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+            <span className="inline-flex items-center gap-2">Refresh</span>
+          </button>
           <button
-            onClick={() => void runAction('/api/v1/admin/run-ingest', undefined, { 'x-internal-secret': internalSecret })
-              .then((json) => { setIngestResult(json); setShowIngestOutput(true) })}
+            onClick={() => void runAction({ action: 'run_now' })}
+            disabled={running}
             className="rounded-lg px-3 py-2 text-sm font-medium"
-            style={{ background: 'var(--primary)', color: '#fff' }}
+            style={{ background: 'var(--primary)', color: '#fff', opacity: running ? 0.7 : 1 }}
           >
-            Run Full Ingest
-          </button>
-          <button
-            onClick={() => void runAction('/api/v1/admin/cleanup').then(setIngestResult)}
-            className="rounded-lg border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-          >
-            Run Cleanup
-          </button>
-          <button
-            onClick={() => void runAction('/api/v1/admin/clear-cache').then(setIngestResult)}
-            className="rounded-lg border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-          >
-            Clear Cache
-          </button>
-          <button
-            onClick={() => void runAction('/api/v1/admin/safe-mode', { enabled: !safeMode }).then(() => { setSafeMode(!safeMode); void load() })}
-            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-          >
-            {safeMode ? <ToggleRightIcon size={18} /> : <ToggleLeftIcon size={18} />} Safe Mode {safeMode ? 'ON' : 'OFF'}
+            <span className="inline-flex items-center gap-2">{running ? 'Running…' : 'Run Now'}</span>
           </button>
         </div>
+      </div>
 
-        {ingestResult && (
-          <div className="mt-4">
-            <button
-              onClick={() => setShowIngestOutput(v => !v)}
-              className="inline-flex items-center gap-2 text-sm"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              {showIngestOutput ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
-              Output
-            </button>
-            {showIngestOutput && (
-              <pre className="mt-3 overflow-auto rounded-lg p-4 text-xs" style={{ background: '#03130a', color: '#86EFAC', maxHeight: '300px' }}>
-                {JSON.stringify(ingestResult, null, 2)}
-              </pre>
-            )}
+      <div className="mb-6 flex gap-2">
+        {(['dashboard', 'runbook'] as const).map((value) => (
+          <button
+            key={value}
+            onClick={() => setTab(value)}
+            className="rounded-lg border px-3 py-2 text-sm capitalize"
+            style={{
+              borderColor: 'var(--border)',
+              background: tab === value ? 'rgba(59,130,246,0.12)' : 'transparent',
+              color: 'var(--text-primary)',
+            }}
+          >
+            {value}
+          </button>
+        ))}
+      </div>
+
+      {error ? (
+        <div className="mb-6 rounded-xl border px-4 py-3 text-sm" style={{ borderColor: 'rgba(239,68,68,0.35)', color: '#F87171', background: 'rgba(239,68,68,0.08)' }}>
+          {error}
+        </div>
+      ) : null}
+
+      {tab === 'dashboard' ? (
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {(doctorRun?.checks ?? []).map((check) => (
+              <div key={check.name} className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{check.name}</div>
+                  <span className="rounded-full px-2 py-0.5 text-xs uppercase" style={{ background: `${statusColors[check.status]}22`, color: statusColors[check.status] }}>{check.status}</span>
+                </div>
+                <div className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>{String(check.value)}</div>
+                <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>{check.threshold}</div>
+                <div className="mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{check.message}</div>
+                <div className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>Updated {formatTimeAgo(doctorRun?.last_updated ?? null)}</div>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
 
-      {/* Degraded reasons */}
-      {health?.degraded_reasons?.length > 0 && (
-        <div className="rounded-xl border p-4 mb-6" style={{ borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.06)' }}>
-          <div className="mb-2 text-sm font-semibold" style={{ color: '#F59E0B' }}>⚠ Degraded</div>
-          <ul className="text-xs space-y-1" style={{ color: '#F59E0B' }}>
-            {health.degraded_reasons.map((r: string) => <li key={r}>· {r}</li>)}
-          </ul>
-        </div>
-      )}
+          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+              <div className="mb-4 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Recommendations</div>
+              <div className="space-y-3">
+                {recommendations.map((entry) => (
+                  <div key={entry.pattern} className="rounded-lg border p-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="font-medium" style={{ color: 'var(--text-primary)' }}>{entry.pattern}</div>
+                      <span className="text-xs" style={{ color: entry.auto_healable ? '#22C55E' : '#94A3B8' }}>{entry.auto_healable ? 'auto-healable' : 'manual'}</span>
+                    </div>
+                    <div className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>{entry.diagnosis}</div>
+                    <div className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>{entry.recommended_action}</div>
+                  </div>
+                ))}
+                {recommendations.length === 0 ? <div className="text-sm" style={{ color: 'var(--text-muted)' }}>No recommendations right now. A rare moment of peace.</div> : null}
+              </div>
+            </div>
 
-      {/* Recent events */}
-      <div className="rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-        <div className="border-b px-4 py-3 text-sm font-semibold" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-          Recent Events (24h sample)
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ color: 'var(--text-muted)' }}>
-                <th className="px-4 py-3 text-left">Source</th>
-                <th className="px-4 py-3 text-left">Title</th>
-                <th className="px-4 py-3 text-left">Sev</th>
-                <th className="px-4 py-3 text-left">Time</th>
-                <th className="px-4 py-3 text-left">Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentEvents.map((event: Health) => (
-                <tr key={event.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
-                    {event.source}
-                  </td>
-                  <td className="px-4 py-3 text-xs max-w-xs truncate" style={{ color: 'var(--text-primary)' }}>
-                    {String(event.title ?? '').slice(0, 60)}
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    {event.severity ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
-                    {timeAgo(event.occurred_at)}
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
-                    {event._relevance_score !== undefined ? event._relevance_score.toFixed(2) : '—'}
-                  </td>
-                </tr>
+            <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+              <div className="mb-4 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Manual Controls</div>
+              <div className="space-y-2">
+                <button onClick={() => void runAction({ action: 'safe_mode', enabled: true })} disabled={running} className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>Activate Safe Mode</button>
+                <button onClick={() => void runAction({ action: 'pause_heavy_lane' })} disabled={running} className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>Pause Heavy Lane</button>
+                <button onClick={() => void runAction({ action: 'flush_cache' })} disabled={running} className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>Flush Cache</button>
+                <button onClick={() => void runAction({ action: 'open_circuit_breaker', source: 'gdelt' })} disabled={running} className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>Open Circuit Breaker</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+            <div className="mb-4 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Auto-actions log</div>
+            <div className="space-y-3">
+              {autoActions.map((entry) => (
+                <div key={entry.id} className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div style={{ color: 'var(--text-primary)' }}>{String(entry.metadata['action'] ?? 'auto_heal')}</div>
+                    <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatTimeAgo(entry.created_at)}</div>
+                  </div>
+                  <div className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>{String(entry.metadata['message'] ?? '')}</div>
+                  <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>Target: {entry.resource_id ?? 'platform'}</div>
+                </div>
               ))}
-            </tbody>
-          </table>
+              {!loading && autoActions.length === 0 ? <div className="text-sm" style={{ color: 'var(--text-muted)' }}>No self-heal actions recorded yet.</div> : null}
+            </div>
+          </div>
         </div>
-      </div>
-
-      {loading && (
-        <div className="mt-4 text-sm flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
-          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          Running…
+      ) : (
+        <div className="rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ color: 'var(--text-muted)' }}>
+                  <th className="px-4 py-3 text-left">Pattern</th>
+                  <th className="px-4 py-3 text-left">Symptoms</th>
+                  <th className="px-4 py-3 text-left">Diagnosis</th>
+                  <th className="px-4 py-3 text-left">Recommended action</th>
+                  <th className="px-4 py-3 text-left">Auto-healable</th>
+                </tr>
+              </thead>
+              <tbody>
+                {runbook.map((entry) => (
+                  <tr key={entry.pattern} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                    <td className="px-4 py-3 font-medium" style={{ color: 'var(--text-primary)' }}>{entry.pattern}</td>
+                    <td className="px-4 py-3" style={{ color: 'var(--text-secondary)' }}>{entry.symptoms.join(', ')}</td>
+                    <td className="px-4 py-3" style={{ color: 'var(--text-secondary)' }}>{entry.diagnosis}</td>
+                    <td className="px-4 py-3" style={{ color: 'var(--text-secondary)' }}>{entry.recommended_action}</td>
+                    <td className="px-4 py-3"><span className="rounded-full px-2 py-0.5 text-xs" style={{ background: entry.auto_healable ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.15)', color: entry.auto_healable ? '#22C55E' : '#94A3B8' }}>{entry.auto_healable ? 'Yes' : 'No'}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
+
+      {loading ? <div className="mt-6 text-sm" style={{ color: 'var(--text-muted)' }}>Loading doctor state…</div> : null}
     </div>
   )
 }

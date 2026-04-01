@@ -7,8 +7,7 @@ import {
   ChevronDown, ChevronUp,
 } from 'lucide-react'
 import type { OverviewEvent } from './types'
-import { getPublicSourceName } from '@/lib/utils/source-display'
-import { getLocationDisplay, getBestDescription } from '@/lib/event-presentation'
+import { getBestDescription, getLocationConfidenceLabel, getLocationDisplay, getSignificanceTier, sanitizeSourceDisplay } from '@/lib/event-presentation'
 
 // Cast all lucide icons to avoid React 18 JSX type mismatch
 const IconX          = X as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
@@ -65,21 +64,6 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   explosion:           'Explosion',
   attack:              'Attack',
   news:                'News',
-}
-
-// ─── source display names ─────────────────────────────────────────────────────
-
-export const SOURCE_DISPLAY_NAMES: Record<string, string> = {
-  'noaa':       'NOAA National Weather Service',
-  'usgs':       'USGS Earthquake Hazards Program',
-  'gdacs':      'GDACS (Global Disaster Alert)',
-  'unhcr':      'UNHCR (UN Refugee Agency)',
-  'nasa_eonet': 'NASA EONET (Natural Events)',
-  'reliefweb':  'ReliefWeb (OCHA)',
-  'gdelt':      'GDELT Project',
-  'acled':      'ACLED Armed Conflict Database',
-  'news_rss':   'News Wire',
-  'newsapi':    'News Aggregator',
 }
 
 // ─── country centroids ────────────────────────────────────────────────────────
@@ -226,7 +210,9 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
   const status = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG['pending']!
 
   const sourceKey = event.source ?? ''
-  const sourceDisplayName = getPublicSourceName(sourceKey, event.provenance_raw ?? null, event.title ?? null)
+  const sourceDisplayName = sourceKey ? sanitizeSourceDisplay(sourceKey) : ''
+  const significanceTier = getSignificanceTier((event as OverviewEvent & { significance_score?: number | null }).significance_score)
+  const confidence = getLocationConfidenceLabel(null)
 
   // Coordinates — with country centroid fallback
   const coords = getEventCoords(event)
@@ -242,7 +228,6 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
 
   // Event time (client-side, browser timezone)
   const eventTime = formatEventTime(event.occurred_at)
-  const detectedTime = formatEventTime(event.ingested_at ?? event.occurred_at)
 
   // Description — cleaned; fall back to auto-fetched snippet for GDELT/no-desc events
   // Use || not ?? so empty string also falls through to fetchedSnippet
@@ -337,9 +322,7 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
               <span className="flex items-center gap-1">
                 <IconGlobe size={11} />
                 {getLocationDisplay(event)}
-                {event.location_confidence && (
-                  <span style={{ color: 'var(--text-muted)' }}>· {event.location_confidence}</span>
-                )}
+                <span style={{ color: 'var(--text-muted)' }}>· {confidence.icon} {confidence.label}</span>
               </span>
               {event.event_type && (
                 <span className="flex items-center gap-1">
@@ -362,9 +345,7 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
             <div className="text-[11px] uppercase tracking-wider font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
               Source
             </div>
-            <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-              {sourceDisplayName}
-            </div>
+            {sourceDisplayName ? <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{sourceDisplayName}</div> : null}
             {/* Only show attribution if it's not a pipeline internal (GDELT, NewsAPI etc.) */}
             {provenanceAttr && provenanceAttr.trim() &&
              !provenanceAttr.toLowerCase().includes('gdelt') &&
@@ -392,17 +373,10 @@ export function EventDetailPanel({ event, onClose, hasOrg }: EventDetailPanelPro
                   {eventTime.utc}
                 </div>
               </div>
-              {event.ingested_at && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Detected</div>
-                  <div
-                    className="text-xs"
-                    style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}
-                  >
-                    {detectedTime.utc}
-                  </div>
-                </div>
-              )}
+              <div>
+                <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Significance</div>
+                <div className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${significanceTier.bgColor} ${significanceTier.color}`}>{significanceTier.label}</div>
+              </div>
             </div>
           </div>
 
