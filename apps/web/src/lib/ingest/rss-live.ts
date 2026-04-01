@@ -3,8 +3,8 @@ import { createServiceClient } from '../supabase/server'
 import { isBlocklisted, classifyByTitle, inferRegionFromTitle } from '../classification'
 
 const RSS_FEEDS = [
-  { url: 'https://feeds.reuters.com/reuters/worldNews', outlet: 'Reuters', trust: 95, region: null },
-  { url: 'https://feeds.reuters.com/reuters/topNews', outlet: 'Reuters', trust: 95, region: null },
+  { url: 'https://rsshub.app/reuters/world', outlet: 'Reuters', trust: 95, region: null },
+  { url: 'https://rsshub.app/reuters/us', outlet: 'Reuters', trust: 95, region: null },
   { url: 'https://rsshub.app/apnews/topics/apf-intlnews', outlet: 'AP News', trust: 92, region: null },
   { url: 'https://rsshub.app/apnews/topics/apf-africa', outlet: 'AP News', trust: 92, region: 'sub_saharan_africa' },
   { url: 'https://rsshub.app/apnews/topics/apf-asiapac', outlet: 'AP News', trust: 92, region: 'south_asia' },
