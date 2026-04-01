@@ -145,14 +145,15 @@ export async function GET(req: Request): Promise<NextResponse> {
 
   // Numeric relevance scoring
   const ALLOWED_CATEGORIES = new Set([
-    'armed_conflict', 'airstrike', 'terrorism', 'coup', 'civil_unrest', 'protest',
-    'political_crisis', 'sanctions', 'ceasefire', 'diplomacy', 'wmd_threat',
+    'armed_conflict', 'conflict', 'airstrike', 'terrorism', 'coup', 'civil_unrest', 'protest',
+    'political', 'political_crisis', 'sanctions', 'ceasefire', 'diplomacy', 'wmd_threat',
     'humanitarian_crisis', 'natural_disaster', 'security', 'cyber',
     'displacement', 'humanitarian', 'border_incident', 'maritime_incident',
     'aviation_incident', 'military', 'mobilization', 'explosion', 'attack',
   ])
 
-  const AUTH_SOURCES_SET = new Set(['gdacs', 'reliefweb', 'unhcr', 'usgs', 'noaa', 'nasa_eonet', 'acled'])
+  // rss_live is pre-filtered at ingest time (5-gate keyword filter) — treat as authoritative
+  const AUTH_SOURCES_SET = new Set(['gdacs', 'reliefweb', 'unhcr', 'usgs', 'noaa', 'nasa_eonet', 'acled', 'rss_live', 'news_rss'])
 
   function computeRelevanceScore(e: Record<string, unknown>): number {
     const text = `${String(e.title ?? '')} ${String(e.description ?? '')}`.toLowerCase()
@@ -177,8 +178,8 @@ export async function GET(req: Request): Promise<NextResponse> {
   const MIN_RELEVANCE = 0.45
 
   const INTEL_FEED_TYPES = new Set([
-    'armed_conflict', 'airstrike', 'military', 'mobilization', 'ceasefire',
-    'civil_unrest', 'protest', 'terrorism', 'explosion', 'attack',
+    'armed_conflict', 'conflict', 'airstrike', 'military', 'mobilization', 'ceasefire',
+    'civil_unrest', 'protest', 'political', 'terrorism', 'explosion', 'attack',
     'political_crisis', 'sanctions', 'diplomacy', 'coup',
     'border_incident', 'maritime_incident', 'aviation_incident',
     'natural_disaster', 'humanitarian_crisis',
@@ -186,8 +187,9 @@ export async function GET(req: Request): Promise<NextResponse> {
     'displacement', 'humanitarian', 'wmd_threat', 'economic',
     'news', // kept but filtered by keyword below
   ])
+  // rss_live + news_rss are pre-filtered at ingest — always pass the gate
   const AUTHORITATIVE_SOURCES_SET = new Set([
-    'gdacs', 'unhcr', 'nasa_eonet', 'usgs', 'noaa', 'acled', 'reliefweb',
+    'gdacs', 'unhcr', 'nasa_eonet', 'usgs', 'noaa', 'acled', 'reliefweb', 'rss_live', 'news_rss',
   ])
   const CONFLICT_KEYWORDS = /\b(war|conflict|attack|airstrike|bomb|missile|troops|military|soldiers|killed|casualties|rebels|insurgent|terrorist|ceasefire|sanctions|coup|invasion|siege|massacre|protest|riot|gunfire|explosion|hostage|refugee|displaced|evacuation|nuclear|chemical|weapon|navy|army|airforce|NATO|peacekeep|humanitarian|aid|crisis|emergency|threat|escalat)\b/i
 
