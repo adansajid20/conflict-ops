@@ -55,7 +55,8 @@ export async function GET(req: Request) {
   await runSource('usgs', async () => { const { ingestUSGS } = await import('@/lib/ingest/usgs'); return ingestUSGS() })
   await runSource('nasa-eonet', async () => { const { ingestNASAEONET } = await import('@/lib/ingest/nasa-eonet'); return ingestNASAEONET() })
   await runSource('gdacs', async () => { const { ingestGDACS } = await import('@/lib/ingest/gdacs'); return ingestGDACS() })
-  await runSource('noaa', async () => { const { ingestNOAA } = await import('@/lib/ingest/noaa'); return ingestNOAA() })
+  // NOAA disabled — injects domestic US weather alerts (tornado/flood/storm warnings), not conflict intel
+  // await runSource('noaa', async () => { const { ingestNOAA } = await import('@/lib/ingest/noaa'); return ingestNOAA() })
   await runSource('cloudflare-radar', async () => { const { ingestCloudflareRadar } = await import('@/lib/ingest/tracking/cloudflare-radar'); return ingestCloudflareRadar() })
 
   let newsApiSkipped = false
