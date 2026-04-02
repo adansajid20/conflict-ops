@@ -396,5 +396,32 @@ export function sanitizeEventForClient(event: Record<string, unknown>): ClientEv
   }
 }
 
-// ─── Re-export cleanDescription so UI components can import from one place ───
-export { cleanDescription } from '@/lib/ingest/utils'
+// ─── cleanDescription: inline copy so UI can import without circular dep ─────
+// (ingest/utils re-exports from classification; classification imports event-presentation)
+export function cleanDescription(raw: string | null | undefined, title?: string | null): string {
+  if (!raw?.trim()) return ''
+  let text = raw
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&#(\d+);/g, (_, c: string) => String.fromCharCode(parseInt(c, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, c: string) => String.fromCharCode(parseInt(c, 16)))
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&ndash;/g, '–').replace(/&mdash;/g, '—').replace(/&nbsp;/g, ' ')
+    .replace(/[A-Z][a-zA-Z\s\-]+\s+on\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s+\d{2}\/\d{2}\/\d{4}\s+-\s+\d{2}:\d{2}/g, '')
+    .replace(/\([A-Z][a-zA-Z\s.]+\/[A-Z]{2,6}\)/g, '')
+    .replace(/^[A-Z][a-zA-Z]+\s+\d{1,2}\s+\([A-Za-z]+\)\s+-?\s*/g, '')
+    .replace(/\s*(Mali Actu|maliactu\.net|Mali Actualités)[^.]*$/gi, '')
+    .replace(/\s*(BBC News|Reuters -|AP News -|Al Jazeera -|France 24 -)[^.]*$/gi, '')
+    .replace(/\s*[-–—]\s*\S+\.(com|net|org|co)\S*\s*$/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  if (title) {
+    const t = title.trim()
+    if (text.startsWith(t)) text = text.slice(t.length).replace(/^[\s:.\-–—]+/, '').trim()
+  }
+  if (text.length > 600) {
+    const cut = text.lastIndexOf(' ', 600)
+    text = text.slice(0, cut > 400 ? cut : 600) + '…'
+  }
+  return text
+}
