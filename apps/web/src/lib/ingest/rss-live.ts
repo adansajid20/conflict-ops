@@ -144,6 +144,15 @@ const parser = new Parser({
   headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ConflictRadar/1.0)' },
 })
 
+function sanitizeWireTitle(raw: string): string {
+  return raw
+    .replace(/^\s*\((LEAD|UPDATE\s*\d*|URGENT|FLASH|CORRECTED|WRITETHRU|ADVISORY|RECASTS|EMBARGOED|ADDS|CHANGES|REFILING)\)\s*/gi, '')
+    .replace(/^\s*Rpt-\s*/gi, '')
+    .replace(/^\s*RPT\s*[-:]\s*/gi, '')
+    .replace(/\s*\((CORRECTS|ADDS|CHANGES|RECASTS)[^)]*\)\s*$/gi, '')
+    .trim()
+}
+
 export async function ingestRSSLive(): Promise<{ inserted: number; skipped: number; errors: number }> {
   const supabase = createServiceClient()
   let inserted = 0
@@ -191,6 +200,12 @@ async function parseFeed(
         continue
       }
 
+      // Gate 1b: description must be different from title and at least 60 chars
+      if (!snippet || snippet.trim() === title || snippet.length < 60) {
+        skipped += 1
+        continue
+      }
+
       if (!hasConflictKeyword(title, snippet)) {
         skipped += 1
         continue
@@ -216,16 +231,23 @@ async function parseFeed(
       const region = feed.region ?? inferRegionFromTitle(title)
 
       // Pre-score severity by keyword before AI heavy lane runs
-      function prescore(t: string): number {
-        const tl = t.toLowerCase()
-        if (/nuclear|invasion|coup|assassination|mass.?casualt|genocide|chemical.?weapon/.test(tl)) return 4
-        if (/killed|dead|airstrike|air.?strike|missile|explosion|bomb|massacre|siege|hostage/.test(tl)) return 3
-        if (/tension|warning|sanctions|protest|arrested|detained|crackdown|blockade|displaced/.test(tl)) return 2
+      function prescore(title: string, desc: string): number {
+        const text = `${title} ${desc}`.toLowerCase()
+
+        const criticalKw = ['nuclear', 'chemical weapon', 'biological weapon', 'dirty bomb', 'mass casualty', ' coup', 'assassination', 'genocide', 'war declared', 'invasion begins', 'martial law', 'nuclear strike', 'icbm', 'ballistic missile launch']
+        if (criticalKw.some(k => text.includes(k))) return 4
+
+        const highKw = ['killed', ' dead ', 'airstrike', 'air strike', 'missile strike', 'explosion kills', 'bomb kills', 'attack kills', 'troops killed', 'soldiers killed', 'civilians killed', 'death toll', 'fatalities', 'casualties', 'offensive launched', 'ceasefire collapsed', 'hostage', 'kidnapped', 'siege', 'assault on', 'shelling kills']
+        if (highKw.some(k => text.includes(k))) return 3
+
+        const mediumKw = ['troops deployed', 'forces mobilized', 'sanctions imposed', 'sanctions announced', 'escalation', 'crackdown', 'detained', 'arrested', 'blockade', 'expels ambassador', 'diplomat expelled', 'emergency declared', 'warns of', 'threatens to', 'protest', 'military exercise', 'test-fired', 'test fired']
+        if (mediumKw.some(k => text.includes(k))) return 2
+
         return 1
       }
 
       batch.push({
-        title,
+        title: sanitizeWireTitle(title),
         description: snippet || null,
         source_id: link,
         occurred_at: pubDate.toISOString(),
@@ -233,7 +255,7 @@ async function parseFeed(
         event_type: classifyByTitle(title),
         external_id: externalId,
         region,
-        severity: prescore(title),
+        severity: prescore(title, snippet),
         is_humanitarian_report: false,
         raw: {
           outlet: feed.outlet,

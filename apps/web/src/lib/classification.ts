@@ -27,6 +27,15 @@ export const TITLE_BLOCKLIST_PATTERNS: RegExp[] = [
   /information bulletin/i, /operational update no\./i, /meeting minutes/i,
   /network meeting/i, /monitoring summary/i, /nfi \d{4}/i, /\bpsea\b/i,
   /budget revision/i, /funding appeal/i,
+  // Economic data releases — not conflict intelligence
+  /\binflation\b.{0,40}(quickens|slows|eases|rises|falls|rate|data|figures)/i,
+  /\b(cpi|pce|ppi)\b.{0,20}(data|figures|report|reading)/i,
+  /\bgdp\b.{0,20}(growth|contracts|expands|slows|data|figures)/i,
+  /\binterest rates?\b.{0,30}(cut|hike|hold|decision|unchanged)/i,
+  /\bcentral bank\b.{0,30}(rate|policy|meeting|decision)/i,
+  /\btrade (deficit|surplus|balance)\b/i,
+  /\bunemployment (rate|data|figures|falls|rises)\b/i,
+  /\bstock(s| market)\b.{0,20}(fall|rise|surge|drop|rally|slump)/i,
   /ІНФОРМАЦІЙНА ДОВІДКА/, /БЮЛЕТЕНЬ/, /КВАРТАЛ/, /ДОПОМОГА З ЖИТЛОМ/,
 ]
 

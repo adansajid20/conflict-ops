@@ -35,6 +35,7 @@ interface KpiStripProps {
   hotRegionCount: number
   criticalHighCount: number
   activeAlertsCount: number
+  breaking2h: number
   hasOrg: boolean
 }
 
@@ -44,6 +45,7 @@ export function KpiStrip({
   hotRegionCount,
   criticalHighCount,
   activeAlertsCount,
+  breaking2h,
   hasOrg,
 }: KpiStripProps) {
   return (
@@ -77,6 +79,14 @@ export function KpiStrip({
           label="Critical / High"
           href="/feed?window=24h&severity=3"
           color="#ef4444"
+        />
+      </div>
+      <div className="min-w-[130px] flex-1">
+        <KpiCard
+          value={breaking2h}
+          label="Breaking"
+          href="/feed?window=24h&severity=3"
+          color={breaking2h > 0 ? '#ef4444' : undefined}
         />
       </div>
       {hasOrg && (

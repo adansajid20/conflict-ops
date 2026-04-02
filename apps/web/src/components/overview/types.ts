@@ -20,7 +20,7 @@ export interface OverviewEvent {
 
 export interface HotRegion {
   region: string
-  riskLevel: 'Critical' | 'High' | 'Moderate' | 'Monitored'
+  riskLevel: 'Critical' | 'High' | 'Elevated' | 'Moderate' | 'Monitored'
   eventCount: number
   topDrivers: string[]
   topCountries: string[]
@@ -40,6 +40,7 @@ export interface OverviewData {
     criticalHighCount: number
     developingCount: number
     activeAlertsCount: number
+    breaking2h: number
   }
   topStories: OverviewEvent[]
   hotRegions: HotRegion[]

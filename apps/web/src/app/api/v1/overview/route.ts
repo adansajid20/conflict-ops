@@ -28,7 +28,7 @@ interface EventRow {
 
 export interface HotRegion {
   region: string
-  riskLevel: 'Critical' | 'High' | 'Moderate' | 'Monitored'
+  riskLevel: 'Critical' | 'High' | 'Elevated' | 'Moderate' | 'Monitored'
   eventCount: number
   topDrivers: string[]
   topCountries: string[]
@@ -48,6 +48,7 @@ export interface OverviewResponse {
     criticalHighCount: number
     developingCount: number
     activeAlertsCount: number
+    breaking2h: number
   }
   topStories: EventRow[]
   hotRegions: HotRegion[]
@@ -114,8 +115,9 @@ function computeFreshnessScore(event: { occurred_at: string; severity?: string |
 }
 
 const RISK_ORDER: Record<HotRegion['riskLevel'], number> = {
-  Critical: 4,
-  High: 3,
+  Critical: 5,
+  High: 4,
+  Elevated: 3,
   Moderate: 2,
   Monitored: 1,
 }
@@ -176,11 +178,13 @@ function computeHotRegions(events: EventRow[]): HotRegion[] {
 
   const regions: HotRegion[] = []
   for (const [region, data] of map.entries()) {
-    // Risk level based on geopolitical events only (no natural disaster inflation)
+    // Risk level based on geopolitical events AND severity
     let riskLevel: HotRegion['riskLevel']
-    if (data.geoSev4 >= 1 || data.geoSev3 >= 3) riskLevel = 'Critical'
-    else if (data.geoSev3 >= 2 || data.sev2 >= 5) riskLevel = 'High'
-    else if (data.count >= 3) riskLevel = 'Moderate'
+    if (data.geoSev4 >= 1) riskLevel = 'Critical'
+    else if (data.geoSev3 >= 5) riskLevel = 'Critical'
+    else if (data.geoSev3 >= 2) riskLevel = 'High'
+    else if (data.geoSev3 >= 1 || data.sev2 >= 10) riskLevel = 'Elevated'
+    else if (data.count >= 5) riskLevel = 'Moderate'
     else riskLevel = 'Monitored'
 
     // Humanize driver labels
@@ -244,6 +248,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
         criticalHighCount: 0,
         developingCount: 0,
         activeAlertsCount: 0,
+        breaking2h: 0,
       },
       topStories: [],
       hotRegions: [],
@@ -274,6 +279,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     freshRes,
     orgRes,
     alertsRes,
+    breakingRes,
     topStories,
   ] = await Promise.all([
     // All events in window (for hot regions + coverage)
@@ -330,6 +336,13 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .from('alerts')
       .select('id', { count: 'exact', head: true })
       .eq('read', false),
+
+    // Breaking events in last 2h (severity >= 3)
+    supabase
+      .from('events')
+      .select('id', { count: 'exact', head: true })
+      .gte('occurred_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+      .gte('severity', 3),
 
     // Top stories (conflict/news) — freshness-first shortlist from last 6h, then 24h fallback
     // Use occurred_at: this is the article publish time in the actual schema.
@@ -422,6 +435,11 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     return true
   })
 
+  // Fuzzy title dedup — skip if first 5 words match an already-seen title
+  function titleFingerprint(t: string): string {
+    return t.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).slice(0, 5).join(' ')
+  }
+
   const DISASTER_CAP = 3
   const weatherSlots = Math.min(dedupedWeather.length, DISASTER_CAP)
   const conflictSlots = 20 - weatherSlots
@@ -429,6 +447,14 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     ...dedupedConflict.slice(0, conflictSlots),
     ...dedupedWeather.slice(0, weatherSlots),
   ]
+
+  const seenFingerprints = new Set<string>()
+  const dedupedFinal = stories.filter(e => {
+    const fp = titleFingerprint(e.title ?? '')
+    if (seenFingerprints.has(fp)) return false
+    seenFingerprints.add(fp)
+    return true
+  })
 
   const lastIngested = (freshRes.data?.ingested_at as string | null) ?? null
   const freshness = computeFreshness(lastIngested)
@@ -459,8 +485,9 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       criticalHighCount: critHighRes.count ?? 0,
       developingCount: developingRes.count ?? 0,
       activeAlertsCount: hasOrg ? (alertsRes.count ?? 0) : 0,
+      breaking2h: breakingRes.count ?? 0,
     },
-    topStories: stories.map((story) => ({
+    topStories: dedupedFinal.map((story) => ({
       ...story,
       ...sanitizeEventForClient(story as unknown as Record<string, unknown>),
       source: sanitizeEventForClient(story as unknown as Record<string, unknown>).outlet_name,

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 
 export interface HotRegion {
   region: string
-  riskLevel: 'Critical' | 'High' | 'Moderate' | 'Monitored'
+  riskLevel: 'Critical' | 'High' | 'Elevated' | 'Moderate' | 'Monitored'
   eventCount: number
   topDrivers: string[]
   topCountries: string[]
@@ -13,7 +13,8 @@ export interface HotRegion {
 const RISK_COLORS: Record<HotRegion['riskLevel'], string> = {
   Critical: '#ef4444',
   High: '#f97316',
-  Moderate: '#f59e0b',
+  Elevated: '#f59e0b',
+  Moderate: '#eab308',
   Monitored: '#3b82f6',
 }
 

@@ -380,8 +380,8 @@ function TopStoriesList({
   const noaaToShow = noaaExpanded ? noaaAll : noaaAll.slice(0, NOAA_LIMIT)
   const hiddenNoaaCount = noaaAll.length - NOAA_LIMIT
 
-  // Combined list: non-NOAA first (up to 10), then NOAA
-  const displayEvents = [...nonNoaa.slice(0, 10 - Math.min(noaaToShow.length, NOAA_LIMIT)), ...noaaToShow]
+  // Combined list: non-NOAA first (up to 20), then NOAA
+  const displayEvents = [...nonNoaa.slice(0, 20 - Math.min(noaaToShow.length, NOAA_LIMIT)), ...noaaToShow]
 
   const renderRow = (event: OverviewEvent) => {
     const sev = SEVERITY_CONFIG[(event.severity as 1|2|3|4) ?? 1] ?? SEVERITY_CONFIG[1]
@@ -790,6 +790,7 @@ export function OverviewClient() {
               hotRegionCount={data.kpis.hotRegionCount}
               criticalHighCount={data.kpis.criticalHighCount}
               activeAlertsCount={data.kpis.activeAlertsCount}
+              breaking2h={data.kpis.breaking2h}
               hasOrg={data.hasOrg}
             />
           </div>
