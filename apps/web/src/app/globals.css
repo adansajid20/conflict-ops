@@ -378,3 +378,15 @@ body {
   from { width: 0%; }
   to { width: 100%; }
 }
+
+.cr-tooltip .maplibregl-popup-content {
+  background: rgba(13, 17, 23, 0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+}
+.cr-tooltip .maplibregl-popup-tip {
+  border-top-color: rgba(13, 17, 23, 0.95);
+}

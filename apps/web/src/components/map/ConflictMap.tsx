@@ -21,6 +21,31 @@ function waitForStyle(map: MapLibreMap, timeoutMs = 3000): Promise<void> {
   })
 }
 
+function createSVGIcon(svgContent: string, bgColor: string | null, size = 32): string {
+  const bg = bgColor ? `<circle cx="12" cy="12" r="11" fill="${bgColor}" opacity="0.9"/>` : ''
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">${bg}${svgContent}</svg>`
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
+async function loadMapIcons(map: maplibregl.Map): Promise<void> {
+  const icons: Record<string, string> = {
+    'icon-plane': createSVGIcon('<path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" fill="white"/>', '#60a5fa'),
+    'icon-ship': createSVGIcon('<path d="M20 21c-1.39 0-2.78-.47-4-1.32-2.44 1.71-5.56 1.71-8 0C6.78 20.53 5.39 21 4 21H2v2h2c1.38 0 2.74-.35 4-1 2.5 1.3 5.5 1.3 8 0 1.26.65 2.62 1 4 1h2v-2zM3.95 19H4c1.6 0 3.02-.88 4-2 .98 1.12 2.4 2 4 2s3.02-.88 4-2c.98 1.12 2.4 2 4 2h.05l1.9-6.68c.08-.26.05-.54-.06-.78s-.29-.42-.52-.55L20 11V6c0-1.1-.9-2-2-2h-3V1H9v3H6c-1.1 0-2 .9-2 2v5l-1.37.86c-.23.13-.41.32-.52.55s-.15.52-.06.78z" fill="white"/>', '#34d399'),
+    'icon-nuclear': createSVGIcon('<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="white"/>', '#a78bfa'),
+    'icon-seismic': createSVGIcon('<path d="M3.5 18.99l11 .01c.67 0 1.27-.33 1.63-.84L20.5 12l-4.37-6.16C15.77 5.33 15.17 5 14.5 5l-11 .01L7.34 12z" fill="white"/>', '#f59e0b'),
+    'icon-fire': createSVGIcon('<path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67z" fill="white"/>', '#ff4500'),
+    'icon-wifi-off': createSVGIcon('<path d="M1 1l22 22-1.41 1.41-2.5-2.5A13.87 13.87 0 0 1 12 24C8.62 24 5.57 22.7 3.27 20.54L4.7 19.1A11.89 11.89 0 0 0 12 22c2.94 0 5.63-1.07 7.71-2.83L18.3 17.73A9.94 9.94 0 0 1 12 20a9.93 9.93 0 0 1-5.42-1.6L8 17c1.13.63 2.42 1 3.79 1 2.34 0 4.47-.83 6.12-2.2l-1.43-1.42A7.93 7.93 0 0 1 12 16a7.94 7.94 0 0 1-4.38-1.31L9 13.25A5.97 5.97 0 0 0 12 14a5.97 5.97 0 0 0 3.21-.93l-1.44-1.44A3.99 3.99 0 0 1 12 12a4 4 0 0 1-2.27-.71L7.83 9.39A5.99 5.99 0 0 0 6 14H4a7.97 7.97 0 0 1 2.09-5.33L4.7 7.28A9.94 9.94 0 0 0 2 14H0a11.9 11.9 0 0 1 3.07-7.93L1.41 4.41 2.83 3l18.38 18.38L20 22.83 1 1z" fill="white"/>', '#8b5cf6'),
+  }
+  for (const [name, dataUrl] of Object.entries(icons)) {
+    try {
+      const image = await map.loadImage(dataUrl)
+      if (image && !map.hasImage(name)) map.addImage(name, image.data)
+    } catch {
+      // ignore icon load failures
+    }
+  }
+}
+
 const LIVE_LAYER_CONFIG = {
   seismic: { color: '#f59e0b', radius: 8 },
   flights: { color: '#60a5fa', radius: 5 },
@@ -30,6 +55,24 @@ const LIVE_LAYER_CONFIG = {
   fires: { color: '#ff4500', radius: 6 },
 } as const
 
+const ICON_MAP: Record<string, string> = {
+  seismic: 'icon-seismic',
+  flights: 'icon-plane',
+  nuclear: 'icon-nuclear',
+  outages: 'icon-wifi-off',
+  vessels: 'icon-ship',
+  fires: 'icon-fire',
+}
+
+const LAYER_LABELS: Record<string, string> = {
+  flights: '✈️ MILITARY FLIGHT',
+  vessels: '🚢 VESSEL',
+  nuclear: '☢️ NUCLEAR FACILITY',
+  seismic: '💥 SEISMIC EVENT',
+  fires: '🔥 ACTIVE FIRE',
+  outages: '🌐 INTERNET OUTAGE',
+}
+
 type LiveLayerName = keyof typeof LIVE_LAYER_CONFIG
 
 type BaseFilterState = {
@@ -37,10 +80,6 @@ type BaseFilterState = {
   minSeverity: number | null
   query: string
   activeLayers: Set<string>
-}
-
-export type MapFilters = BaseFilterState & {
-  onLayerToggle: (layer: string) => void
 }
 
 type EventFeatureProperties = {
@@ -62,6 +101,9 @@ type EventFeatureProperties = {
 type EventCollection = GeoJSON.FeatureCollection<GeoJSON.Point, EventFeatureProperties>
 
 type LiveFeatureCollection = GeoJSON.FeatureCollection<GeoJSON.Point, GeoJSON.GeoJsonProperties>
+
+type WindowValue = '24h' | '72h' | '7d' | '30d'
+type SeverityValue = 'all' | 'critical' | 'high' | 'medium'
 
 const DEFAULT_FILTER_STATE: BaseFilterState = {
   hours: 168,
@@ -86,6 +128,34 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;')
 }
 
+function hoursToWindow(hours: number): WindowValue {
+  if (hours === 24) return '24h'
+  if (hours === 72) return '72h'
+  if (hours === 720) return '30d'
+  return '7d'
+}
+
+function windowToHours(value: WindowValue): number {
+  if (value === '24h') return 24
+  if (value === '72h') return 72
+  if (value === '30d') return 720
+  return 168
+}
+
+function minSeverityToValue(value: number | null): SeverityValue {
+  if (value === 4) return 'critical'
+  if (value === 3) return 'high'
+  if (value === 2) return 'medium'
+  return 'all'
+}
+
+function valueToMinSeverity(value: SeverityValue): number | null {
+  if (value === 'critical') return 4
+  if (value === 'high') return 3
+  if (value === 'medium') return 2
+  return null
+}
+
 export function ConflictMap() {
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
@@ -94,21 +164,9 @@ export function ConflictMap() {
   const [filterState, setFilterState] = useState<BaseFilterState>(DEFAULT_FILTER_STATE)
   const [loading, setLoading] = useState(true)
   const [mapReady, setMapReady] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
+  const [showFilters, setShowFilters] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState<OverviewEvent | null>(null)
   const [hasOrg, setHasOrg] = useState(false)
-
-  const filters = useMemo<MapFilters>(() => ({
-    ...filterState,
-    onLayerToggle: (layer: string) => {
-      setFilterState((current) => {
-        const nextLayers = new Set(current.activeLayers)
-        if (nextLayers.has(layer)) nextLayers.delete(layer)
-        else nextLayers.add(layer)
-        return { ...current, activeLayers: nextLayers }
-      })
-    },
-  }), [filterState])
 
   const filteredData = useMemo<EventCollection>(() => {
     const features = (rawData?.features ?? []).filter((feature) => matchesFilters(feature.properties, filterState))
@@ -228,16 +286,17 @@ export function ConflictMap() {
       try { mapAny.setProjection({ type: 'globe' }) } catch {}
       try {
         mapAny.setFog({
-          color: 'rgb(4, 8, 16)',
-          'high-color': 'rgb(10, 18, 40)',
-          'horizon-blend': 0.04,
-          'space-color': 'rgb(4, 8, 16)',
-          'star-intensity': 0.6,
+          color: 'rgb(15, 30, 60)',
+          'high-color': 'rgb(20, 60, 120)',
+          'horizon-blend': 0.03,
+          'space-color': 'rgb(4, 8, 20)',
+          'star-intensity': 0.8,
         })
       } catch {}
 
       // setProjection triggers a style reload in MapLibre v5 — must wait before addSource/addLayer
       await waitForStyle(map)
+      await loadMapIcons(map)
 
       map.addSource('events', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
 
@@ -247,10 +306,11 @@ export function ConflictMap() {
         source: 'events',
         filter: ['in', ['get', 'severity'], ['literal', [4, 3]]],
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, ['match', ['get', 'severity'], 4, 18, 3, 14, 10], 6, ['match', ['get', 'severity'], 4, 28, 3, 22, 16]],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, ['match', ['get', 'severity'], 4, 12, 3, 10, 8], 6, ['match', ['get', 'severity'], 4, 20, 3, 16, 12]],
           'circle-color': 'rgba(255,255,255,0)',
           'circle-stroke-color': ['match', ['get', 'severity'], 4, 'rgba(239,68,68,0.35)', 3, 'rgba(249,115,22,0.30)', 'rgba(255,255,255,0)'],
-          'circle-stroke-width': ['match', ['get', 'severity'], 4, 3, 3, 2, 0],
+          'circle-stroke-width': ['match', ['get', 'severity'], 4, 2, 3, 1.5, 0],
+          'circle-stroke-opacity': 0.4,
           'circle-opacity': 0.9,
         },
       })
@@ -259,34 +319,37 @@ export function ConflictMap() {
         id: 'event-points',
         type: 'circle',
         source: 'events',
-        layout: { visibility: 'visible' }, // visibility toggled by separate useEffect after mapReady
+        layout: { visibility: 'visible' },
         paint: {
           'circle-color': ['match', ['get', 'severity'], 4, '#ef4444', 3, '#f97316', 2, '#eab308', '#6b7280'],
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, ['match', ['get', 'severity'], 4, 5.5, 3, 5, 2, 4.5, 4], 6, ['match', ['get', 'severity'], 4, 10, 3, 8.5, 2, 7, 5.5]],
-          'circle-stroke-width': ['match', ['get', 'severity'], 4, 2.5, 3, 2, 2, 1.5, 1],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'],
+            1, ['match', ['get', 'severity'], 4, 4, 3, 3.5, 2, 3, 2.5],
+            6, ['match', ['get', 'severity'], 4, 7, 3, 6, 2, 5, 4],
+          ],
+          'circle-stroke-width': ['match', ['get', 'severity'], 4, 2, 3, 1.5, 2, 1, 0.8],
           'circle-stroke-color': 'rgba(255,255,255,0.88)',
           'circle-opacity': ['interpolate', ['linear'], ['coalesce', ['get', 'age_min'], 10080], 0, 0.95, 180, 0.9, 1440, 0.78, 10080, 0.62],
         },
       })
 
-      ;(Object.entries(LIVE_LAYER_CONFIG) as [LiveLayerName, (typeof LIVE_LAYER_CONFIG)[LiveLayerName]][]).forEach(([name, config]) => {
+      ;(Object.entries(LIVE_LAYER_CONFIG) as [LiveLayerName, (typeof LIVE_LAYER_CONFIG)[LiveLayerName]][]).forEach(([name]) => {
         map.addSource(name, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
         map.addLayer({
           id: `${name}-layer`,
-          type: 'circle',
+          type: 'symbol',
           source: name,
-          layout: { visibility: 'none' }, // live layers off by default; toggled by useEffect after mapReady
-          paint: {
-            'circle-color': ['coalesce', ['get', 'color'], config.color],
-            'circle-radius': config.radius,
-            'circle-stroke-color': 'rgba(255,255,255,0.7)',
-            'circle-stroke-width': 1.25,
-            'circle-opacity': 0.88,
+          layout: {
+            'icon-image': ICON_MAP[name] ?? 'icon-seismic',
+            'icon-size': name === 'nuclear' ? 0.9 : name === 'fires' ? 0.55 : 0.7,
+            'icon-allow-overlap': true,
+            'icon-anchor': 'center',
+            visibility: 'none',
           },
+          paint: { 'icon-opacity': 0.9 },
         })
       })
 
-      const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '300px', className: 'conflict-popup' })
+      const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '300px', className: 'cr-tooltip' })
 
       const handleMouseEnter = (e: MapLayerMouseEvent) => {
         map.getCanvas().style.cursor = 'pointer'
@@ -304,12 +367,16 @@ export function ConflictMap() {
           : layer === 'events'
             ? (typeof props.severity === 'number' && props.severity >= 4 ? '#ef4444' : typeof props.severity === 'number' && props.severity >= 3 ? '#f97316' : typeof props.severity === 'number' && props.severity >= 2 ? '#eab308' : '#6b7280')
             : LIVE_LAYER_CONFIG[layer as LiveLayerName]?.color ?? '#60a5fa'
+        const layerLabel = layer === 'events'
+          ? (typeof props.severity === 'number' && props.severity >= 4 ? '🔴 CRITICAL EVENT' : typeof props.severity === 'number' && props.severity >= 3 ? '🟠 HIGH PRIORITY EVENT' : typeof props.severity === 'number' && props.severity >= 2 ? '🟡 MEDIUM PRIORITY EVENT' : '⚪ LOW PRIORITY EVENT')
+          : (LAYER_LABELS[layer] ?? escapeHtml(layer.toUpperCase()))
 
         popup.setLngLat(coords).setHTML(`
-          <div style="background:rgba(3,7,18,0.95);border:1px solid rgba(255,255,255,0.1);border-left:3px solid ${borderColor};border-radius:8px;padding:10px 12px;max-width:280px;">
+          <div style="border-left:3px solid ${borderColor};padding-left:2px;max-width:280px;">
+            <div style="color:${borderColor};font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;font-weight:700;">${escapeHtml(layerLabel)}</div>
             ${meta ? `<div style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">${escapeHtml(meta)}</div>` : ''}
             <div style="color:#f9fafb;font-size:13px;font-weight:600;line-height:1.4;">${escapeHtml(title)}</div>
-            <div style="color:#6b7280;font-size:11px;margin-top:4px;">${layer === 'events' ? 'Click to open brief' : escapeHtml(layer.toUpperCase())}</div>
+            <div style="color:#6b7280;font-size:11px;margin-top:4px;">${layer === 'events' ? 'Click to open brief' : 'Live layer feed'}</div>
           </div>
         `).addTo(map)
       }
@@ -399,29 +466,46 @@ export function ConflictMap() {
     }
   }, [filterState.activeLayers, mapReady])
 
+  const windowValue = hoursToWindow(filterState.hours)
+  const severityValue = minSeverityToValue(filterState.minSeverity)
+
   return (
     <div className="relative h-full w-full overflow-hidden" style={{ background: 'linear-gradient(180deg, #040810 0%, #09101c 100%)' }}>
       <div ref={mapContainer} className="absolute inset-0" />
 
       {!mapReady && (
         <div className="absolute inset-0 z-20 flex items-center justify-center" style={{ background: 'rgba(4,8,16,0.88)' }}>
-          <div className="text-xs tracking-[0.3em]" style={{ color: 'var(--text-muted)' }}>
-            {loading ? 'LOADING GLOBE' : 'INITIALIZING GLOBE'}
+          <div className="w-56 overflow-hidden rounded-full border border-white/10 bg-white/5">
+            <div className="h-1 bg-blue-500" style={{ animation: 'cr-loading 1.6s linear infinite' }} />
           </div>
         </div>
       )}
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between p-4">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-4">
         <div className="space-y-3">
           <button
             onClick={() => setShowFilters((current) => !current)}
-            className="pointer-events-auto rounded-2xl border px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em]"
-            style={{ background: 'rgba(5,10,18,0.8)', borderColor: 'rgba(148,163,184,0.18)', color: 'var(--text-primary)' }}
+            className="pointer-events-auto rounded-2xl border border-white/10 bg-[#0d1117]/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-100 backdrop-blur-sm"
           >
-            Filters
+            {showFilters ? 'Hide filters' : 'Show filters'}
           </button>
           {showFilters && (
-            <MapFilterPanel filters={filters} onChange={setFilterState} onClose={() => setShowFilters(false)} />
+            <MapFilterPanel
+              window={windowValue}
+              severity={severityValue}
+              activeLayers={filterState.activeLayers}
+              onWindowChange={(value) => setFilterState((current) => ({ ...current, hours: windowToHours(value) }))}
+              onSeverityChange={(value) => setFilterState((current) => ({ ...current, minSeverity: valueToMinSeverity(value) }))}
+              onLayerToggle={(layer) => {
+                setFilterState((current) => {
+                  const nextLayers = new Set(current.activeLayers)
+                  if (nextLayers.has(layer)) nextLayers.delete(layer)
+                  else nextLayers.add(layer)
+                  return { ...current, activeLayers: nextLayers }
+                })
+              }}
+              onReset={() => setFilterState(DEFAULT_FILTER_STATE)}
+            />
           )}
         </div>
 
@@ -429,14 +513,14 @@ export function ConflictMap() {
       </div>
 
       <div className="pointer-events-none absolute bottom-4 left-4 z-10">
-        <MapLegend />
+        <MapLegend activeLayers={filterState.activeLayers} />
       </div>
 
       {!loading && filteredData.features.length === 0 && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <div className="rounded-3xl border px-6 py-4 text-center" style={{ background: 'rgba(5,10,18,0.8)', borderColor: 'rgba(148,163,184,0.18)' }}>
-            <div className="text-xs uppercase tracking-[0.24em]" style={{ color: 'var(--text-muted)' }}>No mapped events</div>
-            <div className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>Adjust the filters or widen the time window.</div>
+          <div className="rounded-3xl border border-white/10 bg-[#0d1117]/80 px-6 py-4 text-center backdrop-blur-sm">
+            <div className="text-xs uppercase tracking-[0.24em] text-slate-500">No mapped events</div>
+            <div className="mt-1 text-sm text-slate-300">Adjust the filters or widen the time window.</div>
           </div>
         </div>
       )}
