@@ -29,7 +29,7 @@ const LoaderIcon = Loader2 as unknown as ComponentType<{ className?: string; sty
 const SendIcon = Send as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
 const CloseIcon = X as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
 
-export function IntelCopilot({ topStories = [] }: { topStories?: TopStoryContext[] }) {
+export function IntelCopilot({ topStories: propTopStories }: { topStories?: TopStoryContext[] }) {
   const [open, setOpen] = useState(false)
   const [orgId, setOrgId] = useState<string | null>(null)
   const [input, setInput] = useState('')
@@ -38,6 +38,20 @@ export function IntelCopilot({ topStories = [] }: { topStories?: TopStoryContext
     { role: 'assistant', content: 'Ask about recent events, alerts, missions, or forecasts. I only answer from platform data.' },
   ])
   const [unavailable, setUnavailable] = useState(false)
+  const [fetchedStories, setFetchedStories] = useState<TopStoryContext[]>([])
+
+  // Self-fetch top stories on open if none provided via prop
+  const topStories = propTopStories && propTopStories.length > 0 ? propTopStories : fetchedStories
+
+  useEffect(() => {
+    if (!open || topStories.length > 0) return
+    void fetch('/api/v1/overview?window=24h', { cache: 'no-store' })
+      .then(r => r.json())
+      .then((d: { topStories?: TopStoryContext[] }) => {
+        if (d.topStories) setFetchedStories(d.topStories.slice(0, 20))
+      })
+      .catch(() => {})
+  }, [open, topStories.length])
 
   useEffect(() => {
     void fetch('/api/v1/enterprise/org', { cache: 'no-store' })

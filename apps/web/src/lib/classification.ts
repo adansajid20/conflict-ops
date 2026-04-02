@@ -39,6 +39,13 @@ export const TITLE_BLOCKLIST_PATTERNS: RegExp[] = [
   /ІНФОРМАЦІЙНА ДОВІДКА/, /БЮЛЕТЕНЬ/, /КВАРТАЛ/, /ДОПОМОГА З ЖИТЛОМ/,
   // Consumer/utility noise
   /\bshopping coupon/i,
+  // French-language economic/fiscal content (Mali Actu, Africa feeds)
+  /\bimportateur(s)?\b/i,
+  /\bcorridor\b.{0,30}(bamako|dakar|abidjan)/i,
+  /\bfin du sursis\b/i,
+  /\bdouane(s)?\b.{0,40}(mali|sénégal|afrique)/i,
+  /\btaux de change\b/i,
+  /\bprix.{0,20}march(é|e)\b/i,
   /\bdiscount voucher/i,
   /\bconsumption coupon/i,
   /\butility (company|bill|rebate)\b/i,

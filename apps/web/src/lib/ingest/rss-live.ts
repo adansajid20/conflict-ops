@@ -191,9 +191,15 @@ async function parseFeed(
         continue
       }
 
-      const title = item.title.trim()
+      const title = sanitizeWireTitle(item.title.trim())
       const link = item.link ?? item.guid ?? null
-      const snippet = (item.contentSnippet ?? item.summary ?? '').slice(0, 500)
+      // Strip RSS boilerplate footers (site name, URL, tagline injected by feed generators)
+      const rawSnippet = (item.contentSnippet ?? item.summary ?? '').slice(0, 500)
+      const snippet = rawSnippet
+        .replace(/\s*(Mali Actu|maliactu\.net|Mali Actualités)[^.]*$/gi, '')
+        .replace(/\s*(BBC News|Reuters -|AP News -|Al Jazeera -)[^.]*$/gi, '')
+        .replace(/\s*[-–—]\s*\S+\.(com|net|org|co)\S*\s*$/gi, '')
+        .trim()
 
       if (isBlocklisted(title, link ?? '', snippet)) {
         skipped += 1
