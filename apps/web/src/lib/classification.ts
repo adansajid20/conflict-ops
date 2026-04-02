@@ -37,6 +37,25 @@ export const TITLE_BLOCKLIST_PATTERNS: RegExp[] = [
   /\bunemployment (rate|data|figures|falls|rises)\b/i,
   /\bstock(s| market)\b.{0,20}(fall|rise|surge|drop|rally|slump)/i,
   /ІНФОРМАЦІЙНА ДОВІДКА/, /БЮЛЕТЕНЬ/, /КВАРТАЛ/, /ДОПОМОГА З ЖИТЛОМ/,
+  // Consumer/utility noise
+  /\bshopping coupon/i,
+  /\bdiscount voucher/i,
+  /\bconsumption coupon/i,
+  /\butility (company|bill|rebate)\b/i,
+  /\b(electricity|power|gas) (company|provider|bill)\b.{0,30}(coupon|voucher|rebate|discount)/i,
+  // US domestic weather alerts (not conflict intelligence)
+  /\btornado warning\b/i,
+  /\bsevere thunderstorm warning\b/i,
+  /\bflood warning\b/i,
+  /\bflash flood warning\b/i,
+  /\bwinter storm warning\b/i,
+  /\bice storm warning\b/i,
+  /\bheat advisory\b/i,
+  /\bnws\b.{0,20}\bwarning\b/i,
+  /\bweather alert\b/i,
+  /\bby NWS\b/i,
+  /issued by the National Weather Service/i,
+  /until \d+:\d+[AP]M [A-Z]{2,4} by NWS/i,
 ]
 
 export const DOMAIN_BLOCKLIST: string[] = [
@@ -45,6 +64,7 @@ export const DOMAIN_BLOCKLIST: string[] = [
   'goal.com', 'skysports.com', 'marca.com', 'bild.de',
   'tmz.com', 'people.com', 'eonline.com', 'variety.com',
   'hollywoodreporter.com', 'rollingstone.com', 'buzzfeed.com',
+  'weather.gov', 'nws.noaa.gov',
 ]
 
 export const DESCRIPTION_BLOCKLIST_PATTERNS: RegExp[] = [

@@ -402,19 +402,11 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   // Filter out blocklisted titles from top stories
   const filteredConflict = conflictCandidates.filter(e => !isBlocklisted(e.title ?? ''))
 
-  // Build top stories: freshness-first ranking with severity bonuses
-  const sortedConflict = [...filteredConflict].sort((a, b) => {
-    const scoreDiff = computeFreshnessScore({
-      occurred_at: b.occurred_at ?? b.ingested_at ?? new Date(0).toISOString(),
-      severity: b.severity,
-    }) - computeFreshnessScore({
-      occurred_at: a.occurred_at ?? a.ingested_at ?? new Date(0).toISOString(),
-      severity: a.severity,
-    })
-
-    if (scoreDiff !== 0) return scoreDiff
-    return new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() - new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
-  })
+  // Pure chronological — newest first, no scoring. BREAKING section handles importance surfacing.
+  const sortedConflict = [...filteredConflict].sort((a, b) =>
+    new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() -
+    new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
+  )
   const sortedWeather = [...weatherCandidates].sort((a, b) => {
     const severityDiff = Number(b.severity ?? 1) - Number(a.severity ?? 1)
     if (severityDiff !== 0) return severityDiff
