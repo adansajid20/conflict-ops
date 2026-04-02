@@ -10,6 +10,14 @@ import { MapFilterPanel } from './MapFilterPanel'
 import { MapLegend } from './MapLegend'
 import { MapStatsBar } from './MapStatsBar'
 
+// Waits for MapLibre style to be fully loaded — required after setProjection which triggers a style reload
+function waitForStyle(map: MapLibreMap): Promise<void> {
+  return new Promise((resolve) => {
+    if (map.isStyleLoaded()) { resolve(); return }
+    map.once('style.load', () => resolve())
+  })
+}
+
 const LIVE_LAYER_CONFIG = {
   seismic: { color: '#f59e0b', radius: 8 },
   flights: { color: '#60a5fa', radius: 5 },
@@ -209,7 +217,7 @@ export function ConflictMap() {
 
     mapRef.current = map
 
-    map.on('load', () => {
+    map.on('load', () => { void (async () => {
       const mapAny = map as MapLibreMap & {
         setProjection: (p: { type: string }) => void
         setFog: (f: Record<string, unknown>) => void
@@ -224,6 +232,9 @@ export function ConflictMap() {
           'star-intensity': 0.6,
         })
       } catch {}
+
+      // setProjection triggers a style reload in MapLibre v5 — must wait before addSource/addLayer
+      await waitForStyle(map)
 
       map.addSource('events', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
 
@@ -319,7 +330,7 @@ export function ConflictMap() {
 
       setMapReady(true)
       startRotation()
-    })
+    })() })
 
     return () => {
       stopRotation()
@@ -366,11 +377,13 @@ export function ConflictMap() {
           return await response.json() as LiveFeatureCollection
         })
         .then((geojson) => {
+          if (!map.isStyleLoaded()) return
           const currentSource = map.getSource(layer) as GeoJSONSource | undefined
           currentSource?.setData(geojson)
         })
         .catch(() => {
           if (controller.signal.aborted) return
+          if (!map.isStyleLoaded()) return
           const currentSource = map.getSource(layer) as GeoJSONSource | undefined
           currentSource?.setData({ type: 'FeatureCollection', features: [] })
         })
