@@ -163,21 +163,23 @@ export function ConflictMap() {
     mapRef.current = map
 
     map.on('load', () => {
-      ;(map as MapLibreMap & {
-        setProjection?: (value: unknown) => void
-        setFog?: (value: unknown) => void
-      }).setProjection?.({ type: 'globe' })
+      // MapLibre v3 globe projection — setProjection is a real method in v3.6.x
       try {
-        ;(map as MapLibreMap & { setFog?: (value: unknown) => void }).setFog?.({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(map as any).setProjection({ type: 'globe' })
+      } catch { /* no-op if somehow unavailable */ }
+
+      // Space atmosphere
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(map as any).setFog({
           color: 'rgb(4, 8, 16)',
           'high-color': 'rgb(10, 18, 40)',
           'horizon-blend': 0.04,
           'space-color': 'rgb(4, 8, 16)',
           'star-intensity': 0.6,
         })
-      } catch {
-        // fine
-      }
+      } catch { /* no-op */ }
 
       map.addSource('events', {
         type: 'geojson',
