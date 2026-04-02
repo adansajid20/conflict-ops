@@ -10,10 +10,26 @@ import { MapFilterPanel } from './MapFilterPanel'
 import { MapLegend } from './MapLegend'
 import { MapStatsBar } from './MapStatsBar'
 
-export type MapFilters = {
+const LIVE_LAYER_CONFIG = {
+  seismic: { color: '#f59e0b', radius: 8 },
+  flights: { color: '#60a5fa', radius: 5 },
+  nuclear: { color: '#a78bfa', radius: 10 },
+  outages: { color: '#8b5cf6', radius: 6 },
+  vessels: { color: '#34d399', radius: 6 },
+  fires: { color: '#ff4500', radius: 6 },
+} as const
+
+type LiveLayerName = keyof typeof LIVE_LAYER_CONFIG
+
+type BaseFilterState = {
   hours: number
   minSeverity: number | null
   query: string
+  activeLayers: Set<string>
+}
+
+export type MapFilters = BaseFilterState & {
+  onLayerToggle: (layer: string) => void
 }
 
 type EventFeatureProperties = {
@@ -28,36 +44,65 @@ type EventFeatureProperties = {
   significance_score: number | null
   summary_short: string | null
   age_min: number | null
+  layer?: string | null
+  name?: string | null
 }
 
 type EventCollection = GeoJSON.FeatureCollection<GeoJSON.Point, EventFeatureProperties>
 
-const DEFAULT_FILTERS: MapFilters = { hours: 168, minSeverity: null, query: '' }
+type LiveFeatureCollection = GeoJSON.FeatureCollection<GeoJSON.Point, GeoJSON.GeoJsonProperties>
 
-function matchesFilters(properties: EventFeatureProperties, filters: MapFilters): boolean {
+const DEFAULT_FILTER_STATE: BaseFilterState = {
+  hours: 168,
+  minSeverity: null,
+  query: '',
+  activeLayers: new Set(['events']),
+}
+
+function matchesFilters(properties: EventFeatureProperties, filters: BaseFilterState): boolean {
   if (filters.minSeverity !== null && properties.severity < filters.minSeverity) return false
   if (!filters.query.trim()) return true
   const haystack = `${properties.title} ${properties.region ?? ''} ${properties.event_type ?? ''}`.toLowerCase()
   return haystack.includes(filters.query.trim().toLowerCase())
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
 export function ConflictMap() {
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const rotationRef = useRef<number | null>(null)
-
   const [rawData, setRawData] = useState<EventCollection | null>(null)
-  const [filters, setFilters] = useState<MapFilters>(DEFAULT_FILTERS)
+  const [filterState, setFilterState] = useState<BaseFilterState>(DEFAULT_FILTER_STATE)
   const [loading, setLoading] = useState(true)
   const [mapReady, setMapReady] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<OverviewEvent | null>(null)
   const [hasOrg, setHasOrg] = useState(false)
 
+  const filters = useMemo<MapFilters>(() => ({
+    ...filterState,
+    onLayerToggle: (layer: string) => {
+      setFilterState((current) => {
+        const nextLayers = new Set(current.activeLayers)
+        if (nextLayers.has(layer)) nextLayers.delete(layer)
+        else nextLayers.add(layer)
+        return { ...current, activeLayers: nextLayers }
+      })
+    },
+  }), [filterState])
+
   const filteredData = useMemo<EventCollection>(() => {
-    const features = (rawData?.features ?? []).filter((feature) => matchesFilters(feature.properties, filters))
+    const features = (rawData?.features ?? []).filter((feature) => matchesFilters(feature.properties, filterState))
     return { type: 'FeatureCollection', features }
-  }, [rawData, filters])
+  }, [rawData, filterState])
 
   const stats = useMemo(() => {
     return filteredData.features.reduce(
@@ -97,7 +142,9 @@ export function ConflictMap() {
 
   const handleFeatureClick = useCallback(async (event: MapLayerMouseEvent) => {
     const feature = event.features?.[0]
+    const featureLayer = feature?.properties?.layer
     const eventId = feature?.properties?.id
+    if (featureLayer && featureLayer !== 'events') return
     if (!eventId || typeof eventId !== 'string') return
 
     try {
@@ -117,23 +164,15 @@ export function ConflictMap() {
       try {
         setLoading(true)
         const [eventsResponse, meResponse] = await Promise.all([
-          fetch(`/api/v1/map/events?hours=${filters.hours}`, { cache: 'no-store' }),
+          fetch(`/api/v1/map/events?hours=${filterState.hours}`, { cache: 'no-store' }),
           fetch('/api/v1/me', { cache: 'no-store' }).catch(() => null),
         ])
 
         if (!active) return
 
-        console.log('[map] events response status:', eventsResponse.status, eventsResponse.ok)
         if (eventsResponse.ok) {
-          try {
-            const data = await eventsResponse.json() as EventCollection
-            console.log('[map] features loaded:', data?.features?.length ?? 0)
-            if (active) setRawData(data)
-          } catch (e) {
-            console.error('[map] JSON parse error:', e)
-          }
-        } else {
-          console.error('[map] events API error:', eventsResponse.status, await eventsResponse.text().catch(() => ''))
+          const data = await eventsResponse.json() as EventCollection
+          if (active) setRawData(data)
         }
 
         if (meResponse?.ok) {
@@ -153,7 +192,7 @@ export function ConflictMap() {
       active = false
       window.clearInterval(intervalId)
     }
-  }, [filters.hours])
+  }, [filterState.hours])
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
@@ -171,14 +210,11 @@ export function ConflictMap() {
     mapRef.current = map
 
     map.on('load', () => {
-      // MapLibre v3 globe projection — setProjection is a real method in v3.6.x
       const mapAny = map as MapLibreMap & {
         setProjection: (p: { type: string }) => void
         setFog: (f: Record<string, unknown>) => void
       }
-      try { mapAny.setProjection({ type: 'globe' }) } catch { /* no-op */ }
-
-      // Space atmosphere
+      try { mapAny.setProjection({ type: 'globe' }) } catch {}
       try {
         mapAny.setFog({
           color: 'rgb(4, 8, 16)',
@@ -187,12 +223,9 @@ export function ConflictMap() {
           'space-color': 'rgb(4, 8, 16)',
           'star-intensity': 0.6,
         })
-      } catch { /* no-op */ }
+      } catch {}
 
-      map.addSource('events', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
+      map.addSource('events', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
 
       map.addLayer({
         id: 'event-pulse',
@@ -200,24 +233,10 @@ export function ConflictMap() {
         source: 'events',
         filter: ['in', ['get', 'severity'], ['literal', [4, 3]]],
         paint: {
-          'circle-radius': [
-            'interpolate', ['linear'], ['zoom'],
-            1, ['match', ['get', 'severity'], 4, 18, 3, 14, 10],
-            6, ['match', ['get', 'severity'], 4, 28, 3, 22, 16],
-          ],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, ['match', ['get', 'severity'], 4, 18, 3, 14, 10], 6, ['match', ['get', 'severity'], 4, 28, 3, 22, 16]],
           'circle-color': 'rgba(255,255,255,0)',
-          'circle-stroke-color': [
-            'match', ['get', 'severity'],
-            4, 'rgba(239,68,68,0.35)',
-            3, 'rgba(249,115,22,0.30)',
-            'rgba(255,255,255,0)',
-          ],
-          'circle-stroke-width': [
-            'match', ['get', 'severity'],
-            4, 3,
-            3, 2,
-            0,
-          ],
+          'circle-stroke-color': ['match', ['get', 'severity'], 4, 'rgba(239,68,68,0.35)', 3, 'rgba(249,115,22,0.30)', 'rgba(255,255,255,0)'],
+          'circle-stroke-width': ['match', ['get', 'severity'], 4, 3, 3, 2, 0],
           'circle-opacity': 0.9,
         },
       })
@@ -226,68 +245,70 @@ export function ConflictMap() {
         id: 'event-points',
         type: 'circle',
         source: 'events',
+        layout: { visibility: filterState.activeLayers.has('events') ? 'visible' : 'none' },
         paint: {
-          'circle-color': [
-            'match', ['get', 'severity'],
-            4, '#ef4444',
-            3, '#f97316',
-            2, '#eab308',
-            '#6b7280',
-          ],
-          'circle-radius': [
-            'interpolate', ['linear'], ['zoom'],
-            1, ['match', ['get', 'severity'], 4, 5.5, 3, 5, 2, 4.5, 4],
-            6, ['match', ['get', 'severity'], 4, 10, 3, 8.5, 2, 7, 5.5],
-          ],
-          'circle-stroke-width': [
-            'match', ['get', 'severity'],
-            4, 2.5,
-            3, 2,
-            2, 1.5,
-            1,
-          ],
+          'circle-color': ['match', ['get', 'severity'], 4, '#ef4444', 3, '#f97316', 2, '#eab308', '#6b7280'],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, ['match', ['get', 'severity'], 4, 5.5, 3, 5, 2, 4.5, 4], 6, ['match', ['get', 'severity'], 4, 10, 3, 8.5, 2, 7, 5.5]],
+          'circle-stroke-width': ['match', ['get', 'severity'], 4, 2.5, 3, 2, 2, 1.5, 1],
           'circle-stroke-color': 'rgba(255,255,255,0.88)',
-          'circle-opacity': [
-            'interpolate', ['linear'], ['coalesce', ['get', 'age_min'], 10080],
-            0, 0.95,
-            180, 0.9,
-            1440, 0.78,
-            10080, 0.62,
-          ],
+          'circle-opacity': ['interpolate', ['linear'], ['coalesce', ['get', 'age_min'], 10080], 0, 0.95, 180, 0.9, 1440, 0.78, 10080, 0.62],
         },
       })
 
-      // Hover popup
-      const popup = new maplibregl.Popup({
-        closeButton: false,
-        closeOnClick: false,
-        maxWidth: '300px',
-        className: 'conflict-popup',
+      ;(Object.entries(LIVE_LAYER_CONFIG) as [LiveLayerName, (typeof LIVE_LAYER_CONFIG)[LiveLayerName]][]).forEach(([name, config]) => {
+        map.addSource(name, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+        map.addLayer({
+          id: `${name}-layer`,
+          type: 'circle',
+          source: name,
+          layout: { visibility: filterState.activeLayers.has(name) ? 'visible' : 'none' },
+          paint: {
+            'circle-color': ['coalesce', ['get', 'color'], config.color],
+            'circle-radius': config.radius,
+            'circle-stroke-color': 'rgba(255,255,255,0.7)',
+            'circle-stroke-width': 1.25,
+            'circle-opacity': 0.88,
+          },
+        })
       })
 
-      map.on('mouseenter', 'event-points', (e) => {
+      const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '300px', className: 'conflict-popup' })
+
+      const handleMouseEnter = (e: MapLayerMouseEvent) => {
         map.getCanvas().style.cursor = 'pointer'
         const feature = e.features?.[0]
         if (!feature) return
         const props = feature.properties as Record<string, unknown>
         const coords = ((feature.geometry as unknown) as { coordinates: [number, number] }).coordinates.slice() as [number, number]
-        const sev = typeof props.severity === 'number' ? props.severity : 1
-        const borderColor = sev >= 4 ? '#ef4444' : sev >= 3 ? '#f97316' : sev >= 2 ? '#eab308' : '#6b7280'
-        const region = typeof props.region === 'string' ? props.region : ''
-        const outlet = typeof props.outlet_name === 'string' ? props.outlet_name : ''
-        const title = typeof props.title === 'string' ? props.title : ''
-        const meta = [region, outlet].filter(Boolean).join(' · ')
+        const layer = typeof props.layer === 'string' ? props.layer : 'events'
+        const title = typeof props.title === 'string' ? props.title : typeof props.name === 'string' ? props.name : typeof props.callsign === 'string' ? props.callsign : `${layer} layer item`
+        const region = typeof props.region === 'string' ? props.region : typeof props.zone === 'string' ? props.zone : typeof props.country === 'string' ? props.country : ''
+        const source = typeof props.outlet_name === 'string' ? props.outlet_name : typeof props.type === 'string' ? props.type : ''
+        const meta = [region, source].filter(Boolean).join(' · ')
+        const borderColor = typeof props.color === 'string'
+          ? props.color
+          : layer === 'events'
+            ? (typeof props.severity === 'number' && props.severity >= 4 ? '#ef4444' : typeof props.severity === 'number' && props.severity >= 3 ? '#f97316' : typeof props.severity === 'number' && props.severity >= 2 ? '#eab308' : '#6b7280')
+            : LIVE_LAYER_CONFIG[layer as LiveLayerName]?.color ?? '#60a5fa'
+
         popup.setLngLat(coords).setHTML(`
           <div style="background:rgba(3,7,18,0.95);border:1px solid rgba(255,255,255,0.1);border-left:3px solid ${borderColor};border-radius:8px;padding:10px 12px;max-width:280px;">
-            ${meta ? `<div style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">${meta}</div>` : ''}
-            <div style="color:#f9fafb;font-size:13px;font-weight:600;line-height:1.4;">${title}</div>
-            <div style="color:#6b7280;font-size:11px;margin-top:4px;">Click to open brief</div>
+            ${meta ? `<div style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">${escapeHtml(meta)}</div>` : ''}
+            <div style="color:#f9fafb;font-size:13px;font-weight:600;line-height:1.4;">${escapeHtml(title)}</div>
+            <div style="color:#6b7280;font-size:11px;margin-top:4px;">${layer === 'events' ? 'Click to open brief' : escapeHtml(layer.toUpperCase())}</div>
           </div>
         `).addTo(map)
-      })
-      map.on('mouseleave', 'event-points', () => {
+      }
+
+      const handleMouseLeave = () => {
         map.getCanvas().style.cursor = ''
         popup.remove()
+      }
+
+      const interactiveLayers = ['event-points', ...(Object.keys(LIVE_LAYER_CONFIG).map((name) => `${name}-layer`))]
+      interactiveLayers.forEach((layerId) => {
+        map.on('mouseenter', layerId, handleMouseEnter)
+        map.on('mouseleave', layerId, handleMouseLeave)
       })
       map.on('click', 'event-points', (event) => {
         void handleFeatureClick(event)
@@ -305,13 +326,60 @@ export function ConflictMap() {
       map.remove()
       mapRef.current = null
     }
-  }, [handleFeatureClick, startRotation, stopRotation])
+  }, [filterState.activeLayers, handleFeatureClick, startRotation, stopRotation])
 
   useEffect(() => {
     if (!mapReady) return
     const source = mapRef.current?.getSource('events') as GeoJSONSource | undefined
     if (source) source.setData(filteredData)
   }, [filteredData, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return
+    const map = mapRef.current
+    map.setLayoutProperty('event-points', 'visibility', filterState.activeLayers.has('events') ? 'visible' : 'none')
+    map.setLayoutProperty('event-pulse', 'visibility', filterState.activeLayers.has('events') ? 'visible' : 'none')
+
+    ;(Object.keys(LIVE_LAYER_CONFIG) as LiveLayerName[]).forEach((layer) => {
+      map.setLayoutProperty(`${layer}-layer`, 'visibility', filterState.activeLayers.has(layer) ? 'visible' : 'none')
+    })
+  }, [filterState.activeLayers, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return
+    const map = mapRef.current
+    const controllers: AbortController[] = []
+
+    ;(Object.keys(LIVE_LAYER_CONFIG) as LiveLayerName[]).forEach((layer) => {
+      const source = map.getSource(layer) as GeoJSONSource | undefined
+      if (!source) return
+      if (!filterState.activeLayers.has(layer)) {
+        source.setData({ type: 'FeatureCollection', features: [] })
+        return
+      }
+
+      const controller = new AbortController()
+      controllers.push(controller)
+      void fetch(`/api/v1/live/${layer}`, { cache: 'no-store', signal: controller.signal })
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`${layer} failed with ${response.status}`)
+          return await response.json() as LiveFeatureCollection
+        })
+        .then((geojson) => {
+          const currentSource = map.getSource(layer) as GeoJSONSource | undefined
+          currentSource?.setData(geojson)
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return
+          const currentSource = map.getSource(layer) as GeoJSONSource | undefined
+          currentSource?.setData({ type: 'FeatureCollection', features: [] })
+        })
+    })
+
+    return () => {
+      controllers.forEach((controller) => controller.abort())
+    }
+  }, [filterState.activeLayers, mapReady])
 
   return (
     <div className="relative h-full w-full overflow-hidden" style={{ background: 'linear-gradient(180deg, #040810 0%, #09101c 100%)' }}>
@@ -335,7 +403,7 @@ export function ConflictMap() {
             Filters
           </button>
           {showFilters && (
-            <MapFilterPanel filters={filters} onChange={setFilters} onClose={() => setShowFilters(false)} />
+            <MapFilterPanel filters={filters} onChange={setFilterState} onClose={() => setShowFilters(false)} />
           )}
         </div>
 

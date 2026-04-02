@@ -108,6 +108,66 @@ const RSS_FEEDS = [
   { url: 'https://www.rudaw.net/english/feed', outlet: 'Rudaw (Kurdistan)', trust: 74, region: 'middle_east' },
   { url: 'https://english.enabbaladi.net/feed/', outlet: 'Enab Baladi (Syria)', trust: 72, region: 'middle_east' },
   { url: 'https://www.libya-al-ahrar.tv/en/feed/', outlet: 'Libya Al-Ahrar', trust: 65, region: 'middle_east' },
+  { url: 'https://syriadirect.org/feed/', outlet: 'Syria Direct', trust: 76, region: 'middle_east' },
+
+  // Additional wire services (state/non-western perspective)
+  { url: 'https://rsshub.app/xinhua/world', outlet: 'Xinhua', trust: 60, region: null },
+  { url: 'https://rsshub.app/tass/world', outlet: 'TASS', trust: 58, region: 'eastern_europe' },
+  { url: 'https://www.presstv.ir/rss', outlet: 'Press TV', trust: 55, region: 'middle_east' },
+
+  // UN & Humanitarian
+  { url: 'https://news.un.org/feed/subscribe/en/news/topic/peace-and-security/feed/rss.xml', outlet: 'UN Peace & Security', trust: 85, region: null },
+  { url: 'https://news.un.org/feed/subscribe/en/news/region/africa/feed/rss.xml', outlet: 'UN Africa', trust: 84, region: 'sub_saharan_africa' },
+  { url: 'https://www.icrc.org/en/rss/news', outlet: 'ICRC', trust: 88, region: null },
+  { url: 'https://www.hrw.org/rss/news', outlet: 'Human Rights Watch', trust: 84, region: null },
+  { url: 'https://www.amnesty.org/en/latest/news/feed/', outlet: 'Amnesty International', trust: 82, region: null },
+  { url: 'https://www.icc-cpi.int/RSS/News.aspx', outlet: 'ICC', trust: 88, region: null },
+
+  // Cyber & Tech Conflict
+  { url: 'https://feeds.feedburner.com/TheHackersNews', outlet: 'The Hacker News', trust: 78, region: null },
+  { url: 'https://krebsonsecurity.com/feed/', outlet: 'Krebs on Security', trust: 80, region: null },
+  { url: 'https://cyberscoop.com/feed/', outlet: 'CyberScoop', trust: 79, region: null },
+  { url: 'https://therecord.media/feed', outlet: 'The Record', trust: 80, region: null },
+
+  // Nuclear & WMD
+  { url: 'https://www.armscontrol.org/rss.xml', outlet: 'Arms Control Association', trust: 88, region: null },
+  { url: 'https://thebulletin.org/feed/', outlet: 'Bulletin of Atomic Scientists', trust: 88, region: null },
+  { url: 'https://nonproliferation.org/feed/', outlet: 'CNS Nonproliferation', trust: 86, region: null },
+  { url: 'https://www.iaea.org/rss-feeds/press-releases', outlet: 'IAEA', trust: 92, region: null },
+
+  // Additional think tanks & OSINT
+  { url: 'https://www.iiss.org/rss/the-military-balance', outlet: 'IISS', trust: 88, region: null },
+  { url: 'https://www.rand.org/pubs/rss/commentary.xml', outlet: 'RAND', trust: 85, region: null },
+  { url: 'https://www.brookings.edu/topic/security-strategy/feed/', outlet: 'Brookings Security', trust: 84, region: null },
+  { url: 'https://carnegieendowment.org/rss/', outlet: 'Carnegie Endowment', trust: 84, region: null },
+  { url: 'https://www.understandingwar.org/rss.xml', outlet: 'ISW', trust: 86, region: 'eastern_europe' },
+  { url: 'https://www.counterextremism.com/rss.xml', outlet: 'Counter Extremism Project', trust: 80, region: null },
+  { url: 'https://ctc.westpoint.edu/feed/', outlet: 'CTC Sentinel', trust: 85, region: null },
+
+  // Balkans
+  { url: 'https://balkaninsight.com/feed/', outlet: 'Balkan Insight', trust: 78, region: 'eastern_europe' },
+  { url: 'https://www.seenews.com/rss/', outlet: 'SeeNews', trust: 72, region: 'eastern_europe' },
+
+  // Caucasus & Central Asia
+  { url: 'https://jam-news.net/feed/', outlet: 'JAM News (Caucasus)', trust: 70, region: 'eastern_europe' },
+  { url: 'https://oc-media.org/feed/', outlet: 'OC Media (Caucasus)', trust: 72, region: 'eastern_europe' },
+  { url: 'https://eurasianet.org/rss.xml', outlet: 'Eurasianet', trust: 76, region: 'eastern_europe' },
+
+  // Myanmar additions
+  { url: 'https://www.mizzima.com/feed', outlet: 'Mizzima (Myanmar)', trust: 74, region: 'southeast_asia' },
+  { url: 'https://www.frontiermyanmar.net/en/rss.xml', outlet: 'Frontier Myanmar', trust: 75, region: 'southeast_asia' },
+
+  // Pacific / Oceania
+  { url: 'https://www.rnz.co.nz/rss/pacificnews.xml', outlet: 'RNZ Pacific', trust: 76, region: null },
+  { url: 'https://www.abc.net.au/news/feed/51120/rss.xml', outlet: 'ABC Australia', trust: 78, region: null },
+
+  // South America
+  { url: 'https://mercopress.com/rss/', outlet: 'MercoPress', trust: 72, region: 'latin_america' },
+  { url: 'https://www.colombiareports.com/feed/', outlet: 'Colombia Reports', trust: 70, region: 'latin_america' },
+
+  // Maritime
+  { url: 'https://www.hellenicshippingnews.com/feed/', outlet: 'Hellenic Shipping News', trust: 70, region: null },
+  { url: 'https://splash247.com/feed/', outlet: 'Splash247', trust: 68, region: null },
 ] as const
 
 const CONFLICT_KEYWORDS = [

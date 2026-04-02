@@ -22,6 +22,15 @@ const SEVERITIES = [
   { label: 'Medium +', value: '2' },
 ]
 
+const LIVE_LAYERS = [
+  { key: 'seismic', label: 'Seismic', icon: '💥' },
+  { key: 'flights', label: 'Flights', icon: '✈️' },
+  { key: 'nuclear', label: 'Nuclear', icon: '☢️' },
+  { key: 'outages', label: 'Outages', icon: '🌐' },
+  { key: 'vessels', label: 'Vessels', icon: '🚢' },
+  { key: 'fires', label: 'Fires', icon: '🔥' },
+] as const
+
 export function MapFilterPanel({ filters, onChange, onClose }: MapFilterPanelProps) {
   return (
     <div
@@ -83,6 +92,35 @@ export function MapFilterPanel({ filters, onChange, onClose }: MapFilterPanelPro
           </div>
         </div>
 
+        <div>
+          <div className="mb-2 text-[10px] uppercase tracking-[0.22em]" style={{ color: 'var(--text-muted)' }}>Live layers</div>
+          <div className="space-y-2">
+            {LIVE_LAYERS.map((layer) => {
+              const active = filters.activeLayers.has(layer.key)
+              return (
+                <button
+                  key={layer.key}
+                  onClick={() => filters.onLayerToggle(layer.key)}
+                  className="flex w-full items-center justify-between rounded-2xl border px-3 py-2 text-left text-xs transition-colors"
+                  style={{
+                    borderColor: active ? 'rgba(96,165,250,0.45)' : 'rgba(148,163,184,0.18)',
+                    background: active ? 'rgba(59,130,246,0.14)' : 'rgba(255,255,255,0.02)',
+                    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  }}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>{layer.icon}</span>
+                    <span>{layer.label}</span>
+                  </span>
+                  <span className="text-[10px] uppercase tracking-[0.18em]" style={{ color: active ? '#93c5fd' : 'var(--text-muted)' }}>
+                    {active ? 'On' : 'Off'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         <label className="block">
           <div className="mb-2 text-[10px] uppercase tracking-[0.22em]" style={{ color: 'var(--text-muted)' }}>Search title / region</div>
           <input
@@ -95,7 +133,7 @@ export function MapFilterPanel({ filters, onChange, onClose }: MapFilterPanelPro
         </label>
 
         <button
-          onClick={() => onChange({ hours: 168, minSeverity: null, query: '' })}
+          onClick={() => onChange({ ...filters, hours: 168, minSeverity: null, query: '', activeLayers: new Set(['events']) })}
           className="w-full rounded-2xl border px-3 py-2 text-xs"
           style={{ borderColor: 'rgba(148,163,184,0.18)', color: 'var(--text-secondary)' }}
         >
