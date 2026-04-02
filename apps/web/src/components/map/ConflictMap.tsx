@@ -123,9 +123,17 @@ export function ConflictMap() {
 
         if (!active) return
 
+        console.log('[map] events response status:', eventsResponse.status, eventsResponse.ok)
         if (eventsResponse.ok) {
-          const data = await eventsResponse.json() as EventCollection
-          if (active) setRawData(data)
+          try {
+            const data = await eventsResponse.json() as EventCollection
+            console.log('[map] features loaded:', data?.features?.length ?? 0)
+            if (active) setRawData(data)
+          } catch (e) {
+            console.error('[map] JSON parse error:', e)
+          }
+        } else {
+          console.error('[map] events API error:', eventsResponse.status, await eventsResponse.text().catch(() => ''))
         }
 
         if (meResponse?.ok) {
