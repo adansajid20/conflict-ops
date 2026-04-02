@@ -357,6 +357,13 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .not('title', 'ilike', '%forest fire notification%')
       .not('title', 'ilike', '%prescribed fire%')
       .not('title', 'ilike', '%guidance on child marriage%')
+      .not('title', 'ilike', '%shopping coupon%')
+      .not('title', 'ilike', '%discount voucher%')
+      .not('title', 'ilike', '%tornado warning%')
+      .not('title', 'ilike', '%severe thunderstorm warning%')
+      .not('title', 'ilike', '%flood warning%')
+      .not('title', 'ilike', '%winter storm warning%')
+      .not('title', 'ilike', '% by NWS%')
       .not('event_type', 'eq', 'natural_disaster')
       .order('occurred_at', { ascending: false })
       .limit(20),
@@ -377,6 +384,13 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .not('title', 'ilike', '%forest fire notification%')
       .not('title', 'ilike', '%prescribed fire%')
       .not('title', 'ilike', '%guidance on child marriage%')
+      .not('title', 'ilike', '%shopping coupon%')
+      .not('title', 'ilike', '%discount voucher%')
+      .not('title', 'ilike', '%tornado warning%')
+      .not('title', 'ilike', '%severe thunderstorm warning%')
+      .not('title', 'ilike', '%flood warning%')
+      .not('title', 'ilike', '%winter storm warning%')
+      .not('title', 'ilike', '% by NWS%')
       .not('event_type', 'eq', 'natural_disaster')
       .order('occurred_at', { ascending: false })
       .limit(20)
@@ -495,7 +509,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   }
 
   // Cache for 5 minutes (300s)
-  await setCachedSnapshot(cacheKey, payload, 300)
+  await setCachedSnapshot(cacheKey, payload, 60)
 
   return NextResponse.json(payload)
 }
