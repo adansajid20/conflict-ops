@@ -259,7 +259,7 @@ export function ConflictMap() {
         id: 'event-points',
         type: 'circle',
         source: 'events',
-        layout: { visibility: filterState.activeLayers.has('events') ? 'visible' : 'none' },
+        layout: { visibility: 'visible' }, // visibility toggled by separate useEffect after mapReady
         paint: {
           'circle-color': ['match', ['get', 'severity'], 4, '#ef4444', 3, '#f97316', 2, '#eab308', '#6b7280'],
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, ['match', ['get', 'severity'], 4, 5.5, 3, 5, 2, 4.5, 4], 6, ['match', ['get', 'severity'], 4, 10, 3, 8.5, 2, 7, 5.5]],
@@ -275,7 +275,7 @@ export function ConflictMap() {
           id: `${name}-layer`,
           type: 'circle',
           source: name,
-          layout: { visibility: filterState.activeLayers.has(name) ? 'visible' : 'none' },
+          layout: { visibility: 'none' }, // live layers off by default; toggled by useEffect after mapReady
           paint: {
             'circle-color': ['coalesce', ['get', 'color'], config.color],
             'circle-radius': config.radius,
@@ -337,10 +337,12 @@ export function ConflictMap() {
 
     return () => {
       stopRotation()
+      setMapReady(false)
       map.remove()
       mapRef.current = null
     }
-  }, [filterState.activeLayers, handleFeatureClick, startRotation, stopRotation])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Map is created once on mount — activeLayers/visibility handled by separate useEffects
 
   useEffect(() => {
     if (!mapReady) return
