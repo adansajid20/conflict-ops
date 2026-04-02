@@ -48,6 +48,8 @@ export const TTL = {
   FEED: 30,
   FORECAST: 300,
   MAP_CLUSTERS: 60,
+  MAP_EVENTS: 120,
+  HOT_REGIONS: 120,
   SYSTEM_FLAGS: 10,
 } as const
 
