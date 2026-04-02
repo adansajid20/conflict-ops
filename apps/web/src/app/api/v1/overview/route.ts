@@ -330,3 +330,4 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   await setCachedSnapshot(cacheKey, payload, 60)
   return NextResponse.json(payload)
 }
+
