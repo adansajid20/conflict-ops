@@ -249,11 +249,37 @@ export function ConflictMap() {
         },
       })
 
-      map.on('mouseenter', 'event-points', () => {
+      // Hover popup
+      const popup = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        maxWidth: '300px',
+        className: 'conflict-popup',
+      })
+
+      map.on('mouseenter', 'event-points', (e) => {
         map.getCanvas().style.cursor = 'pointer'
+        const feature = e.features?.[0]
+        if (!feature) return
+        const props = feature.properties as Record<string, unknown>
+        const coords = ((feature.geometry as unknown) as { coordinates: [number, number] }).coordinates.slice() as [number, number]
+        const sev = typeof props.severity === 'number' ? props.severity : 1
+        const borderColor = sev >= 4 ? '#ef4444' : sev >= 3 ? '#f97316' : sev >= 2 ? '#eab308' : '#6b7280'
+        const region = typeof props.region === 'string' ? props.region : ''
+        const outlet = typeof props.outlet_name === 'string' ? props.outlet_name : ''
+        const title = typeof props.title === 'string' ? props.title : ''
+        const meta = [region, outlet].filter(Boolean).join(' · ')
+        popup.setLngLat(coords).setHTML(`
+          <div style="background:rgba(3,7,18,0.95);border:1px solid rgba(255,255,255,0.1);border-left:3px solid ${borderColor};border-radius:8px;padding:10px 12px;max-width:280px;">
+            ${meta ? `<div style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">${meta}</div>` : ''}
+            <div style="color:#f9fafb;font-size:13px;font-weight:600;line-height:1.4;">${title}</div>
+            <div style="color:#6b7280;font-size:11px;margin-top:4px;">Click to open brief</div>
+          </div>
+        `).addTo(map)
       })
       map.on('mouseleave', 'event-points', () => {
         map.getCanvas().style.cursor = ''
+        popup.remove()
       })
       map.on('click', 'event-points', (event) => {
         void handleFeatureClick(event)

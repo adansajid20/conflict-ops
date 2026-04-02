@@ -361,3 +361,14 @@ body {
   .print-surface { border: none !important; box-shadow: none !important; background: #fff !important; color: #000 !important; }
   body { background: #fff !important; }
 }
+
+/* MapLibre popup overrides */
+.maplibregl-popup-content {
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+.maplibregl-popup-tip {
+  display: none !important;
+}
