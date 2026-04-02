@@ -13,6 +13,16 @@ const MessageSchema = z.object({
 const RequestSchema = z.object({
   org_id: z.string().uuid(),
   messages: z.array(MessageSchema).min(1).max(20),
+  top_stories: z.array(z.object({
+    id: z.string().optional(),
+    title: z.string().nullable().optional(),
+    region: z.string().nullable().optional(),
+    event_type: z.string().nullable().optional(),
+    severity: z.number().nullable().optional(),
+    occurred_at: z.string().nullable().optional(),
+    outlet_name: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+  })).max(20).optional(),
 })
 
 type ChatMessage = z.infer<typeof MessageSchema>
@@ -102,10 +112,22 @@ export async function POST(req: Request): Promise<NextResponse<ApiResponse<Copil
   const allowed = await verifyOrg(userId, parsed.data.org_id)
   if (!allowed) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
 
+  const overviewContext = (parsed.data.top_stories ?? []).map((event, index) => ({
+    rank: index + 1,
+    id: event.id ?? null,
+    title: event.title ?? null,
+    region: event.region ?? null,
+    event_type: event.event_type ?? null,
+    severity: event.severity ?? null,
+    occurred_at: event.occurred_at ?? null,
+    outlet_name: event.outlet_name ?? null,
+    description: event.description ?? null,
+  }))
+
   const messages: Array<Record<string, unknown>> = [
     {
       role: 'system',
-      content: 'You are the CONFLICT OPS Intel Analyst co-pilot. Never hallucinate. Use tools when factual data is needed. If tool data is empty or unavailable, say so plainly. Ground all claims in returned data. Include inline event references as [event:<id>] when citing event records.',
+      content: `You are the CONFLICT OPS Intel Analyst co-pilot. Never hallucinate. Use tools when factual data is needed. If tool data is empty or unavailable, say so plainly. Ground all claims in returned data. Include inline event references as [event:<id>] when citing event records. Current overview top stories context: ${JSON.stringify(overviewContext)}`,
     },
     ...parsed.data.messages.map((message: ChatMessage) => ({ role: message.role, content: message.content })),
   ]

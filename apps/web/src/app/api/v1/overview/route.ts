@@ -4,18 +4,18 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getCachedSnapshot, setCachedSnapshot } from '@/lib/cache/redis'
 import { isSafeMode } from '@/lib/doctor/safe-mode-check'
 import { isBlocklisted } from '@/lib/classification'
-import { humanizeDriver, isGeopoliticalType, computeSeverityCounts, sanitizeEventForClient } from '@/lib/event-presentation'
+import { humanizeDriver, isGeopoliticalType, computeSeverityCounts, sanitizeEventForClient, getRegionDisplay } from '@/lib/event-presentation'
 
 export const dynamic = 'force-dynamic'
-
-// ─── types ────────────────────────────────────────────────────────────────────
 
 interface EventRow {
   id: string
   source: string | null
+  source_id?: string | null
   event_type: string | null
   title: string | null
   description: string | null
+  summary_short?: string | null
   region: string | null
   country_code: string | null
   severity: number | null
@@ -23,11 +23,14 @@ interface EventRow {
   occurred_at: string | null
   ingested_at: string | null
   location: string | null
-  provenance_raw: { url?: string; attribution?: string; source?: string } | null
+  provenance_raw: { url?: string; attribution?: string; source?: string; outlet?: string } | null
+  raw?: { outlet?: string } | null
+  significance_score?: number | null
 }
 
 export interface HotRegion {
   region: string
+  slug: string
   riskLevel: 'Critical' | 'High' | 'Elevated' | 'Moderate' | 'Monitored'
   eventCount: number
   topDrivers: string[]
@@ -49,6 +52,8 @@ export interface OverviewResponse {
     developingCount: number
     activeAlertsCount: number
     breaking2h: number
+    activeConflictZones: number
+    mostActiveRegion: string | null
   }
   topStories: EventRow[]
   hotRegions: HotRegion[]
@@ -58,8 +63,6 @@ export interface OverviewResponse {
   severityCounts: { critical: number; high: number; medium: number; low: number }
 }
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
-
 function computeFreshness(lastIngestedAt: string | null): {
   label: 'Fresh' | 'Delayed' | 'Stale' | 'Offline'
   description: string
@@ -68,8 +71,6 @@ function computeFreshness(lastIngestedAt: string | null): {
   if (!lastIngestedAt) return { label: 'Offline', description: 'No recent data', color: 'red' }
   const ageMs = Date.now() - new Date(lastIngestedAt).getTime()
   const ageMin = Math.floor(ageMs / 60000)
-  // Fresh: <120 min (2h) — FreshnessBanner handles 30–120 min soft warning separately
-  // Delayed: 2h–12h; Stale/Offline: >12h
   if (ageMin < 120) return { label: 'Fresh', description: `${ageMin}m ago`, color: 'green' }
   if (ageMin < 720) return { label: 'Delayed', description: `${Math.floor(ageMin / 60)}h ago`, color: 'yellow' }
   return { label: 'Stale', description: `${Math.floor(ageMin / 60)}h ago`, color: 'red' }
@@ -79,39 +80,13 @@ function computeCoverage(distinctSourceCount: number, eventCount: number): {
   label: 'High' | 'Medium' | 'Low'
   tooltip: string
 } {
-  if (distinctSourceCount >= 3 && eventCount >= 50)
+  if (distinctSourceCount >= 3 && eventCount >= 50) {
     return { label: 'High', tooltip: 'Multiple independent sources confirm activity across regions.' }
-  if (distinctSourceCount >= 2 || eventCount >= 20)
+  }
+  if (distinctSourceCount >= 2 || eventCount >= 20) {
     return { label: 'Medium', tooltip: 'Partial coverage from some sources. Core tracking active.' }
+  }
   return { label: 'Low', tooltip: 'Limited source diversity. Tracking may be incomplete.' }
-}
-
-function computeFreshnessScore(event: { occurred_at: string; severity?: string | number | null }): number {
-  const ageMs = Date.now() - new Date(event.occurred_at).getTime()
-  const ageHours = ageMs / (1000 * 60 * 60)
-
-  const freshnessScore =
-    ageHours <= 3 ? 100 :
-    ageHours <= 6 ? 80 :
-    ageHours <= 12 ? 50 :
-    ageHours <= 24 ? 20 : 5
-
-  const normalizedSeverity = typeof event.severity === 'string'
-    ? event.severity.toLowerCase()
-    : event.severity == 4
-      ? 'critical'
-      : event.severity == 3
-        ? 'high'
-        : event.severity == 2
-          ? 'medium'
-          : null
-
-  const severityBonus =
-    normalizedSeverity === 'critical' ? 30 :
-    normalizedSeverity === 'high' ? 20 :
-    normalizedSeverity === 'medium' ? 10 : 0
-
-  return freshnessScore + severityBonus
 }
 
 const RISK_ORDER: Record<HotRegion['riskLevel'], number> = {
@@ -122,63 +97,36 @@ const RISK_ORDER: Record<HotRegion['riskLevel'], number> = {
   Monitored: 1,
 }
 
-function computeHotRegions(events: EventRow[]): HotRegion[] {
-  const map = new Map<
-    string,
-    { count: number; sev4: number; sev3: number; sev2: number; geoSev4: number; geoSev3: number; types: Map<string, number>; countries: Set<string> }
-  >()
+function normalizeRegionSlug(region: string | null | undefined): string {
+  return (region ?? 'global').toLowerCase().replace(/\s+/g, '_')
+}
 
+function computeHotRegions(events: EventRow[]): HotRegion[] {
+  const map = new Map<string, { count: number; sev2: number; geoSev4: number; geoSev3: number; types: Map<string, number>; countries: Set<string> }>()
   const GEO_PLACEHOLDER_REGIONS = new Set(['global', 'world', '', 'un', 'united_nations', 'north_america', 'oceania'])
 
-  const REGION_DISPLAY: Record<string, string> = {
-    'middle_east': 'Middle East',
-    'eastern_europe': 'Eastern Europe',
-    'south_asia': 'South Asia',
-    'east_asia': 'East Asia',
-    'sub_saharan_africa': 'Sub-Saharan Africa',
-    'southeast_asia': 'Southeast Asia',
-    'latin_america': 'Latin America',
-    'north_africa': 'North Africa',
-    'central_asia': 'Central Asia',
-    'west_africa': 'West Africa',
-    'east_africa': 'East Africa',
-    'central_africa': 'Central Africa',
-    'europe': 'Europe',
-    'asia_pacific': 'Asia Pacific',
-    'africa': 'Africa',
-    'asia': 'Asia',
-  }
-
-  for (const e of events) {
-    // Normalize to snake_case for dedup key
-    const rawRegion = e.region || 'global'
-    const regionSlug = rawRegion.toLowerCase().replace(/\s+/g, '_')
-    const region = REGION_DISPLAY[regionSlug] ?? rawRegion
-    // Skip placeholder regions
-    if (GEO_PLACEHOLDER_REGIONS.has(regionSlug)) continue
-
-    const entry = map.get(region) ?? {
-      count: 0, sev4: 0, sev3: 0, sev2: 0, geoSev4: 0, geoSev3: 0,
-      types: new Map(), countries: new Set()
+  for (const event of events) {
+    const slug = normalizeRegionSlug(event.region)
+    if (GEO_PLACEHOLDER_REGIONS.has(slug)) continue
+    const region = getRegionDisplay(slug) ?? event.region ?? 'Global'
+    const entry = map.get(slug) ?? { count: 0, sev2: 0, geoSev4: 0, geoSev3: 0, types: new Map(), countries: new Set() }
+    entry.count += 1
+    const severity = event.severity ?? 1
+    if (severity >= 2) entry.sev2 += 1
+    if (isGeopoliticalType(event.event_type)) {
+      if (severity >= 4) entry.geoSev4 += 1
+      else if (severity >= 3) entry.geoSev3 += 1
     }
-    entry.count++
-    const sev = e.severity ?? 1
-    if (sev >= 4) entry.sev4++
-    else if (sev >= 3) entry.sev3++
-    else if (sev >= 2) entry.sev2++
-    // Geopolitical risk counts: exclude natural_disaster from scoring
-    if (isGeopoliticalType(e.event_type)) {
-      if (sev >= 4) entry.geoSev4++
-      else if (sev >= 3) entry.geoSev3++
+    if (event.event_type) entry.types.set(event.event_type, (entry.types.get(event.event_type) ?? 0) + 1)
+    if (event.country_code) entry.countries.add(event.country_code)
+    map.set(slug, entry)
+    if (region !== getRegionDisplay(slug)) {
+      // no-op; keeps formatter in play without duplicate storage
     }
-    if (e.event_type) entry.types.set(e.event_type, (entry.types.get(e.event_type) ?? 0) + 1)
-    if (e.country_code) entry.countries.add(e.country_code)
-    map.set(region, entry)  // key is display name — already deduped via slug normalization
   }
 
   const regions: HotRegion[] = []
-  for (const [region, data] of map.entries()) {
-    // Risk level based on geopolitical events AND severity
+  for (const [slug, data] of map.entries()) {
     let riskLevel: HotRegion['riskLevel']
     if (data.geoSev4 >= 1) riskLevel = 'Critical'
     else if (data.geoSev3 >= 5) riskLevel = 'Critical'
@@ -187,27 +135,20 @@ function computeHotRegions(events: EventRow[]): HotRegion[] {
     else if (data.count >= 5) riskLevel = 'Moderate'
     else riskLevel = 'Monitored'
 
-    // Humanize driver labels
-    const topDrivers = [...data.types.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([t]) => humanizeDriver(t))
-
     regions.push({
-      region,
+      region: getRegionDisplay(slug) ?? slug,
+      slug,
       riskLevel,
       eventCount: data.count,
-      topDrivers,
+      topDrivers: [...data.types.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([type]) => humanizeDriver(type)),
       topCountries: [...data.countries].slice(0, 5),
     })
   }
 
-  return regions
-    .sort((a, b) => {
-      const rd = RISK_ORDER[b.riskLevel] - RISK_ORDER[a.riskLevel]
-      return rd !== 0 ? rd : b.eventCount - a.eventCount
-    })
-    .slice(0, 8)
+  return regions.sort((a, b) => {
+    const riskDiff = RISK_ORDER[b.riskLevel] - RISK_ORDER[a.riskLevel]
+    return riskDiff !== 0 ? riskDiff : b.eventCount - a.eventCount
+  }).slice(0, 8)
 }
 
 const WINDOW_MS: Record<string, number> = {
@@ -216,30 +157,18 @@ const WINDOW_MS: Record<string, number> = {
   '30d': 2_592_000_000,
 }
 
-// ─── handler ──────────────────────────────────────────────────────────────────
-
 export async function GET(req: Request): Promise<NextResponse<OverviewResponse | { error: string }>> {
   const { userId } = await auth()
-  // Public access allowed — userId null means unauthenticated (anonymous feed view)
-
   const url = new URL(req.url)
   const win = url.searchParams.get('window') ?? '24h'
-  const severityFilter = url.searchParams.get('severity')
-  const categoryFilter = url.searchParams.get('category')
-  const hasActiveFilters = Boolean(
-    (severityFilter && severityFilter !== 'all') ||
-    (categoryFilter && categoryFilter !== 'all')
-  )
 
   if (!WINDOW_MS[win]) return NextResponse.json({ error: 'Invalid window' }, { status: 400 })
 
-  const cacheKey = `cache:overview:${win}:sev${severityFilter ?? 'all'}:cat${categoryFilter ?? 'all'}`
+  const cacheKey = `cache:overview:${win}`
 
   if (await isSafeMode()) {
     const safeCached = await getCachedSnapshot<OverviewResponse>(cacheKey)
-    if (safeCached) {
-      return NextResponse.json(safeCached, { headers: { 'X-Safe-Mode': 'true' } })
-    }
+    if (safeCached) return NextResponse.json(safeCached, { headers: { 'X-Safe-Mode': 'true' } })
 
     return NextResponse.json({
       lastUpdatedAt: null,
@@ -256,6 +185,8 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
         developingCount: 0,
         activeAlertsCount: 0,
         breaking2h: 0,
+        activeConflictZones: 0,
+        mostActiveRegion: null,
       },
       topStories: [],
       hotRegions: [],
@@ -267,33 +198,17 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   }
 
   const cached = await getCachedSnapshot<OverviewResponse>(cacheKey)
-  if (cached) {
-    return NextResponse.json(cached)
-  }
+  if (cached) return NextResponse.json(cached)
 
   const supabase = createServiceClient()
   const since = new Date(Date.now() - WINDOW_MS[win]!).toISOString()
   const since7d = new Date(Date.now() - WINDOW_MS['7d']!).toISOString()
-  const topStoriesSince6h = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
   const topStoriesSince24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  const storiesSince = hasActiveFilters ? topStoriesSince24h : topStoriesSince6h
 
-  // Parallel queries — never expose source health/pipeline status
-  const [
-    windowEvents,
-    count7dRes,
-    critHighRes,
-    developingRes,
-    freshRes,
-    orgRes,
-    alertsRes,
-    breakingRes,
-    topStories,
-  ] = await Promise.all([
-    // All events in window (for hot regions + coverage)
+  const [windowEvents, count7dRes, critHighRes, developingRes, freshRes, orgRes, alertsRes, breakingRes, activeConflictZonesRes, mostActiveRegionRpcRes, topStoriesRes] = await Promise.all([
     supabase
       .from('events')
-      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw,summary_short')
+      .select('id,source,source_id,event_type,title,description,summary_short,region,country_code,severity,status,occurred_at,ingested_at,location,provenance_raw,raw,significance_score')
       .gte('occurred_at', since)
       .eq('is_humanitarian_report', false)
       .not('source', 'ilike', '%usgs%')
@@ -304,100 +219,26 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .order('severity', { ascending: false })
       .order('occurred_at', { ascending: false })
       .limit(500),
-
-    // Count 7d (always, regardless of window)
+    supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', since7d),
+    supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', since).gte('severity', 3),
+    supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', since).in('status', ['developing', 'pending']),
+    supabase.from('events').select('ingested_at').eq('is_humanitarian_report', false).order('ingested_at', { ascending: false, nullsFirst: false }).limit(1).single(),
+    userId ? supabase.from('users').select('org_id').eq('clerk_user_id', userId).single() : Promise.resolve({ data: null, error: null }),
+    supabase.from('alerts').select('id', { count: 'exact', head: true }).eq('read', false),
+    supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()).gte('severity', 3),
     supabase
       .from('events')
-      .select('id', { count: 'exact', head: true })
-      .gte('occurred_at', since7d),
-
-    // Critical + high count in window
+      .select('region')
+      .gte('occurred_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .gte('severity', 3)
+      .in('event_type', ['conflict', 'armed_conflict', 'airstrike', 'military', 'terrorism'])
+      .not('region', 'is', null),
+    supabase.rpc('get_most_active_region', {}),
     supabase
       .from('events')
-      .select('id', { count: 'exact', head: true })
-      .gte('occurred_at', since)
-      .gte('severity', 3),
-
-    // Developing/pending in window
-    supabase
-      .from('events')
-      .select('id', { count: 'exact', head: true })
-      .gte('occurred_at', since)
-      .in('status', ['developing', 'pending']),
-
-    // Most recent ingest for freshness
-    supabase
-      .from('events')
-      .select('ingested_at')
-      .eq('is_humanitarian_report', false)
-      .order('ingested_at', { ascending: false, nullsFirst: false })
-      .limit(1)
-      .single(),
-
-    // User's org (null for unauthenticated)
-    userId
-      ? supabase.from('users').select('org_id').eq('clerk_user_id', userId).single()
-      : Promise.resolve({ data: null, error: null }),
-
-    // Active alerts (only if org exists — handled below)
-    supabase
-      .from('alerts')
-      .select('id', { count: 'exact', head: true })
-      .eq('read', false),
-
-    // Breaking events in last 2h (severity >= 3)
-    supabase
-      .from('events')
-      .select('id', { count: 'exact', head: true })
-      .gte('occurred_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
-      .gte('severity', 3),
-
-    // Top stories (conflict/news) — when filtered, widen to 24h and return raw ordered results.
-    // Use occurred_at: this is the article publish time in the actual schema.
-    (() => {
-      let storiesQuery = supabase
-        .from('events')
-        .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw,summary_short')
-        .gte('occurred_at', storiesSince)
-        .eq('is_humanitarian_report', false)
-        .gte('occurred_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-        .not('source', 'in', '("noaa","nasa_eonet","nasa-eonet","usgs")')
-        .not('title', 'ilike', '%forest fire notification%')
-        .not('title', 'ilike', '%prescribed fire%')
-        .not('title', 'ilike', '%guidance on child marriage%')
-        .not('title', 'ilike', '%shopping coupon%')
-        .not('title', 'ilike', '%discount voucher%')
-        .not('title', 'ilike', '%tornado warning%')
-        .not('title', 'ilike', '%severe thunderstorm warning%')
-        .not('title', 'ilike', '%flood warning%')
-        .not('title', 'ilike', '%winter storm warning%')
-        .not('title', 'ilike', '% by NWS%')
-        .not('event_type', 'eq', 'natural_disaster')
-        .order('occurred_at', { ascending: false })
-        .limit(hasActiveFilters ? 50 : 20)
-
-      if (severityFilter && severityFilter !== 'all') {
-        storiesQuery = storiesQuery.eq('severity', parseInt(severityFilter, 10))
-      }
-      if (categoryFilter && categoryFilter !== 'all') {
-        storiesQuery = storiesQuery.eq('event_type', categoryFilter)
-      }
-
-      return storiesQuery
-    })(),
-  ])
-
-  const hasOrg = !!(orgRes.data?.org_id)
-  const allEvents = (windowEvents.data ?? []) as EventRow[]
-  let conflictCandidates = (topStories.data ?? []) as EventRow[]
-
-  if (!hasActiveFilters && conflictCandidates.length < 5) {
-    let topStories24hQuery = supabase
-      .from('events')
-      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw,summary_short')
+      .select('id,source,source_id,event_type,title,description,summary_short,region,country_code,severity,status,occurred_at,ingested_at,location,provenance_raw,raw,significance_score')
       .gte('occurred_at', topStoriesSince24h)
       .eq('is_humanitarian_report', false)
-      .gte('occurred_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .not('source', 'in', '("noaa","nasa_eonet","nasa-eonet","usgs")')
       .not('title', 'ilike', '%forest fire notification%')
       .not('title', 'ilike', '%prescribed fire%')
@@ -411,109 +252,49 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .not('title', 'ilike', '% by NWS%')
       .not('event_type', 'eq', 'natural_disaster')
       .order('occurred_at', { ascending: false })
-      .limit(20)
+      .limit(40),
+  ])
 
-    if (severityFilter && severityFilter !== 'all') {
-      topStories24hQuery = topStories24hQuery.eq('severity', parseInt(severityFilter, 10))
-    }
-    if (categoryFilter && categoryFilter !== 'all') {
-      topStories24hQuery = topStories24hQuery.eq('event_type', categoryFilter)
-    }
+  const hasOrg = !!orgRes.data?.org_id
+  const allEvents = (windowEvents.data ?? []) as EventRow[]
+  const conflictCandidates = ((topStoriesRes.data ?? []) as EventRow[]).filter((event) => !isBlocklisted(event.title ?? ''))
 
-    const topStories24hRes = await topStories24hQuery
-    conflictCandidates = (topStories24hRes.data ?? []) as EventRow[]
+  function titleFingerprint(title: string): string {
+    return title.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).slice(0, 5).join(' ')
   }
 
-  // Fetch disaster sources separately — cap at 3 total in Top Stories
-  // Only show severity >= 2 NOAA alerts and severity >= 3 EONET/USGS events
-  const disasterRes = await supabase
-    .from('events')
-    .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw,summary_short')
-    .gte('occurred_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString())  // last 12h only
-    .eq('is_humanitarian_report', false)
-    .in('source', ['noaa'])                        // NOAA only — usgs/eonet too noisy for top stories
-    .gte('severity', 4)                            // CRITICAL weather events only (Red Flag Warning = 3, skip it)
-    .not('title', 'ilike', '%green%')
-    .order('severity', { ascending: false })
-    .order('occurred_at', { ascending: false })
-    .limit(3)
-  const weatherCandidates = (disasterRes.data ?? []) as EventRow[]
-
-  // Filter out blocklisted titles from top stories
-  const filteredConflict = conflictCandidates.filter(e => !isBlocklisted(e.title ?? ''))
-
-  let finalTopStories: EventRow[]
-
-  if (hasActiveFilters) {
-    finalTopStories = [...filteredConflict].sort((a, b) =>
-      new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() -
-      new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
-    )
-  } else {
-    // Pure chronological — newest first, no scoring. BREAKING section handles importance surfacing.
-    const sortedConflict = [...filteredConflict].sort((a, b) =>
-      new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() -
-      new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
-    )
-    const sortedWeather = [...weatherCandidates].sort((a, b) => {
-      const severityDiff = Number(b.severity ?? 1) - Number(a.severity ?? 1)
-      if (severityDiff !== 0) return severityDiff
-      return new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() - new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
-    })
-    // Dedup by title — remove near-identical events (e.g. 3x "Green forest fire in Thailand")
-    const seenTitles = new Set<string>()
-    const dedupedConflict = sortedConflict.filter(e => {
-      const key = (e.title ?? '').toLowerCase().trim().slice(0, 60)
-      if (seenTitles.has(key)) return false
-      seenTitles.add(key)
-      return true
-    })
-    const dedupedWeather = sortedWeather.filter(e => {
-      const key = (e.title ?? '').toLowerCase().trim().slice(0, 60)
-      if (seenTitles.has(key)) return false
-      seenTitles.add(key)
-      return true
-    })
-
-    // Fuzzy title dedup — skip if first 5 words match an already-seen title
-    function titleFingerprint(t: string): string {
-      return t.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).slice(0, 5).join(' ')
-    }
-
-    const DISASTER_CAP = 3
-    const weatherSlots = Math.min(dedupedWeather.length, DISASTER_CAP)
-    const conflictSlots = 20 - weatherSlots
-    const stories: EventRow[] = [
-      ...dedupedConflict.slice(0, conflictSlots),
-      ...dedupedWeather.slice(0, weatherSlots),
-    ]
-
-    const seenFingerprints = new Set<string>()
-    finalTopStories = stories.filter(e => {
-      const fp = titleFingerprint(e.title ?? '')
-      if (seenFingerprints.has(fp)) return false
-      seenFingerprints.add(fp)
-      return true
-    })
-  }
-
-  const lastIngested = (freshRes.data?.ingested_at as string | null) ?? null
-  const freshness = computeFreshness(lastIngested)
-
-  const distinctSources = new Set(allEvents.map((e) => e.source).filter(Boolean)).size
-  const coverage = computeCoverage(distinctSources, allEvents.length)
+  const seenFingerprints = new Set<string>()
+  const finalTopStories = conflictCandidates.filter((event) => {
+    const fingerprint = titleFingerprint(event.title ?? '')
+    if (seenFingerprints.has(fingerprint)) return false
+    seenFingerprints.add(fingerprint)
+    return true
+  }).slice(0, 20)
 
   const hotRegions = computeHotRegions(allEvents)
-
-  const notices: string[] = []
-  if (freshness.label === 'Stale' || freshness.label === 'Offline') {
-    notices.push('Updates are delayed. Core tracking continues. Try refresh.')
-  }
-
+  const freshness = computeFreshness((freshRes.data?.ingested_at as string | null) ?? null)
+  const distinctSources = new Set(allEvents.map((event) => event.source).filter(Boolean)).size
+  const coverage = computeCoverage(distinctSources, allEvents.length)
   const severityCounts = computeSeverityCounts(allEvents)
 
+  const regionCounts = allEvents.reduce((acc, event) => {
+    if (event.region) acc[event.region] = (acc[event.region] ?? 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+  const computedMostActiveRegion = Object.entries(regionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+  const rpcMostActiveRegion = typeof mostActiveRegionRpcRes.data === 'string'
+    ? mostActiveRegionRpcRes.data
+    : Array.isArray(mostActiveRegionRpcRes.data)
+      ? String((mostActiveRegionRpcRes.data[0] as { region?: string } | undefined)?.region ?? '') || null
+      : null
+  const mostActiveRegionSlug = rpcMostActiveRegion || computedMostActiveRegion
+  const activeConflictZones = new Set(((activeConflictZonesRes.data ?? []) as Array<{ region: string | null }>).map((row) => normalizeRegionSlug(row.region)).filter(Boolean)).size
+
+  const notices: string[] = []
+  if (freshness.label === 'Stale' || freshness.label === 'Offline') notices.push('Updates are delayed. Core tracking continues. Try refresh.')
+
   const payload: OverviewResponse = {
-    lastUpdatedAt: lastIngested,
+    lastUpdatedAt: (freshRes.data?.ingested_at as string | null) ?? null,
     freshnessStatus: freshness.label,
     freshnessDescription: freshness.description,
     freshnessColor: freshness.color,
@@ -527,15 +308,18 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       developingCount: developingRes.count ?? 0,
       activeAlertsCount: hasOrg ? (alertsRes.count ?? 0) : 0,
       breaking2h: breakingRes.count ?? 0,
+      activeConflictZones,
+      mostActiveRegion: mostActiveRegionSlug ? getRegionDisplay(normalizeRegionSlug(mostActiveRegionSlug)) : null,
     },
-    topStories: finalTopStories.map((story) => ({
-      ...story,
-      ...sanitizeEventForClient(story as unknown as Record<string, unknown>),
-      source: sanitizeEventForClient(story as unknown as Record<string, unknown>).outlet_name,
-      ingested_at: story.ingested_at,
-      occurred_at: story.occurred_at,
-      provenance_raw: null,
-    })),
+    topStories: finalTopStories.map((story) => {
+      const sanitized = sanitizeEventForClient(story as unknown as Record<string, unknown>)
+      return {
+        ...story,
+        description: sanitized.description,
+        outlet_name: sanitized.outlet_name,
+        significance_tier: sanitized.significance_tier,
+      }
+    }),
     hotRegions,
     notices,
     hasOrg,
@@ -543,8 +327,6 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     severityCounts,
   }
 
-  // Cache for 5 minutes (300s)
   await setCachedSnapshot(cacheKey, payload, 60)
-
   return NextResponse.json(payload)
 }

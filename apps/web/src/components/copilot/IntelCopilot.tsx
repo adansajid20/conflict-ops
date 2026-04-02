@@ -5,15 +5,31 @@ import { Bot, Loader2, Send, X } from 'lucide-react'
 
 type OrgResponse = { success?: boolean; data?: { org?: { id?: string } } }
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
+type TopStoryContext = {
+  id: string
+  title: string | null
+  region: string | null
+  event_type: string | null
+  severity: number | null
+  occurred_at: string | null
+  outlet_name?: string | null
+  description?: string | null
+}
 
 type CopilotApiResponse = { success: boolean; data?: { response: string; unavailable?: boolean }; error?: string }
+
+const SUGGESTED_PROMPTS = [
+  'What are the most significant developments in the last 24 hours?',
+  'Which regions are at highest risk of escalation right now?',
+  'Summarize the Iran situation based on current intelligence',
+]
 
 const BotIcon = Bot as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
 const LoaderIcon = Loader2 as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
 const SendIcon = Send as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
 const CloseIcon = X as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
 
-export function IntelCopilot() {
+export function IntelCopilot({ topStories = [] }: { topStories?: TopStoryContext[] }) {
   const [open, setOpen] = useState(false)
   const [orgId, setOrgId] = useState<string | null>(null)
   const [input, setInput] = useState('')
@@ -47,7 +63,7 @@ export function IntelCopilot() {
       const response = await fetch('/api/v1/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ org_id: orgId, messages: nextMessages }),
+        body: JSON.stringify({ org_id: orgId, messages: nextMessages, top_stories: topStories }),
       })
       const json = await response.json() as CopilotApiResponse
       const reply = json.data?.response ?? json.error ?? 'No response available.'
@@ -93,24 +109,38 @@ export function IntelCopilot() {
             {!orgId ? (
               <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>Complete org setup to use the co-pilot.</div>
             ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={(event) => { if (event.key === 'Enter') void submitQuestion() }}
-                  placeholder={placeholder}
-                  disabled={thinking || unavailable}
-                  className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
-                  style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }}
-                />
-                <button
-                  onClick={() => void submitQuestion()}
-                  disabled={thinking || !input.trim() || unavailable}
-                  className="rounded-lg px-3 py-2"
-                  style={{ background: unavailable ? 'var(--bg-surface-3)' : 'var(--primary)', color: '#fff' }}
-                >
-                  <SendIcon className="h-4 w-4" />
-                </button>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {SUGGESTED_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt}
+                      onClick={() => setInput(prompt)}
+                      className="rounded-full border px-3 py-1 text-xs"
+                      style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    onKeyDown={(event) => { if (event.key === 'Enter') void submitQuestion() }}
+                    placeholder={placeholder}
+                    disabled={thinking || unavailable}
+                    className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
+                    style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }}
+                  />
+                  <button
+                    onClick={() => void submitQuestion()}
+                    disabled={thinking || !input.trim() || unavailable}
+                    className="rounded-lg px-3 py-2"
+                    style={{ background: unavailable ? 'var(--bg-surface-3)' : 'var(--primary)', color: '#fff' }}
+                  >
+                    <SendIcon className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             )}
           </div>

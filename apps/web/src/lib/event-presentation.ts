@@ -8,6 +8,32 @@ import { resolveOutletName } from '@/lib/outlet-resolver'
 
 export { COUNTRY_NAMES, EVENT_TYPE_TO_CATEGORY }
 
+export const REGION_DISPLAY_NAMES: Record<string, string> = {
+  middle_east: 'Middle East',
+  eastern_europe: 'Eastern Europe',
+  south_asia: 'South Asia',
+  east_asia: 'East Asia',
+  sub_saharan_africa: 'Sub-Saharan Africa',
+  southeast_asia: 'Southeast Asia',
+  latin_america: 'Latin America',
+  north_africa: 'North Africa',
+  central_asia: 'Central Asia',
+  east_africa: 'East Africa',
+  west_africa: 'West Africa',
+  central_africa: 'Central Africa',
+  south_america: 'South America',
+  north_america: 'North America',
+  asia_pacific: 'Asia Pacific',
+  europe: 'Europe',
+  africa: 'Africa',
+  global: 'Global',
+}
+
+export function getRegionDisplay(slug: string | null | undefined): string | null {
+  if (!slug) return null
+  return REGION_DISPLAY_NAMES[slug.toLowerCase()] ?? slug.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 export interface EventLike {
   id?: string
   source?: string | null
@@ -87,7 +113,6 @@ export function sanitizeSourceDisplay(source: string): string {
 }
 
 export function getSignificanceTier(score: number | null | undefined, severity?: number | null): { label: string; color: string; bgColor: string } {
-  // AI score takes priority when available
   if (typeof score === 'number') {
     if (score >= 85) return { label: 'Extreme', color: 'text-red-400', bgColor: 'bg-red-950' }
     if (score >= 70) return { label: 'Critical', color: 'text-orange-400', bgColor: 'bg-orange-950' }
@@ -95,7 +120,6 @@ export function getSignificanceTier(score: number | null | undefined, severity?:
     if (score >= 30) return { label: 'Notable', color: 'text-blue-400', bgColor: 'bg-blue-950' }
     return { label: 'Routine', color: 'text-slate-400', bgColor: 'bg-slate-900' }
   }
-  // Fall back to rule-based severity integer (set at ingest by prescore())
   if (severity !== null && severity !== undefined) {
     if (severity >= 4) return { label: 'Critical', color: 'text-orange-400', bgColor: 'bg-orange-950' }
     if (severity >= 3) return { label: 'High', color: 'text-red-400', bgColor: 'bg-red-900' }
@@ -132,7 +156,7 @@ export function getDisplayName(countryCode: string | null | undefined, region: s
   if (countryCode && !GEO_PLACEHOLDERS.has(countryCode) && countryCode.length === 2) {
     return COUNTRY_NAMES[countryCode] ?? countryCode
   }
-  if (region && !GEO_PLACEHOLDERS.has(region)) return region
+  if (region && !GEO_PLACEHOLDERS.has(region)) return getRegionDisplay(region) ?? region
   if (locationName && !GEO_PLACEHOLDERS.has(locationName)) return locationName
   return 'Location unknown'
 }
@@ -256,7 +280,7 @@ export function getUICategory(eventType: string | null | undefined): string {
 }
 
 export function generateSummary(event: EventLike): string {
-  const loc = event.country_code && COUNTRY_NAMES[event.country_code] ? ` in ${COUNTRY_NAMES[event.country_code]}` : event.region ? ` in ${event.region}` : ''
+  const loc = event.country_code && COUNTRY_NAMES[event.country_code] ? ` in ${COUNTRY_NAMES[event.country_code]}` : event.region ? ` in ${getRegionDisplay(event.region) ?? event.region}` : ''
   const sev = event.severity === 4 ? 'Critical' : event.severity === 3 ? 'Significant' : 'Reported'
   const typeStr = getEffectiveType(event.event_type).replace(/_/g, ' ')
   const srcName = sanitizeSourceDisplay(resolveOutletName(event.source, event.provenance_raw as Record<string, any> | null, event.title))
@@ -277,19 +301,20 @@ export function computeSeverityCounts(events: Array<{ severity?: number | null }
 export function sanitizeEventForClient(event: Record<string, unknown>): ClientEvent {
   const source = String(event.source ?? '')
   const title = String(event.title ?? 'Untitled event')
-  const publishedAt = typeof event.published_at === 'string'
-    ? event.published_at
-    : typeof event.event_date === 'string'
-      ? event.event_date
-      : typeof event.occurred_at === 'string'
-        ? event.occurred_at
+  const publishedAt = typeof event.occurred_at === 'string'
+    ? event.occurred_at
+    : typeof event.published_at === 'string'
+      ? event.published_at
+      : typeof event.event_date === 'string'
+        ? event.event_date
         : typeof event.created_at === 'string'
           ? event.created_at
           : null
   const provenance = ((event.provenance_raw as Record<string, any> | null) ?? (event.raw as Record<string, any> | null) ?? null)
-  const outletName = typeof provenance?.outlet === 'string'
-    ? sanitizeSourceDisplay(provenance.outlet)
-    : sanitizeSourceDisplay(resolveOutletName(source, provenance, title))
+  const resolvedOutlet = typeof provenance?.outlet === 'string'
+    ? provenance.outlet
+    : resolveOutletName(source, provenance, title)
+  const outletName = resolvedOutlet ? sanitizeSourceDisplay(resolvedOutlet) : 'ConflictRadar Intelligence Network'
   const locationConfidence = getLocationConfidenceLabel(coerceLocationConfidence((event.location_confidence as string | number | null | undefined) ?? null))
   return {
     id: String(event.id ?? ''),

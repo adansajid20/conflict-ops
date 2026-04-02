@@ -2,103 +2,85 @@
 
 import Link from 'next/link'
 
-interface KpiCardProps {
-  value: number
-  label: string
-  href: string
-  color?: string
+interface KpiStripProps {
+  kpis: {
+    eventsWindow: number
+    hotRegionCount: number
+    breaking2h: number
+    activeConflictZones: number
+    mostActiveRegion: string | null
+  }
+  lastUpdatedAt: string | null
 }
 
-function KpiCard({ value, label, href, color }: KpiCardProps) {
+function getLiveMeta(lastUpdatedAt: string | null) {
+  if (!lastUpdatedAt) {
+    return { label: 'Delayed', detail: 'No recent data', color: '#ef4444' }
+  }
+
+  const ageMin = Math.max(0, Math.floor((Date.now() - new Date(lastUpdatedAt).getTime()) / 60000))
+
+  if (ageMin < 5) return { label: 'Live', detail: 'Updated just now', color: '#10b981' }
+  if (ageMin < 30) return { label: `${ageMin}m ago`, detail: `Updated ${ageMin}m ago`, color: '#f59e0b' }
+  return { label: 'Delayed', detail: `Updated ${ageMin}m ago`, color: '#ef4444' }
+}
+
+function Dot({ color, pulse = false }: { color: string; pulse?: boolean }) {
+  return <span className={`inline-block h-2.5 w-2.5 rounded-full ${pulse ? 'animate-pulse' : ''}`} style={{ background: color }} />
+}
+
+function StatCard({ href, label, value, accent, meta }: { href: string; label: string; value: string | number; accent?: string; meta?: React.ReactNode }) {
   return (
     <Link
       href={href}
-      className="rounded-xl border p-4 flex flex-col gap-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+      className="rounded-xl border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
       style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}
     >
-      <span
-        className="text-2xl font-bold tabular-nums"
-        style={{ fontFamily: 'JetBrains Mono, monospace', color: color ?? 'var(--text-primary)' }}
-      >
-        {value.toLocaleString()}
-      </span>
-      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+      <div className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
         {label}
-      </span>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <div
+          className="text-2xl font-bold tabular-nums"
+          style={{ fontFamily: 'JetBrains Mono, monospace', color: accent ?? 'var(--text-primary)' }}
+        >
+          {value}
+        </div>
+        {meta}
+      </div>
     </Link>
   )
 }
 
-interface KpiStripProps {
-  eventCount24h: number
-  eventCount7d: number
-  hotRegionCount: number
-  criticalHighCount: number
-  activeAlertsCount: number
-  breaking2h: number
-  hasOrg: boolean
-}
+export function KpiStrip({ kpis, lastUpdatedAt }: KpiStripProps) {
+  const liveMeta = getLiveMeta(lastUpdatedAt)
+  const activeConflictColor = kpis.activeConflictZones > 5 ? '#ef4444' : kpis.activeConflictZones > 2 ? '#f97316' : undefined
 
-export function KpiStrip({
-  eventCount24h,
-  eventCount7d,
-  hotRegionCount,
-  criticalHighCount,
-  activeAlertsCount,
-  breaking2h,
-  hasOrg,
-}: KpiStripProps) {
   return (
-    <div className="flex gap-3 overflow-x-auto pb-1">
-      <div className="min-w-[130px] flex-1">
-        <KpiCard
-          value={eventCount24h}
-          label="Events 24h"
-          href="/feed?window=24h"
-        />
-      </div>
-      <div className="min-w-[130px] flex-1">
-        <KpiCard
-          value={eventCount7d}
-          label="Events 7d"
-          href="/feed?window=7d"
-          color="#38BDF8"
-        />
-      </div>
-      <div className="min-w-[130px] flex-1">
-        <KpiCard
-          value={hotRegionCount}
-          label="Hot Regions"
-          href="/feed?window=24h"
-          color="#f97316"
-        />
-      </div>
-      <div className="min-w-[130px] flex-1">
-        <KpiCard
-          value={criticalHighCount}
-          label="Critical / High"
-          href="/feed?window=24h&severity=3"
-          color="#ef4444"
-        />
-      </div>
-      <div className="min-w-[130px] flex-1">
-        <KpiCard
-          value={breaking2h}
-          label="Breaking"
-          href="/feed?window=24h&severity=3"
-          color={breaking2h > 0 ? '#ef4444' : undefined}
-        />
-      </div>
-      {hasOrg && (
-        <div className="min-w-[130px] flex-1">
-          <KpiCard
-            value={activeAlertsCount}
-            label="Active Alerts"
-            href="/alerts"
-            color="#8b5cf6"
-          />
-        </div>
-      )}
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      <StatCard
+        href="/feed?window=24h"
+        label="Active Conflicts"
+        value={kpis.activeConflictZones}
+        accent={activeConflictColor}
+      />
+      <StatCard
+        href="/feed?window=24h"
+        label="Breaking"
+        value={kpis.breaking2h}
+        accent={kpis.breaking2h > 0 ? '#ef4444' : undefined}
+        meta={kpis.breaking2h > 0 ? <Dot color="#ef4444" pulse /> : undefined}
+      />
+      <StatCard href="/feed?window=24h" label="Events Today" value={kpis.eventsWindow} />
+      <StatCard href="/feed?window=24h" label="Hot Regions" value={kpis.hotRegionCount} accent="#f97316" />
+      <StatCard href="/feed?window=24h" label="Most Active" value={kpis.mostActiveRegion ?? '—'} accent="#38bdf8" />
+      <StatCard
+        href="/feed?window=24h"
+        label="Live"
+        value={liveMeta.label}
+        accent={liveMeta.color}
+        meta={<Dot color={liveMeta.color} pulse={liveMeta.label === 'Live'} />}
+      />
     </div>
   )
 }
