@@ -224,9 +224,16 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
 
   const url = new URL(req.url)
   const win = url.searchParams.get('window') ?? '24h'
+  const severityFilter = url.searchParams.get('severity')
+  const categoryFilter = url.searchParams.get('category')
+  const hasActiveFilters = Boolean(
+    (severityFilter && severityFilter !== 'all') ||
+    (categoryFilter && categoryFilter !== 'all')
+  )
+
   if (!WINDOW_MS[win]) return NextResponse.json({ error: 'Invalid window' }, { status: 400 })
 
-  const cacheKey = `cache:overview:${win}`
+  const cacheKey = `cache:overview:${win}:sev${severityFilter ?? 'all'}:cat${categoryFilter ?? 'all'}`
 
   if (await isSafeMode()) {
     const safeCached = await getCachedSnapshot<OverviewResponse>(cacheKey)
@@ -269,6 +276,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   const since7d = new Date(Date.now() - WINDOW_MS['7d']!).toISOString()
   const topStoriesSince6h = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
   const topStoriesSince24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const storiesSince = hasActiveFilters ? topStoriesSince24h : topStoriesSince6h
 
   // Parallel queries — never expose source health/pipeline status
   const [
@@ -344,37 +352,47 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .gte('occurred_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
       .gte('severity', 3),
 
-    // Top stories (conflict/news) — freshness-first shortlist from last 6h, then 24h fallback
+    // Top stories (conflict/news) — when filtered, widen to 24h and return raw ordered results.
     // Use occurred_at: this is the article publish time in the actual schema.
-    // Exclude: noaa (weather), nasa_eonet (natural fires), usgs (earthquakes) — these go in weather bucket
-    supabase
-      .from('events')
-      .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw,summary_short')
-      .gte('occurred_at', topStoriesSince6h)
-      .eq('is_humanitarian_report', false)
-      .gte('occurred_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-      .not('source', 'in', '("noaa","nasa_eonet","nasa-eonet","usgs")')
-      .not('title', 'ilike', '%forest fire notification%')
-      .not('title', 'ilike', '%prescribed fire%')
-      .not('title', 'ilike', '%guidance on child marriage%')
-      .not('title', 'ilike', '%shopping coupon%')
-      .not('title', 'ilike', '%discount voucher%')
-      .not('title', 'ilike', '%tornado warning%')
-      .not('title', 'ilike', '%severe thunderstorm warning%')
-      .not('title', 'ilike', '%flood warning%')
-      .not('title', 'ilike', '%winter storm warning%')
-      .not('title', 'ilike', '% by NWS%')
-      .not('event_type', 'eq', 'natural_disaster')
-      .order('occurred_at', { ascending: false })
-      .limit(20),
+    (() => {
+      let storiesQuery = supabase
+        .from('events')
+        .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw,summary_short')
+        .gte('occurred_at', storiesSince)
+        .eq('is_humanitarian_report', false)
+        .gte('occurred_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        .not('source', 'in', '("noaa","nasa_eonet","nasa-eonet","usgs")')
+        .not('title', 'ilike', '%forest fire notification%')
+        .not('title', 'ilike', '%prescribed fire%')
+        .not('title', 'ilike', '%guidance on child marriage%')
+        .not('title', 'ilike', '%shopping coupon%')
+        .not('title', 'ilike', '%discount voucher%')
+        .not('title', 'ilike', '%tornado warning%')
+        .not('title', 'ilike', '%severe thunderstorm warning%')
+        .not('title', 'ilike', '%flood warning%')
+        .not('title', 'ilike', '%winter storm warning%')
+        .not('title', 'ilike', '% by NWS%')
+        .not('event_type', 'eq', 'natural_disaster')
+        .order('occurred_at', { ascending: false })
+        .limit(hasActiveFilters ? 50 : 20)
+
+      if (severityFilter && severityFilter !== 'all') {
+        storiesQuery = storiesQuery.eq('severity', parseInt(severityFilter, 10))
+      }
+      if (categoryFilter && categoryFilter !== 'all') {
+        storiesQuery = storiesQuery.eq('event_type', categoryFilter)
+      }
+
+      return storiesQuery
+    })(),
   ])
 
   const hasOrg = !!(orgRes.data?.org_id)
   const allEvents = (windowEvents.data ?? []) as EventRow[]
   let conflictCandidates = (topStories.data ?? []) as EventRow[]
 
-  if (conflictCandidates.length < 5) {
-    const topStories24hRes = await supabase
+  if (!hasActiveFilters && conflictCandidates.length < 5) {
+    let topStories24hQuery = supabase
       .from('events')
       .select('id,source,event_type,title,description,region,country_code,severity,status,occurred_at,ingested_at,location::text,provenance_raw,summary_short')
       .gte('occurred_at', topStoriesSince24h)
@@ -395,6 +413,14 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .order('occurred_at', { ascending: false })
       .limit(20)
 
+    if (severityFilter && severityFilter !== 'all') {
+      topStories24hQuery = topStories24hQuery.eq('severity', parseInt(severityFilter, 10))
+    }
+    if (categoryFilter && categoryFilter !== 'all') {
+      topStories24hQuery = topStories24hQuery.eq('event_type', categoryFilter)
+    }
+
+    const topStories24hRes = await topStories24hQuery
     conflictCandidates = (topStories24hRes.data ?? []) as EventRow[]
   }
 
@@ -416,51 +442,60 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   // Filter out blocklisted titles from top stories
   const filteredConflict = conflictCandidates.filter(e => !isBlocklisted(e.title ?? ''))
 
-  // Pure chronological — newest first, no scoring. BREAKING section handles importance surfacing.
-  const sortedConflict = [...filteredConflict].sort((a, b) =>
-    new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() -
-    new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
-  )
-  const sortedWeather = [...weatherCandidates].sort((a, b) => {
-    const severityDiff = Number(b.severity ?? 1) - Number(a.severity ?? 1)
-    if (severityDiff !== 0) return severityDiff
-    return new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() - new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
-  })
-  // Dedup by title — remove near-identical events (e.g. 3x "Green forest fire in Thailand")
-  const seenTitles = new Set<string>()
-  const dedupedConflict = sortedConflict.filter(e => {
-    const key = (e.title ?? '').toLowerCase().trim().slice(0, 60)
-    if (seenTitles.has(key)) return false
-    seenTitles.add(key)
-    return true
-  })
-  const dedupedWeather = sortedWeather.filter(e => {
-    const key = (e.title ?? '').toLowerCase().trim().slice(0, 60)
-    if (seenTitles.has(key)) return false
-    seenTitles.add(key)
-    return true
-  })
+  let finalTopStories: EventRow[]
 
-  // Fuzzy title dedup — skip if first 5 words match an already-seen title
-  function titleFingerprint(t: string): string {
-    return t.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).slice(0, 5).join(' ')
+  if (hasActiveFilters) {
+    finalTopStories = [...filteredConflict].sort((a, b) =>
+      new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() -
+      new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
+    )
+  } else {
+    // Pure chronological — newest first, no scoring. BREAKING section handles importance surfacing.
+    const sortedConflict = [...filteredConflict].sort((a, b) =>
+      new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() -
+      new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
+    )
+    const sortedWeather = [...weatherCandidates].sort((a, b) => {
+      const severityDiff = Number(b.severity ?? 1) - Number(a.severity ?? 1)
+      if (severityDiff !== 0) return severityDiff
+      return new Date(b.occurred_at ?? b.ingested_at ?? 0).getTime() - new Date(a.occurred_at ?? a.ingested_at ?? 0).getTime()
+    })
+    // Dedup by title — remove near-identical events (e.g. 3x "Green forest fire in Thailand")
+    const seenTitles = new Set<string>()
+    const dedupedConflict = sortedConflict.filter(e => {
+      const key = (e.title ?? '').toLowerCase().trim().slice(0, 60)
+      if (seenTitles.has(key)) return false
+      seenTitles.add(key)
+      return true
+    })
+    const dedupedWeather = sortedWeather.filter(e => {
+      const key = (e.title ?? '').toLowerCase().trim().slice(0, 60)
+      if (seenTitles.has(key)) return false
+      seenTitles.add(key)
+      return true
+    })
+
+    // Fuzzy title dedup — skip if first 5 words match an already-seen title
+    function titleFingerprint(t: string): string {
+      return t.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).slice(0, 5).join(' ')
+    }
+
+    const DISASTER_CAP = 3
+    const weatherSlots = Math.min(dedupedWeather.length, DISASTER_CAP)
+    const conflictSlots = 20 - weatherSlots
+    const stories: EventRow[] = [
+      ...dedupedConflict.slice(0, conflictSlots),
+      ...dedupedWeather.slice(0, weatherSlots),
+    ]
+
+    const seenFingerprints = new Set<string>()
+    finalTopStories = stories.filter(e => {
+      const fp = titleFingerprint(e.title ?? '')
+      if (seenFingerprints.has(fp)) return false
+      seenFingerprints.add(fp)
+      return true
+    })
   }
-
-  const DISASTER_CAP = 3
-  const weatherSlots = Math.min(dedupedWeather.length, DISASTER_CAP)
-  const conflictSlots = 20 - weatherSlots
-  const stories: EventRow[] = [
-    ...dedupedConflict.slice(0, conflictSlots),
-    ...dedupedWeather.slice(0, weatherSlots),
-  ]
-
-  const seenFingerprints = new Set<string>()
-  const dedupedFinal = stories.filter(e => {
-    const fp = titleFingerprint(e.title ?? '')
-    if (seenFingerprints.has(fp)) return false
-    seenFingerprints.add(fp)
-    return true
-  })
 
   const lastIngested = (freshRes.data?.ingested_at as string | null) ?? null
   const freshness = computeFreshness(lastIngested)
@@ -493,7 +528,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       activeAlertsCount: hasOrg ? (alertsRes.count ?? 0) : 0,
       breaking2h: breakingRes.count ?? 0,
     },
-    topStories: dedupedFinal.map((story) => ({
+    topStories: finalTopStories.map((story) => ({
       ...story,
       ...sanitizeEventForClient(story as unknown as Record<string, unknown>),
       source: sanitizeEventForClient(story as unknown as Record<string, unknown>).outlet_name,

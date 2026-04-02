@@ -25,7 +25,6 @@ import {
   getLocationDisplay,
   getSignificanceTier,
   isBreaking,
-  UI_CATEGORY_TYPES,
   computeSeverityCounts,
   sanitizeSourceDisplay,
 } from '@/lib/event-presentation'
@@ -111,12 +110,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 // Uses shared UI_CATEGORY_TYPES from event-presentation for consistent filtering
 
 const CATEGORY_LIST = [
-  { key: 'Conflict',   emoji: '⚔️' },
-  { key: 'Airstrikes', emoji: '💥' },
-  { key: 'Political',  emoji: '🏛️' },
-  { key: 'Disasters',  emoji: '🌊' },
-  { key: 'News',       emoji: '📰' },
-]
+  { value: 'conflict', label: 'Conflict',   emoji: '⚔️' },
+  { value: 'airstrike', label: 'Airstrikes', emoji: '💥' },
+  { value: 'political', label: 'Political',  emoji: '🏛️' },
+  { value: 'natural_disaster', label: 'Disasters',  emoji: '🌊' },
+  { value: 'news', label: 'News',       emoji: '📰' },
+] as const
 
 const SEVERITY_PILLS = [
   { value: null,  label: 'All',      emoji: null,  activeClass: 'bg-white/10 border-white/30 text-white' },
@@ -160,8 +159,10 @@ function FilterBar({
 
   const catCounts = useMemo(() => {
     const counts: Record<string, number> = {}
-    CATEGORY_LIST.forEach(c => {
-      counts[c.key] = allEvents.filter(e => UI_CATEGORY_TYPES[c.key]?.includes(getEffectiveType(e.event_type))).length
+    CATEGORY_LIST.forEach((category) => {
+      counts[category.value] = allEvents.filter((event) =>
+        getEffectiveType(event.event_type) === getEffectiveType(category.value)
+      ).length
     })
     return counts
   }, [allEvents])
@@ -213,13 +214,13 @@ function FilterBar({
         >
           All <span className="ml-1 opacity-60">({totalCount})</span>
         </button>
-        {CATEGORY_LIST.map(cat => {
-          const isActive = categoryFilter === cat.key
-          const count = catCounts[cat.key] ?? 0
+        {CATEGORY_LIST.map((cat) => {
+          const isActive = categoryFilter === cat.value
+          const count = catCounts[cat.value] ?? 0
           return (
             <button
-              key={cat.key}
-              onClick={() => setCategoryFilter(isActive ? null : cat.key)}
+              key={cat.value}
+              onClick={() => setCategoryFilter(isActive ? null : cat.value)}
               className={[
                 'px-3 py-1 rounded-full text-xs font-medium border transition-colors',
                 isActive
@@ -227,7 +228,7 @@ function FilterBar({
                   : 'bg-transparent border-gray-700 text-gray-400 hover:border-gray-500',
               ].join(' ')}
             >
-              {cat.emoji} {cat.key} <span className="ml-1 opacity-60">({count})</span>
+              {cat.emoji} {cat.label} <span className="ml-1 opacity-60">({count})</span>
             </button>
           )
         })}
@@ -238,8 +239,6 @@ function FilterBar({
         <span>
           Showing{' '}
           <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{filteredCount}</span>
-          {' '}of{' '}
-          <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{totalCount}</span>
           {' '}events
         </span>
         {isFiltered && (
@@ -547,9 +546,12 @@ export function OverviewClient() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [data, setData] = useState<OverviewData | null>(null)
+  const [filteredData, setFilteredData] = useState<OverviewData | null>(null)
+  const [filterLoading, setFilterLoading] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<OverviewEvent | null>(null)
   const [severityFilter, setSeverityFilter] = useState<number | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
+  const filterKey = `sev=${severityFilter ?? 'all'}&cat=${categoryFilter ?? 'all'}`
 
   // stale-while-revalidate cache: keyed by window
   const cache = useRef<Partial<Record<Window, OverviewData>>>({})
@@ -626,6 +628,38 @@ export function OverviewClient() {
     return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [win, fetchOverview])
 
+  useEffect(() => {
+    if (severityFilter === null && categoryFilter === null) {
+      setFilteredData(null)
+      setFilterLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
+    const params = new URLSearchParams({ window: win })
+    if (severityFilter !== null) params.set('severity', String(severityFilter))
+    if (categoryFilter !== null) params.set('category', categoryFilter)
+
+    setFilterLoading(true)
+
+    fetch(`/api/v1/overview?${params.toString()}`, { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('filter fetch failed')
+        return response.json() as Promise<OverviewData>
+      })
+      .then((json) => {
+        setFilteredData(json)
+      })
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setFilterLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [severityFilter, categoryFilter, win])
+
   // Reset filters when window changes so stale counts don't persist
   const handleWindowChange = (w: Window) => {
     if (w === win) return
@@ -633,50 +667,38 @@ export function OverviewClient() {
     setSelectedEvent(null)
     setSeverityFilter(null)
     setCategoryFilter(null)
+    setFilteredData(null)
+    setFilterLoading(false)
   }
 
-  // Client-side filtered top stories
+  const activeData = (severityFilter !== null || categoryFilter !== null) ? filteredData : data
+
   const breakingStories = useMemo(() => {
-    if (!data) return []
+    if (!activeData) return []
 
     const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000
-    return data.topStories
+    return activeData.topStories
       .filter((event) => {
         const ts = event.ingested_at ? new Date(event.ingested_at).getTime() : 0
         return ts >= twoHoursAgo && (event.severity === 4 || event.severity === 3)
       })
       .slice(0, 3)
-  }, [data])
+  }, [activeData])
 
   const filteredStories = useMemo(() => {
-    if (!data) return []
-    let result = data.topStories
-    if (severityFilter !== null) {
-      result = result.filter(e => (e.severity ?? 0) === severityFilter)
-    }
-    if (categoryFilter !== null) {
-      const types = UI_CATEGORY_TYPES[categoryFilter] ?? []
-      result = result.filter(e => types.includes(getEffectiveType(e.event_type)))
-    }
-    // Diversity cap: max 5 events per source domain to prevent GDELT flooding
-    // Preserves ingested_at DESC order — just skips excess from same source
-    const sourceCounts: Record<string, number> = {}
-    const diverse: typeof result = []
-    for (const e of result) {
-      const src = e.source ?? 'unknown'
-      sourceCounts[src] = (sourceCounts[src] ?? 0) + 1
-      if (sourceCounts[src] <= 5) diverse.push(e)
-      if (diverse.length >= 20) break
-    }
-    return diverse
-  }, [data, severityFilter, categoryFilter])
+    if (!activeData) return []
+    return activeData.topStories.slice(0, 50)
+  }, [activeData, filterKey])
 
   // ─── header meta ───────────────────────────────────────────────────────────
 
-  const freshnessColor = data ? FRESHNESS_COLORS[data.freshnessColor] : 'var(--text-muted)'
-  const coverageColor = data ? COVERAGE_COLORS[data.coverageLevel] : 'var(--text-muted)'
-  const displayCount = data ? Math.min(20, data.topStories.length) : 0
-  const countText = !data ? '' : displayCount === data.topStories.length ? `Showing ${data.topStories.length} events` : `Showing top ${displayCount} of ${data.topStories.length} events`
+  const freshnessColor = activeData ? FRESHNESS_COLORS[activeData.freshnessColor] : 'var(--text-muted)'
+  const coverageColor = activeData ? COVERAGE_COLORS[activeData.coverageLevel] : 'var(--text-muted)'
+  const countText = filterLoading
+    ? 'Loading...'
+    : activeData
+      ? `Showing ${filteredStories.length} events`
+      : ''
 
   return (
     <div className="mx-auto max-w-[1400px] p-6">
@@ -687,7 +709,7 @@ export function OverviewClient() {
             <h1 className="text-[22px] font-semibold" style={{ color: 'var(--text-primary)' }}>
               Situation Overview
             </h1>
-            {data && (
+            {activeData && (
               <span
                 className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
                 style={{
@@ -696,13 +718,13 @@ export function OverviewClient() {
                   border: `1px solid ${freshnessColor}30`,
                 }}
               >
-                {data.freshnessStatus}
+                {activeData.freshnessStatus}
               </span>
             )}
           </div>
-          {data && (
+          {activeData && (
             <div className="mt-1 flex items-center gap-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-              <span>Last update: {data.freshnessDescription}</span>
+              <span>Last update: {activeData.freshnessDescription}</span>
               <span>·</span>
               <span style={{ color: coverageColor }}>Global monitoring across all major conflict zones</span>
               <span>·</span>
@@ -760,10 +782,10 @@ export function OverviewClient() {
       {loading && !data && !error && <OverviewSkeleton />}
 
       {/* Main content — shown when we have data (possibly stale while re-fetching) */}
-      {data && (
+      {activeData && (
         <>
           {/* Stale/offline banner */}
-          {(data.freshnessStatus === 'Stale' || data.freshnessStatus === 'Offline') && (
+          {(activeData.freshnessStatus === 'Stale' || activeData.freshnessStatus === 'Offline') && (
             <div
               className="rounded-xl border px-4 py-3 flex items-center gap-2 mb-4"
               style={{ borderColor: '#f59e0b30', background: '#f59e0b08' }}
@@ -785,21 +807,21 @@ export function OverviewClient() {
           {/* KPI strip */}
           <div className="mb-4">
             <KpiStrip
-              eventCount24h={data.kpis.eventsWindow}
-              eventCount7d={data.kpis.events7d}
-              hotRegionCount={data.kpis.hotRegionCount}
-              criticalHighCount={data.kpis.criticalHighCount}
-              activeAlertsCount={data.kpis.activeAlertsCount}
-              breaking2h={data.kpis.breaking2h}
-              hasOrg={data.hasOrg}
+              eventCount24h={activeData.kpis.eventsWindow}
+              eventCount7d={activeData.kpis.events7d}
+              hotRegionCount={activeData.kpis.hotRegionCount}
+              criticalHighCount={activeData.kpis.criticalHighCount}
+              activeAlertsCount={activeData.kpis.activeAlertsCount}
+              breaking2h={activeData.kpis.breaking2h}
+              hasOrg={activeData.hasOrg}
             />
           </div>
 
           {/* Background re-fetch indicator (subtle) */}
-          {loading && (
+          {(loading || filterLoading) && (
             <div className="mb-3 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
               <IconRefresh size={11} className="animate-spin" />
-              Refreshing…
+              {filterLoading ? 'Loading filtered results…' : 'Refreshing…'}
             </div>
           )}
 
@@ -850,19 +872,21 @@ export function OverviewClient() {
                 </div>
               )}
               <FilterBar
-                allEvents={data.topStories}
+                allEvents={activeData.topStories}
                 severityFilter={severityFilter}
                 setSeverityFilter={setSeverityFilter}
                 categoryFilter={categoryFilter}
                 setCategoryFilter={setCategoryFilter}
                 filteredCount={filteredStories.length}
-                totalCount={data.topStories.length}
-                severityCounts={data.severityCounts}
+                totalCount={activeData.topStories.length}
+                severityCounts={activeData.severityCounts}
               />
-              <TopStoriesList
-                events={filteredStories}
-                onSelect={setSelectedEvent}
-              />
+              <div className={filterLoading ? 'opacity-60 pointer-events-none transition-opacity' : 'transition-opacity'}>
+                <TopStoriesList
+                  events={filteredStories}
+                  onSelect={setSelectedEvent}
+                />
+              </div>
             </section>
 
             {/* Right column */}
@@ -878,18 +902,18 @@ export function OverviewClient() {
                   </h2>
                 </div>
                 <div className="p-3">
-                  {data.hotRegions.length === 0 ? (
+                  {activeData.hotRegions.length === 0 ? (
                     <p className="px-2 py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
                       Insufficient data to rank regions.
                     </p>
                   ) : (
-                    <HotRegionsTable regions={data.hotRegions} />
+                    <HotRegionsTable regions={activeData.hotRegions} />
                   )}
                 </div>
               </section>
 
               {/* Quick Actions */}
-              <QuickActions hasOrg={data.hasOrg} />
+              <QuickActions hasOrg={activeData.hasOrg} />
             </div>
           </div>
         </>
