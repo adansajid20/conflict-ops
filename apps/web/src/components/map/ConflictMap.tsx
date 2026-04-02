@@ -164,15 +164,15 @@ export function ConflictMap() {
 
     map.on('load', () => {
       // MapLibre v3 globe projection — setProjection is a real method in v3.6.x
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(map as any).setProjection({ type: 'globe' })
-      } catch { /* no-op if somehow unavailable */ }
+      const mapAny = map as MapLibreMap & {
+        setProjection: (p: { type: string }) => void
+        setFog: (f: Record<string, unknown>) => void
+      }
+      try { mapAny.setProjection({ type: 'globe' }) } catch { /* no-op */ }
 
       // Space atmosphere
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(map as any).setFog({
+        mapAny.setFog({
           color: 'rgb(4, 8, 16)',
           'high-color': 'rgb(10, 18, 40)',
           'horizon-blend': 0.04,
