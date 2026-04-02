@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ExternalLink, Bell, Bot, Copy, ChevronDown, ChevronUp } from 'lucide-react'
 import type { EntityMention, OverviewEvent } from './types'
-import { getBestDescription, getOutletDisplay, getRegionDisplay } from '@/lib/event-presentation'
+import { getBestDescription, cleanDescription, getOutletDisplay, getRegionDisplay } from '@/lib/event-presentation'
 
 const IconX = X as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
 const IconExternalLink = ExternalLink as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
@@ -182,7 +182,10 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
   const region = getRegionDisplay(event.region) ?? 'Global'
   const timeAgo = formatRelativeOccurredTime(event.occurred_at)
   const eventId = event.id
-  const description = (event.description ?? getBestDescription(event, 1600) ?? '').trim()
+  const description = cleanDescription(
+    event.description ?? getBestDescription(event, 1600) ?? '',
+    event.title ?? ''
+  )
   const summaryShort = (event.summary_short ?? '').trim()
   const significanceScore = typeof event.significance_score === 'number' ? event.significance_score : null
   const significanceBarColor = significanceScore !== null ? getSeverityBarColor(significanceScore) : '#6b7280'

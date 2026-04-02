@@ -1,6 +1,7 @@
 import Parser from 'rss-parser'
 import { createServiceClient } from '../supabase/server'
 import { isBlocklisted, classifyByTitle, inferRegionFromTitle } from '../classification'
+import { cleanDescription } from './utils'
 
 const RSS_FEEDS = [
   { url: 'https://rsshub.app/reuters/world', outlet: 'Reuters', trust: 95, region: null },
@@ -193,13 +194,10 @@ async function parseFeed(
 
       const title = sanitizeWireTitle(item.title.trim())
       const link = item.link ?? item.guid ?? null
-      // Strip RSS boilerplate footers (site name, URL, tagline injected by feed generators)
-      const rawSnippet = (item.contentSnippet ?? item.summary ?? '').slice(0, 500)
-      const snippet = rawSnippet
-        .replace(/\s*(Mali Actu|maliactu\.net|Mali Actualités)[^.]*$/gi, '')
-        .replace(/\s*(BBC News|Reuters -|AP News -|Al Jazeera -)[^.]*$/gi, '')
-        .replace(/\s*[-–—]\s*\S+\.(com|net|org|co)\S*\s*$/gi, '')
-        .trim()
+      const snippet = cleanDescription(
+        item.contentSnippet ?? item.summary ?? '',
+        title
+      )
 
       if (isBlocklisted(title, link ?? '', snippet)) {
         skipped += 1

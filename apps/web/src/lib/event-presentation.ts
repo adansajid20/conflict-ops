@@ -395,3 +395,6 @@ export function sanitizeEventForClient(event: Record<string, unknown>): ClientEv
     location_confidence_label: `${locationConfidence.icon} ${locationConfidence.label}`,
   }
 }
+
+// ─── Re-export cleanDescription so UI components can import from one place ───
+export { cleanDescription } from '@/lib/ingest/utils'
