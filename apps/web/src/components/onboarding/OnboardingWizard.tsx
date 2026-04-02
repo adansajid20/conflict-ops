@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 const STEPS = [
-  { id: 'welcome',   title: 'Welcome to CONFLICT OPS', icon: '◈' },
+  { id: 'welcome',   title: 'Welcome to CONFLICTRADAR', icon: '◈' },
   { id: 'org',       title: 'Set Up Your Organization', icon: '⊕' },
   { id: 'mission',   title: 'Create Your First Mission', icon: '◉' },
   { id: 'pir',       title: 'Define Your Intelligence Requirements', icon: '⚠' },

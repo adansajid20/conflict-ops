@@ -11,7 +11,7 @@ export default function GlobalError({
     <html lang="en" data-theme="ops">
       <body style={{ margin: 0, background: '#080A0E', color: '#E6EDF3', fontFamily: 'ui-monospace, monospace' }}>
         <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-          <div style={{ color: '#00FF88', letterSpacing: '0.15em', fontSize: 12 }}>CONFLICT OPS // SYSTEM ERROR</div>
+          <div style={{ color: '#00FF88', letterSpacing: '0.15em', fontSize: 12 }}>CONFLICTRADAR // SYSTEM ERROR</div>
           <h1 style={{ margin: 0, fontSize: 24 }}>CRITICAL FAULT DETECTED</h1>
           <p style={{ margin: 0, color: '#8B949E', fontSize: 14 }}>{error.message ?? 'An unexpected error occurred'}</p>
           {error.digest && (

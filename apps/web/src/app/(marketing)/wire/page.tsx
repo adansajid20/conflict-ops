@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
-  title: 'Live Wire — CONFLICT OPS',
+  title: 'Live Wire — CONFLICTRADAR',
   description: 'Public live feed of global conflict and geopolitical events. Updated every 15 minutes.',
 }
 
@@ -48,7 +48,7 @@ export default async function WirePage() {
       <div className="border-b sticky top-0 z-10" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
-            <span className="font-bold tracking-widest mono" style={{ color: 'var(--primary)' }}>CONFLICT OPS</span>
+            <span className="font-bold tracking-widest mono" style={{ color: 'var(--primary)' }}>CONFLICTRADAR</span>
             <span className="mx-2 text-xs" style={{ color: 'var(--border)' }}>|</span>
             <span className="text-sm mono" style={{ color: 'var(--text-muted)' }}>LIVE WIRE</span>
           </div>

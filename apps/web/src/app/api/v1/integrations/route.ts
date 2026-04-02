@@ -46,10 +46,10 @@ export async function POST(req: Request): Promise<NextResponse<ApiResponse<Recor
 
   if (parsed.data.test) {
     if (parsed.data.provider === 'slack') {
-      const result = await sendSlackNotification(parsed.data.config['webhook_url'] ?? '', 'CONFLICT OPS integration test')
+      const result = await sendSlackNotification(parsed.data.config['webhook_url'] ?? '', 'CONFLICTRADAR integration test')
       return NextResponse.json({ success: result.success, data: { provider: 'slack', tested: true }, error: result.error })
     }
-    const result = await triggerPagerDuty(parsed.data.config['integration_key'] ?? '', 'CONFLICT OPS integration test', 'info')
+    const result = await triggerPagerDuty(parsed.data.config['integration_key'] ?? '', 'CONFLICTRADAR integration test', 'info')
     return NextResponse.json({ success: result.success, data: { provider: 'pagerduty', tested: true }, error: result.error })
   }
 

@@ -2,7 +2,7 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#0a0e14', color: '#c9d1d9', fontFamily: 'monospace' }}>
       <nav className="border-b px-6 py-4 flex items-center justify-between" style={{ borderColor: '#21262d' }}>
-        <a href="/landing" className="text-lg font-bold tracking-widest" style={{ color: '#58a6ff' }}>CONFLICT OPS</a>
+        <a href="/landing" className="text-lg font-bold tracking-widest" style={{ color: '#58a6ff' }}>CONFLICTRADAR</a>
         <a href="/sign-in" className="text-sm" style={{ color: '#8b949e' }}>Sign in →</a>
       </nav>
       <div className="max-w-3xl mx-auto px-6 py-16">
@@ -35,7 +35,7 @@ We do not sell your personal information to third parties.`,
           },
           {
             title: '3. Data Sources and Attribution',
-            body: `CONFLICT OPS aggregates data from publicly available sources including:
+            body: `CONFLICTRADAR aggregates data from publicly available sources including:
 • ACLED (Armed Conflict Location & Event Data Project) — acleddata.com
 • GDELT Project — gdeltproject.org
 • NASA FIRMS — firms.modaps.eosdis.nasa.gov
@@ -91,7 +91,7 @@ To exercise any of these rights, contact privacy@conflictradar.co.`,
             title: '8. Contact',
             body: `For privacy-related inquiries:
 Email: privacy@conflictradar.co
-Address: CONFLICT OPS / conflictradar.co`,
+Address: CONFLICTRADAR / conflictradar.co`,
           },
         ].map(section => (
           <div key={section.title} className="mb-10">

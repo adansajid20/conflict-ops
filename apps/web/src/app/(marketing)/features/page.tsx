@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'Features — CONFLICT OPS',
+  title: 'Features — CONFLICTRADAR',
   description: 'Enterprise geopolitical intelligence platform. Real-time conflict tracking, AI forecasting, vessel tracking, and threat assessment.',
 }
 
@@ -61,7 +61,7 @@ export default function FeaturesPage() {
       <nav className="border-b" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/landing" className="font-bold tracking-widest mono" style={{ color: 'var(--primary)' }}>
-            CONFLICT OPS
+            CONFLICTRADAR
           </Link>
           <div className="flex items-center gap-6 text-sm mono">
             <Link href="/features" style={{ color: 'var(--primary)' }}>Features</Link>

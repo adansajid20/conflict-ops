@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Security — CONFLICT OPS',
-  description: 'Trust center, controls, infrastructure, and disclosure policy for CONFLICT OPS.',
+  title: 'Security — CONFLICTRADAR',
+  description: 'Trust center, controls, infrastructure, and disclosure policy for CONFLICTRADAR.',
 }
 
 const badges = [

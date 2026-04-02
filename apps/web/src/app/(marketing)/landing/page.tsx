@@ -3,7 +3,7 @@ import { LandingClient } from '@/components/landing/LandingClient'
 import { WaitlistForm } from '@/components/landing/WaitlistForm'
 
 export const metadata: Metadata = {
-  title: 'Conflict Ops — Geopolitical Intelligence. Built for Operators.',
+  title: 'ConflictRadar — Geopolitical Intelligence. Built for Operators.',
   description: 'Production-grade geopolitical intelligence for analysts, operators, and security teams.',
 }
 
@@ -23,7 +23,7 @@ const HOW_IT_WORKS = [
 ]
 
 const COMPETITORS = [
-  ['CONFLICT OPS', '$9–$299', 'Yes', 'Yes', 'Yes', 'Yes'],
+  ['CONFLICTRADAR', '$9–$299', 'Yes', 'Yes', 'Yes', 'Yes'],
   ['Dataminr', 'Enterprise', 'No', 'Yes', 'Limited', 'No'],
   ['Recorded Future', 'Enterprise', 'No', 'Yes', 'Limited', 'No'],
   ['Stratfor', 'Enterprise', 'No', 'Partial', 'No', 'No'],
@@ -51,7 +51,7 @@ export default function LandingPage() {
         <div className="rounded-2xl border p-8" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
           <div className="mb-2 text-sm font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Social proof</div>
           <div className="text-3xl font-semibold" style={{ color: 'var(--text-primary)' }}>Used by analysts in 30+ countries</div>
-          <p className="mt-3 max-w-3xl" style={{ color: 'var(--text-muted)' }}>From individual researchers to multi-seat security teams, CONFLICT OPS is built for people who need signal now, not after six procurement calls and a dull vendor deck.</p>
+          <p className="mt-3 max-w-3xl" style={{ color: 'var(--text-muted)' }}>From individual researchers to multi-seat security teams, CONFLICTRADAR is built for people who need signal now, not after six procurement calls and a dull vendor deck.</p>
         </div>
       </section>
 

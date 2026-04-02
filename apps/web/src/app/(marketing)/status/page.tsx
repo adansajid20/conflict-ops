@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'System Status — CONFLICT OPS',
+  title: 'System Status — CONFLICTRADAR',
   description: 'Real-time platform health for conflictradar.co',
 }
 

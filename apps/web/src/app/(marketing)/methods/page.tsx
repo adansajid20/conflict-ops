@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Intelligence Methods — CONFLICT OPS',
-  description: 'How CONFLICT OPS collects, processes, and verifies geopolitical intelligence.',
+  title: 'Intelligence Methods — CONFLICTRADAR',
+  description: 'How CONFLICTRADAR collects, processes, and verifies geopolitical intelligence.',
 }
 
 const SOURCES = [

@@ -3,7 +3,7 @@
  * Source: eonet.gsfc.nasa.gov — FREE, uses NASA_API_KEY
  * Attribution: "Natural event data from NASA EONET (eonet.gsfc.nasa.gov)"
  *
- * Relevant to CONFLICT OPS:
+ * Relevant to CONFLICTRADAR:
  * - Wildfires in conflict zones (Sudan, Ukraine, Myanmar) — cover/concealment signals
  * - Floods/droughts → displacement → conflict driver
  * - Severe storms disrupting humanitarian corridors

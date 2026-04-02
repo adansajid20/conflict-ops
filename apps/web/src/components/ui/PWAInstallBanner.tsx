@@ -44,7 +44,7 @@ export function PWAInstallBanner() {
   return (
     <div className="border-b px-4 py-3 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }}>
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-        <span>Install CONFLICT OPS for faster access, offline shell support, and app-like launch.</span>
+        <span>Install CONFLICTRADAR for faster access, offline shell support, and app-like launch.</span>
         <div className="flex items-center gap-2">
           <button onClick={dismiss} className="rounded-md border px-3 py-1.5" style={{ borderColor: 'var(--border)' }}>Dismiss</button>
           <button onClick={() => void install()} className="rounded-md px-3 py-1.5" style={{ background: 'var(--primary)', color: '#fff' }}>Install App</button>

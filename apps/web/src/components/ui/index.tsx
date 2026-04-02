@@ -2,7 +2,7 @@
 import React from 'react'
 
 // ============================================================
-// SHARED UI PRIMITIVES — CONFLICT OPS DESIGN SYSTEM
+// SHARED UI PRIMITIVES — CONFLICTRADAR DESIGN SYSTEM
 // ============================================================
 
 // ---------- Panel ----------

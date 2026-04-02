@@ -210,7 +210,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {(() => { const ShieldIcon = Shield as React.ElementType; return <ShieldIcon className="h-4 w-4" style={{ color: 'var(--primary-text)' }} /> })()}
               </div>
               <div>
-                <div className="text-sm font-semibold tracking-[0.04em]" style={{ color: 'var(--text-primary)' }}>{branding?.app_name ?? 'CONFLICT OPS'}</div>
+                <div className="text-sm font-semibold tracking-[0.04em]" style={{ color: 'var(--text-primary)' }}>{branding?.app_name ?? 'CONFLICTRADAR'}</div>
                 <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Intelligence Platform</div>
               </div>
             </Link>

@@ -3,10 +3,10 @@ import Link from 'next/link'
 import { CookieConsentBanner } from '@/components/ui/CookieConsentBanner'
 
 export const metadata: Metadata = {
-  title: 'CONFLICT OPS — Geopolitical Intelligence Platform',
+  title: 'CONFLICTRADAR — Geopolitical Intelligence Platform',
   description: 'Enterprise-grade geopolitical intelligence for analysts, security teams, and risk professionals. Real-time conflict tracking, forecasting, and threat assessment.',
   openGraph: {
-    title: 'CONFLICT OPS',
+    title: 'CONFLICTRADAR',
     description: 'Palantir-grade geopolitical intelligence. Built for serious analysts.',
     type: 'website',
   },

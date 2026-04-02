@@ -1,5 +1,5 @@
 /**
- * Gemini AI utilities for CONFLICT OPS
+ * Gemini AI utilities for CONFLICTRADAR
  * Model: gemini-2.0-flash (fast, cheap, free tier: 1,500 req/day)
  * Hard budget: max 50 calls per heavy lane run
  * Drop-in replacement for openai.ts

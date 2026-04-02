@@ -16,7 +16,7 @@ export async function sendInviteEmail(params: SendInviteEmailParams): Promise<vo
 
   const html = `
     <div style="background:#0D1117;color:#F1F5F9;padding:32px;font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto">
-      <div style="font-size:12px;letter-spacing:0.16em;color:#60A5FA;margin-bottom:16px">CONFLICT OPS</div>
+      <div style="font-size:12px;letter-spacing:0.16em;color:#60A5FA;margin-bottom:16px">CONFLICTRADAR</div>
       <h1 style="font-size:24px;margin:0 0 12px">You're invited to join ${params.orgName}</h1>
       <p style="color:#94A3B8;line-height:1.6">${params.invitedByEmail ?? 'A workspace admin'} invited you to join <strong>${params.orgName}</strong> as <strong>${params.role}</strong>.</p>
       <p style="color:#94A3B8;line-height:1.6">Use the secure link below to accept your invitation.</p>

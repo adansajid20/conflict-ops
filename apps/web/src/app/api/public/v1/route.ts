@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 // API root — returns available endpoints and version info
 export function GET() {
   return NextResponse.json({
-    api: 'CONFLICT OPS',
+    api: 'CONFLICTRADAR',
     version: 'v1',
     documentation: 'https://conflictradar.co/api-docs',
     authentication: 'Bearer token — generate at /settings/api',

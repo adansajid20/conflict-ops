@@ -23,15 +23,15 @@ export type SendEmailParams = {
 }
 
 const RESEND_API = 'https://api.resend.com/emails'
-const FROM = process.env['EMAIL_FROM'] ?? 'CONFLICT OPS <noreply@conflictradar.co>'
+const FROM = process.env['EMAIL_FROM'] ?? 'CONFLICTRADAR <noreply@conflictradar.co>'
 const APP_URL = process.env['NEXT_PUBLIC_APP_URL'] ?? '${APP_URL}'
 
 function buildSubject(template: EmailTemplate, data: Record<string, unknown>): string {
   switch (template) {
     case 'alert_triggered': return `⚠ ALERT: ${data['alert_name'] ?? 'PIR threshold crossed'}`
-    case 'welcome': return '✓ Welcome to CONFLICT OPS — Your access is ready'
-    case 'weekly_brief': return `CONFLICT OPS Weekly Brief — ${data['week'] ?? new Date().toDateString()}`
-    case 'trial_ending': return '⏳ Your CONFLICT OPS trial ends in 3 days'
+    case 'welcome': return '✓ Welcome to CONFLICTRADAR — Your access is ready'
+    case 'weekly_brief': return `CONFLICTRADAR Weekly Brief — ${data['week'] ?? new Date().toDateString()}`
+    case 'trial_ending': return '⏳ Your CONFLICTRADAR trial ends in 3 days'
   }
 }
 
@@ -54,9 +54,9 @@ function buildHtml(template: EmailTemplate, data: Record<string, unknown>): stri
   .footer { border-top: 1px solid #21262d; margin-top: 40px; padding-top: 16px; font-size: 11px; color: #484f58; }
 </style></head>
 <body><div class="wrap">
-  <div class="header"><div class="logo">CONFLICT OPS</div></div>
+  <div class="header"><div class="logo">CONFLICTRADAR</div></div>
   ${content}
-  <div class="footer">CONFLICT OPS // UNCLASSIFIED // OPERATOR USE ONLY<br>You're receiving this because you have an active CONFLICT OPS account.</div>
+  <div class="footer">CONFLICTRADAR // UNCLASSIFIED // OPERATOR USE ONLY<br>You're receiving this because you have an active CONFLICTRADAR account.</div>
 </div></body>
 </html>`
 
@@ -65,7 +65,7 @@ function buildHtml(template: EmailTemplate, data: Record<string, unknown>): stri
       return base(`
         <div class="badge">WELCOME OPERATOR</div>
         <h2>Your access is ready</h2>
-        <p>Welcome to CONFLICT OPS. You now have access to real-time conflict intelligence, forecasting tools, and the analysis workbench.</p>
+        <p>Welcome to CONFLICTRADAR. You now have access to real-time conflict intelligence, forecasting tools, and the analysis workbench.</p>
         <p>Your 14-day trial starts now. No credit card required.</p>
         <p><strong style="color:#e6edf3">What to do first:</strong></p>
         <p>1. Open the <strong style="color:#e6edf3">Intel Feed</strong> — live conflict events updated every 15 minutes<br>
@@ -95,7 +95,7 @@ function buildHtml(template: EmailTemplate, data: Record<string, unknown>): stri
       return base(`
         <div class="badge">⏳ TRIAL ENDING</div>
         <h2>3 days left on your trial</h2>
-        <p>Your CONFLICT OPS trial ends in 3 days. Upgrade to keep your missions, alerts, and analysis history.</p>
+        <p>Your CONFLICTRADAR trial ends in 3 days. Upgrade to keep your missions, alerts, and analysis history.</p>
         <p>Start at <strong style="color:#e6edf3">$29/month</strong> for Individual access, or <strong style="color:#e6edf3">$99/month</strong> for Pro with full workbench access.</p>
         <a href="${APP_URL}/settings/billing" class="btn">Upgrade Now →</a>
       `)

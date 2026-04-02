@@ -372,3 +372,9 @@ body {
 .maplibregl-popup-tip {
   display: none !important;
 }
+
+
+@keyframes cr-loading {
+  from { width: 0%; }
+  to { width: 100%; }
+}

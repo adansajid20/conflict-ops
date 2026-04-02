@@ -121,7 +121,7 @@ export async function GET(req: Request) {
   }, {
     headers: {
       'X-API-Version': 'v1',
-      'X-Attribution': 'Powered by CONFLICT OPS (conflictradar.co)',
+      'X-Attribution': 'Powered by CONFLICTRADAR (conflictradar.co)',
     },
   })
 }

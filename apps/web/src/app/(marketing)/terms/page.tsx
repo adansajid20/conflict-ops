@@ -2,7 +2,7 @@ export default function TermsPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#0a0e14', color: '#c9d1d9', fontFamily: 'monospace' }}>
       <nav className="border-b px-6 py-4 flex items-center justify-between" style={{ borderColor: '#21262d' }}>
-        <a href="/landing" className="text-lg font-bold tracking-widest" style={{ color: '#58a6ff' }}>CONFLICT OPS</a>
+        <a href="/landing" className="text-lg font-bold tracking-widest" style={{ color: '#58a6ff' }}>CONFLICTRADAR</a>
         <a href="/sign-in" className="text-sm" style={{ color: '#8b949e' }}>Sign in →</a>
       </nav>
       <div className="max-w-3xl mx-auto px-6 py-16">
@@ -13,13 +13,13 @@ export default function TermsPage() {
         {[
           {
             title: '1. Acceptance of Terms',
-            body: `By accessing or using CONFLICT OPS ("the Service"), you agree to be bound by these Terms of Service. If you do not agree to these terms, do not use the Service.
+            body: `By accessing or using CONFLICTRADAR ("the Service"), you agree to be bound by these Terms of Service. If you do not agree to these terms, do not use the Service.
 
-The Service is operated by CONFLICT OPS (conflictradar.co). These terms apply to all users, including free trial users, paid subscribers, and Enterprise customers.`,
+The Service is operated by CONFLICTRADAR (conflictradar.co). These terms apply to all users, including free trial users, paid subscribers, and Enterprise customers.`,
           },
           {
             title: '2. Description of Service',
-            body: `CONFLICT OPS is a geopolitical intelligence aggregation and analysis platform. The Service aggregates publicly available data from third-party sources and provides tools for analysis, forecasting, and reporting.
+            body: `CONFLICTRADAR is a geopolitical intelligence aggregation and analysis platform. The Service aggregates publicly available data from third-party sources and provides tools for analysis, forecasting, and reporting.
 
 THE SERVICE IS FOR INFORMATIONAL PURPOSES ONLY. Nothing on the platform constitutes professional security advice, military intelligence, or legal counsel. Users are solely responsible for decisions made based on information provided by the Service.`,
           },
@@ -38,7 +38,7 @@ Violation of these terms will result in immediate account termination.`,
           },
           {
             title: '4. Data and Intelligence Disclaimer',
-            body: `All data displayed on the Service is aggregated from publicly available third-party sources. CONFLICT OPS:
+            body: `All data displayed on the Service is aggregated from publicly available third-party sources. CONFLICTRADAR:
 • Makes no warranty regarding the accuracy, completeness, or timeliness of any data
 • Does not verify the authenticity of source events
 • Is not responsible for decisions made based on platform data
@@ -58,13 +58,13 @@ Forecasts and probability estimates are computational outputs, not professional 
           },
           {
             title: '6. Intellectual Property',
-            body: `The Service, including all software, design, and documentation, is owned by CONFLICT OPS. You are granted a limited, non-exclusive, non-transferable license to use the Service for your internal business purposes.
+            body: `The Service, including all software, design, and documentation, is owned by CONFLICTRADAR. You are granted a limited, non-exclusive, non-transferable license to use the Service for your internal business purposes.
 
 You may not copy, modify, distribute, or create derivative works from the Service. Third-party data displayed on the platform remains the property of its respective owners and is subject to their licensing terms.`,
           },
           {
             title: '7. Limitation of Liability',
-            body: `TO THE MAXIMUM EXTENT PERMITTED BY LAW, CONFLICT OPS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY.
+            body: `TO THE MAXIMUM EXTENT PERMITTED BY LAW, CONFLICTRADAR SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY.
 
 OUR TOTAL LIABILITY FOR ANY CLAIM ARISING FROM THESE TERMS OR THE SERVICE SHALL NOT EXCEED THE AMOUNT YOU PAID US IN THE 12 MONTHS PRIOR TO THE CLAIM.`,
           },

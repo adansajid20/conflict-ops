@@ -120,7 +120,7 @@ export async function POST(req: Request): Promise<NextResponse<ApiResponse<Invit
   const appUrl = process.env['NEXT_PUBLIC_APP_URL'] ?? 'http://localhost:3000'
   await sendInviteEmail({
     to: parsed.data.email,
-    orgName: String(org.name ?? 'CONFLICT OPS'),
+    orgName: String(org.name ?? 'CONFLICTRADAR'),
     role: parsed.data.role,
     inviteUrl: `${appUrl}/api/v1/enterprise/invite/accept?token=${token}`,
     invitedByEmail: admin.email ?? null,

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'Pricing — CONFLICT OPS',
+  title: 'Pricing — CONFLICTRADAR',
   description: 'Simple, transparent pricing. From individual analysts to enterprise security teams.',
 }
 
@@ -27,7 +27,7 @@ export default function PricingPage() {
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
       <nav className="border-b" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/landing" className="font-bold tracking-widest mono" style={{ color: 'var(--primary)' }}>CONFLICT OPS</Link>
+          <Link href="/landing" className="font-bold tracking-widest mono" style={{ color: 'var(--primary)' }}>CONFLICTRADAR</Link>
           <div className="flex items-center gap-6 text-sm mono">
             <Link href="/features" style={{ color: 'var(--text-muted)' }}>Features</Link>
             <Link href="/pricing" style={{ color: 'var(--primary)' }}>Pricing</Link>

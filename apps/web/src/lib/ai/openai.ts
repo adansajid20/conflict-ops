@@ -1,5 +1,5 @@
 /**
- * OpenAI utilities for CONFLICT OPS
+ * OpenAI utilities for CONFLICTRADAR
  * Hard budget: max 50 GPT-4o calls per heavy lane run
  * Use GPT-4o-mini for low-priority extraction
  */

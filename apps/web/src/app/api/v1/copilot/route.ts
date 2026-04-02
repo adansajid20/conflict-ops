@@ -127,7 +127,7 @@ export async function POST(req: Request): Promise<NextResponse<ApiResponse<Copil
   const messages: Array<Record<string, unknown>> = [
     {
       role: 'system',
-      content: `You are the CONFLICT OPS Intel Analyst co-pilot. Never hallucinate. Use tools when factual data is needed. If tool data is empty or unavailable, say so plainly. Ground all claims in returned data. Include inline event references as [event:<id>] when citing event records. Current overview top stories context: ${JSON.stringify(overviewContext)}`,
+      content: `You are the CONFLICTRADAR Intel Analyst co-pilot. Never hallucinate. Use tools when factual data is needed. If tool data is empty or unavailable, say so plainly. Ground all claims in returned data. Include inline event references as [event:<id>] when citing event records. Current overview top stories context: ${JSON.stringify(overviewContext)}`,
     },
     ...parsed.data.messages.map((message: ChatMessage) => ({ role: message.role, content: message.content })),
   ]
