@@ -11,7 +11,7 @@ type MapEventRow = {
   severity: number | null
   event_type: string | null
   region: string | null
-  outlet_name: string | null
+  source: string | null
   source_id: string | null
   significance_score: number | null
   summary_short: string | null
@@ -232,7 +232,7 @@ export async function GET(request: NextRequest) {
 
   let query = createServiceClient()
     .from('events')
-    .select('id, title, occurred_at, severity, event_type, region, outlet_name, source_id, significance_score, summary_short')
+    .select('id, title, occurred_at, severity, event_type, region, source, source_id, significance_score, summary_short')
     .gte('occurred_at', since)
     .order('occurred_at', { ascending: false })
     .limit(limit)
@@ -269,7 +269,7 @@ export async function GET(request: NextRequest) {
         severity: typeof event.severity === 'number' ? event.severity : 1,
         event_type: event.event_type ?? 'general',
         region: event.region,
-        outlet_name: event.outlet_name,
+        outlet_name: event.source,
         source_id: event.source_id,
         significance_score: event.significance_score,
         summary_short: event.summary_short,
