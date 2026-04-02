@@ -308,9 +308,10 @@ export function ConflictMap() {
   }, [handleFeatureClick, startRotation, stopRotation])
 
   useEffect(() => {
+    if (!mapReady) return
     const source = mapRef.current?.getSource('events') as GeoJSONSource | undefined
     if (source) source.setData(filteredData)
-  }, [filteredData])
+  }, [filteredData, mapReady])
 
   return (
     <div className="relative h-full w-full overflow-hidden" style={{ background: 'linear-gradient(180deg, #040810 0%, #09101c 100%)' }}>
