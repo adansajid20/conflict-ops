@@ -1,9 +1,13 @@
+export type EntityMention = { name: string; type: string; count?: number }
+
 export interface OverviewEvent {
   id: string
   source: string | null
+  source_id?: string | null
   event_type: string | null
   title: string | null
   description: string | null
+  summary_short?: string | null
   region: string | null
   country_code: string | null
   severity: number | null
@@ -17,6 +21,7 @@ export interface OverviewEvent {
   corroboration_count?: number | null
   significance_score?: number | null
   significance_tier?: string | null
+  entities?: EntityMention[] | null
 }
 
 export interface HotRegion {

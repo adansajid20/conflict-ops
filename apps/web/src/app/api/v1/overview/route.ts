@@ -16,6 +16,7 @@ interface EventRow {
   title: string | null
   description: string | null
   summary_short?: string | null
+  entities?: unknown[] | null
   region: string | null
   country_code: string | null
   severity: number | null
@@ -208,7 +209,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   const [windowEvents, count7dRes, critHighRes, developingRes, freshRes, orgRes, alertsRes, breakingRes, activeConflictZonesRes, mostActiveRegionRpcRes, topStoriesRes] = await Promise.all([
     supabase
       .from('events')
-      .select('id,source,source_id,event_type,title,description,summary_short,region,country_code,severity,status,occurred_at,ingested_at,location,provenance_raw,raw,significance_score')
+      .select('id,source,source_id,event_type,title,description,summary_short,entities,region,country_code,severity,status,occurred_at,ingested_at,location,provenance_raw,raw,significance_score')
       .gte('occurred_at', since)
       .eq('is_humanitarian_report', false)
       .not('source', 'ilike', '%usgs%')
@@ -236,7 +237,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     supabase.rpc('get_most_active_region', {}),
     supabase
       .from('events')
-      .select('id,source,source_id,event_type,title,description,summary_short,region,country_code,severity,status,occurred_at,ingested_at,location,provenance_raw,raw,significance_score')
+      .select('id,source,source_id,event_type,title,description,summary_short,entities,region,country_code,severity,status,occurred_at,ingested_at,location,provenance_raw,raw,significance_score')
       .gte('occurred_at', topStoriesSince24h)
       .eq('is_humanitarian_report', false)
       .not('source', 'in', '("noaa","nasa_eonet","nasa-eonet","usgs")')

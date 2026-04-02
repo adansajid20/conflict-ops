@@ -8,6 +8,35 @@ import { resolveOutletName } from '@/lib/outlet-resolver'
 
 export { COUNTRY_NAMES, EVENT_TYPE_TO_CATEGORY }
 
+const OUTLET_DISPLAY_NAMES: Record<string, string> = {
+  'aljazeera.com': 'Al Jazeera',
+  'reuters.com': 'Reuters',
+  'bbc.com': 'BBC',
+  'bbc.co.uk': 'BBC',
+  'apnews.com': 'AP News',
+  'theguardian.com': 'The Guardian',
+  'ft.com': 'Financial Times',
+  'nytimes.com': 'New York Times',
+  'washingtonpost.com': 'Washington Post',
+  'dw.com': 'Deutsche Welle',
+  'france24.com': 'France 24',
+  'rferl.org': 'Radio Free Europe',
+  'middleeasteye.net': 'Middle East Eye',
+  'al-monitor.com': 'Al-Monitor',
+  'kyivindependent.com': 'Kyiv Independent',
+  'timesofisrael.com': 'Times of Israel',
+  'haaretz.com': 'Haaretz',
+  'dawn.com': 'Dawn',
+  'thehindu.com': 'The Hindu',
+  'scmp.com': 'South China Morning Post',
+  'yonhapnews.co.kr': 'Yonhap',
+  'warontherocks.com': 'War on the Rocks',
+  'foreignpolicy.com': 'Foreign Policy',
+  'ukrinform.net': 'Ukrinform',
+  'ukrinform.ua': 'Ukrinform',
+  'iranintl.com': 'Iran International',
+}
+
 export const REGION_DISPLAY_NAMES: Record<string, string> = {
   middle_east: 'Middle East',
   eastern_europe: 'Eastern Europe',
@@ -32,6 +61,22 @@ export const REGION_DISPLAY_NAMES: Record<string, string> = {
 export function getRegionDisplay(slug: string | null | undefined): string | null {
   if (!slug) return null
   return REGION_DISPLAY_NAMES[slug.toLowerCase()] ?? slug.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+export function getOutletDisplay(outletName?: string | null, url?: string | null): string {
+  const RSS_PATTERNS = ['rss_live', 'rss_', 'rss', 'gdelt', 'newsapi', 'acled', 'reliefweb', 'news_rss']
+  if (!outletName || RSS_PATTERNS.some((p) => outletName.toLowerCase().startsWith(p.toLowerCase()))) {
+    if (url) {
+      try {
+        const domain = new URL(url).hostname.replace(/^www\./, '')
+        return OUTLET_DISPLAY_NAMES[domain] ?? domain
+      } catch {
+        return 'Intelligence Feed'
+      }
+    }
+    return 'Intelligence Feed'
+  }
+  return outletName
 }
 
 export interface EventLike {

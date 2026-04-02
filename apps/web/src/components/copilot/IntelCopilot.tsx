@@ -60,6 +60,12 @@ export function IntelCopilot({ topStories: propTopStories }: { topStories?: TopS
       .catch(() => setOrgId(null))
   }, [])
 
+  useEffect(() => {
+    const handler = () => setOpen(true)
+    window.addEventListener('intel-copilot:open', handler)
+    return () => window.removeEventListener('intel-copilot:open', handler)
+  }, [])
+
   const placeholder = useMemo(() => {
     if (unavailable) return 'AI Co-pilot unavailable'
     return 'What is happening in Sudan this week?'

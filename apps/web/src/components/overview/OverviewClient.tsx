@@ -8,7 +8,7 @@ import { safeRelativeTime } from '@/lib/utils/time'
 import { KpiStrip } from './KpiStrip'
 import { HotRegionsTable } from './HotRegionsTable'
 import { EventDetailPanel } from './EventDetailPanel'
-import { getBestDescription, getLocationDisplay, getSignificanceTier, getRegionDisplay } from '@/lib/event-presentation'
+import { getBestDescription, getLocationDisplay, getSignificanceTier, getRegionDisplay, getOutletDisplay } from '@/lib/event-presentation'
 import type { OverviewData, OverviewEvent } from './types'
 
 const IconClock = Clock as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
@@ -107,7 +107,7 @@ function TopStoriesList({ events, onSelect }: { events: OverviewEvent[]; onSelec
         const tier = getSignificanceTier(event.significance_score ?? null, event.severity)
         const showBadge = !['Monitoring', 'Low', 'Routine'].includes(event.significance_tier ?? tier.label)
         const description = event.description ?? getBestDescription(event, 220)
-        const sourceName = event.outlet_name ?? 'ConflictRadar Intelligence Network'
+        const sourceName = getOutletDisplay(event.outlet_name, event.source_id)
         const regionName = getRegionDisplay(event.region) ?? getLocationDisplay(event)
         const timeText = formatRelativeOccurredTime(event.occurred_at)
 
@@ -158,7 +158,7 @@ function QuickActions({ data, hasOrg }: { data: OverviewData; hasOrg: boolean })
       ...data.topStories.slice(0, 10).flatMap((event, index) => [
         `${index + 1}. ${event.title ?? 'Untitled event'}`,
         `   Region: ${getRegionDisplay(event.region) ?? 'Unknown'}`,
-        `   Source: ${event.outlet_name ?? 'ConflictRadar Intelligence Network'}`,
+        `   Source: ${getOutletDisplay(event.outlet_name, event.source_id)}`,
         `   Time: ${formatRelativeOccurredTime(event.occurred_at)}`,
         `   Summary: ${(event.description ?? getBestDescription(event, 180) ?? '').trim()}`,
         '',
@@ -422,7 +422,13 @@ export function OverviewClient() {
 
       <AnimatePresence>
         {selectedEvent && (
-          <EventDetailPanel key={selectedEvent.id} event={selectedEvent} onClose={() => setSelectedEvent(null)} hasOrg={data?.hasOrg ?? false} />
+          <EventDetailPanel
+            key={selectedEvent.id}
+            event={selectedEvent}
+            onClose={() => setSelectedEvent(null)}
+            onSelect={setSelectedEvent}
+            hasOrg={data?.hasOrg ?? false}
+          />
         )}
       </AnimatePresence>
     </div>
