@@ -10,11 +10,14 @@ import { MapFilterPanel } from './MapFilterPanel'
 import { MapLegend } from './MapLegend'
 import { MapStatsBar } from './MapStatsBar'
 
-// Waits for MapLibre style to be fully loaded — required after setProjection which triggers a style reload
-function waitForStyle(map: MapLibreMap): Promise<void> {
+// Waits for MapLibre style to be fully loaded — with timeout fallback so it never hangs
+function waitForStyle(map: MapLibreMap, timeoutMs = 3000): Promise<void> {
   return new Promise((resolve) => {
     if (map.isStyleLoaded()) { resolve(); return }
-    map.once('style.load', () => resolve())
+    let done = false
+    const finish = () => { if (!done) { done = true; resolve() } }
+    const t = window.setTimeout(finish, timeoutMs)
+    map.once('style.load', () => { clearTimeout(t); finish() })
   })
 }
 
