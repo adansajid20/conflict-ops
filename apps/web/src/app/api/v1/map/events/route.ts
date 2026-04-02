@@ -17,6 +17,68 @@ type MapEventRow = {
   summary_short: string | null
 }
 
+// ── REGION CENTROIDS — keyed by normalized lowercase+space form ───────────
+// Handles both DB formats: 'middle_east' and 'Middle East' → normalized to 'middle east'
+const REGION_CENTROIDS: Record<string, [number, number]> = {
+  'middle east': [42.0, 29.0],
+  'eastern europe': [28.0, 49.0],
+  'western europe': [5.0, 48.0],
+  'north america': [-95.0, 40.0],
+  'latin america': [-70.0, -15.0],
+  'south america': [-60.0, -20.0],
+  'central america': [-85.0, 13.0],
+  'south asia': [78.0, 20.0],
+  'southeast asia': [110.0, 5.0],
+  'east asia': [115.0, 35.0],
+  'sub saharan africa': [20.0, 0.0],
+  'sub-saharan africa': [20.0, 0.0],
+  'north africa': [15.0, 27.0],
+  'west africa': [-5.0, 12.0],
+  'east africa': [37.0, 0.0],
+  'central africa': [20.0, 0.0],
+  'southern africa': [25.0, -20.0],
+  'horn of africa': [43.0, 8.0],
+  'sahel': [5.0, 14.0],
+  'caucasus': [43.0, 42.0],
+  'central asia': [63.0, 42.0],
+  'balkans': [20.0, 44.0],
+  'asia pacific': [130.0, 15.0],
+  'indo pacific': [130.0, 15.0],
+  'south china sea': [114.0, 12.0],
+  'korean peninsula': [127.5, 37.5],
+  'taiwan strait': [120.5, 24.5],
+  'caribbean': [-70.0, 18.0],
+  'global': [0.0, 20.0],
+  'international': [0.0, 20.0],
+  'europe': [10.0, 50.0],
+  'africa': [20.0, 5.0],
+  'asia': [100.0, 30.0],
+  // Countries that appear as region values
+  'ukraine': [31.2, 48.4], 'russia': [60.0, 60.0],
+  'israel': [34.9, 31.5], 'palestine': [35.2, 31.9],
+  'iran': [53.7, 32.4], 'iraq': [44.4, 33.2],
+  'syria': [38.5, 35.0], 'lebanon': [35.9, 33.9],
+  'yemen': [47.5, 15.5], 'afghanistan': [67.7, 33.9],
+  'pakistan': [69.3, 30.4], 'india': [78.9, 20.6],
+  'china': [104.2, 35.9], 'taiwan': [120.9, 23.7],
+  'north korea': [127.5, 40.3], 'south korea': [127.8, 36.6],
+  'myanmar': [96.0, 19.7], 'turkey': [35.2, 39.0],
+  'sudan': [30.2, 15.5], 'ethiopia': [40.5, 9.1],
+  'somalia': [45.3, 5.2], 'nigeria': [8.7, 9.1],
+  'mali': [-2.0, 17.6], 'niger': [8.0, 17.0],
+  'libya': [17.2, 26.3], 'egypt': [30.8, 26.8],
+  'venezuela': [-66.6, 8.0], 'haiti': [-72.3, 18.9],
+  'colombia': [-74.3, 4.6], 'mexico': [-102.5, 23.6],
+  'united states': [-95.7, 37.1], 'usa': [-95.7, 37.1],
+  'georgia': [43.4, 42.3], 'azerbaijan': [49.9, 40.4],
+  'armenia': [44.5, 40.2], 'israel/palestine': [35.2, 31.8],
+}
+
+// Normalize region key: 'Middle East' → 'middle east', 'middle_east' → 'middle east'
+function normalizeRegion(s: string): string {
+  return s.toLowerCase().replace(/_/g, ' ').replace(/-/g, ' ').trim()
+}
+
 // ── CITY-LEVEL COORDINATES (150+ conflict-relevant cities) ─────────────────
 const CITY_COORDS: Record<string, [number, number]> = {
   // Ukraine front lines
@@ -118,45 +180,7 @@ const CITY_COORDS: Record<string, [number, number]> = {
   managua: [-86.29, 12.13],
 }
 
-// Country name → centroid
-const COUNTRY_COORDS: Record<string, [number, number]> = {
-  ukraine: [31.0, 49.0], russia: [55.0, 61.0],
-  israel: [34.9, 31.5], gaza: [34.3, 31.4],
-  iran: [53.0, 32.5], syria: [38.3, 34.8],
-  iraq: [43.7, 33.2], yemen: [47.6, 15.9],
-  lebanon: [35.5, 33.9], turkey: [35.2, 39.0], turkiye: [35.2, 39.0],
-  pakistan: [69.3, 30.4], afghanistan: [67.7, 33.9],
-  india: [78.9, 20.6], myanmar: [96.0, 19.7],
-  china: [104.2, 35.9], taiwan: [120.9, 23.6],
-  'north korea': [127.5, 40.3], 'south korea': [127.8, 36.6],
-  sudan: [30.2, 15.5], ethiopia: [40.5, 9.1],
-  somalia: [45.3, 5.2], nigeria: [8.7, 9.1],
-  mali: [-2.0, 17.6], niger: [8.0, 17.0],
-  'burkina faso': [-1.6, 12.4], cameroon: [12.4, 3.9],
-  congo: [24.0, -2.9], drc: [24.0, -2.9],
-  libya: [17.2, 26.3], egypt: [30.8, 26.8],
-  haiti: [-72.3, 18.9], venezuela: [-66.6, 8.0],
-  colombia: [-74.3, 4.6], mexico: [-102.5, 23.6],
-  philippines: [121.8, 12.9], indonesia: [113.9, -0.8],
-  bangladesh: [90.4, 23.7], 'saudi arabia': [45.1, 23.9],
-  saudi: [45.1, 23.9], georgia: [43.4, 42.3],
-  azerbaijan: [49.87, 40.41], armenia: [44.51, 40.18],
-  mozambique: [35.0, -18.7],
-}
 
-// Region slug → centroid (fallback)
-const REGION_COORDS: Record<string, [number, number]> = {
-  middle_east: [42.0, 29.0], eastern_europe: [32.0, 49.0],
-  south_asia: [74.0, 25.0], east_asia: [115.0, 35.0],
-  sub_saharan_africa: [20.0, 5.0], north_africa: [20.0, 27.0],
-  southeast_asia: [110.0, 5.0], central_asia: [63.0, 42.0],
-  west_africa: [-5.0, 12.0], east_africa: [37.0, 2.0],
-  southern_africa: [25.0, -20.0], latin_america: [-65.0, -10.0],
-  north_america: [-95.0, 40.0], western_europe: [10.0, 50.0],
-  caucasus: [44.0, 42.0], horn_of_africa: [42.0, 8.0],
-  balkans: [21.0, 44.0], sahel: [5.0, 15.0],
-  global: [20.0, 20.0],
-}
 
 // Stable hash jitter — same event always gets same offset (no pin jumping on refresh)
 function stableJitter(id: string, range: number): [number, number] {
@@ -170,46 +194,41 @@ function stableJitter(id: string, range: number): [number, number] {
   return [x, y]
 }
 
-function inferCoordinates(event: MapEventRow): [number, number] | null {
-  const [jx, jy] = stableJitter(event.id, 0.8)
-  const titleLower = (event.title ?? '').toLowerCase()
+function geocodeEvent(event: MapEventRow): [number, number] | null {
+  const [jx, jy] = stableJitter(event.id, 2.5)
 
-  // 1. City match in title (best precision)
-  for (const [city, coords] of Object.entries(CITY_COORDS)) {
-    if (titleLower.includes(city)) {
-      return [
-        Math.max(-179.5, Math.min(179.5, coords[0] + jx * 0.3)),
-        Math.max(-85, Math.min(85, coords[1] + jy * 0.3)),
-      ]
-    }
+  function applyJitter(coords: [number, number], scale = 1): [number, number] {
+    return [
+      Math.max(-179.5, Math.min(179.5, coords[0] + jx * scale)),
+      Math.max(-85, Math.min(85, coords[1] + jy * scale)),
+    ]
   }
 
-  // 2. Country match in title
-  for (const [country, coords] of Object.entries(COUNTRY_COORDS)) {
-    if (titleLower.includes(country)) {
-      return [
-        Math.max(-179.5, Math.min(179.5, coords[0] + jx)),
-        Math.max(-85, Math.min(85, coords[1] + jy)),
-      ]
-    }
-  }
-
-  // 3. Region field → normalise to slug
+  // ── STEP 1: Trust region DB field first (most reliable) ──────────────────
   if (event.region) {
-    const regionKey = event.region.trim().toLowerCase().replace(/[\s-]+/g, '_')
-    const coords = REGION_COORDS[regionKey] ?? REGION_COORDS[regionKey.replace('_', '')]
-    if (coords) {
-      return [
-        Math.max(-179.5, Math.min(179.5, coords[0] + jx * 2)),
-        Math.max(-85, Math.min(85, coords[1] + jy * 2)),
-      ]
+    const key = normalizeRegion(event.region)
+
+    // Exact match
+    if (REGION_CENTROIDS[key]) return applyJitter(REGION_CENTROIDS[key], 0.8)
+
+    // Partial match (e.g. 'asia_pacific' → 'asia pacific')
+    for (const [rk, coords] of Object.entries(REGION_CENTROIDS)) {
+      if (key.includes(rk) || rk.includes(key)) return applyJitter(coords, 0.8)
     }
-    // Try partial match against region coords
-    for (const [key, c] of Object.entries(REGION_COORDS)) {
-      if (regionKey.includes(key) || key.includes(regionKey)) {
-        return [Math.max(-179.5, Math.min(179.5, c[0] + jx * 2)), Math.max(-85, Math.min(85, c[1] + jy * 2))]
-      }
+
+    // City name in region field
+    for (const [city, coords] of Object.entries(CITY_COORDS)) {
+      if (key.includes(city)) return applyJitter(coords, 0.3)
     }
+  }
+
+  // ── STEP 2: City names in title only (NOT country names) ─────────────────
+  // Country names in headlines are actors, not locations.
+  // "Washington warns Iran" should NOT geocode to USA.
+  const titleLower = (event.title ?? '').toLowerCase()
+  for (const [city, coords] of Object.entries(CITY_COORDS)) {
+    const regex = new RegExp(`\\b${city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)
+    if (regex.test(titleLower)) return applyJitter(coords, 0.3)
   }
 
   return null
@@ -253,7 +272,7 @@ export async function GET(request: NextRequest) {
   const features: Array<GeoJSON.Feature<GeoJSON.Point, GeoJSON.GeoJsonProperties>> = []
 
   for (const event of (data ?? []) as MapEventRow[]) {
-    const coords = inferCoordinates(event)
+    const coords = geocodeEvent(event)
     if (!coords) continue
 
     const occurredTime = event.occurred_at ? new Date(event.occurred_at).getTime() : null
