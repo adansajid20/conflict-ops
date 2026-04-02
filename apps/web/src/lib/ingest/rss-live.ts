@@ -237,10 +237,26 @@ async function parseFeed(
         const criticalKw = ['nuclear', 'chemical weapon', 'biological weapon', 'dirty bomb', 'mass casualty', ' coup', 'assassination', 'genocide', 'war declared', 'invasion begins', 'martial law', 'nuclear strike', 'icbm', 'ballistic missile launch']
         if (criticalKw.some(k => text.includes(k))) return 4
 
-        const highKw = ['killed', ' dead ', 'airstrike', 'air strike', 'missile strike', 'explosion kills', 'bomb kills', 'attack kills', 'troops killed', 'soldiers killed', 'civilians killed', 'death toll', 'fatalities', 'casualties', 'offensive launched', 'ceasefire collapsed', 'hostage', 'kidnapped', 'siege', 'assault on', 'shelling kills']
+        const highKw = [
+          'killed', ' dead ', 'airstrike', 'air strike', 'missile strike', 'drone strike',
+          'explosion kills', 'bomb kills', 'attack kills', 'troops killed', 'soldiers killed',
+          'civilians killed', 'death toll', 'fatalities', 'casualties', 'offensive launched',
+          'ceasefire collapsed', 'hostage', 'kidnapped', 'siege', 'assault on',
+          'shelling kills', 'shelling', 'bombing', 'bombed', ' attacked', 'under attack',
+          'strikes on', 'strikes civilian', 'drones attack', 'drones strike', 'rockets hit',
+          'rocket attack', 'rocket fire', 'gunmen', 'gunfire kills', 'shot dead',
+          'car bomb', 'suicide bomb', 'ied blast', 'explosion injures', 'explosion kills',
+          'injured in attack', 'wounded', ' fires on ', 'opens fire',
+        ]
         if (highKw.some(k => text.includes(k))) return 3
 
-        const mediumKw = ['troops deployed', 'forces mobilized', 'sanctions imposed', 'sanctions announced', 'escalation', 'crackdown', 'detained', 'arrested', 'blockade', 'expels ambassador', 'diplomat expelled', 'emergency declared', 'warns of', 'threatens to', 'protest', 'military exercise', 'test-fired', 'test fired']
+        const mediumKw = [
+          'troops deployed', 'forces mobilized', 'sanctions imposed', 'sanctions announced',
+          'escalation', 'crackdown', 'detained', 'arrested', 'blockade', 'expels ambassador',
+          'diplomat expelled', 'emergency declared', 'warns of', 'threatens to', 'protest',
+          'military exercise', 'test-fired', 'test fired', ' attack', ' strikes', 'drone',
+          'air raid', 'shelled', 'clash', 'clashes', 'fighting', 'offensive',
+        ]
         if (mediumKw.some(k => text.includes(k))) return 2
 
         return 1

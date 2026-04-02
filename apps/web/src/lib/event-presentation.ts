@@ -86,15 +86,23 @@ export function sanitizeSourceDisplay(source: string): string {
   return source
 }
 
-export function getSignificanceTier(score: number | null | undefined): { label: string; color: string; bgColor: string } {
-  if (score === null || score === undefined) {
-    return { label: 'Monitoring', color: 'text-slate-400', bgColor: 'bg-slate-800' }
+export function getSignificanceTier(score: number | null | undefined, severity?: number | null): { label: string; color: string; bgColor: string } {
+  // AI score takes priority when available
+  if (typeof score === 'number') {
+    if (score >= 85) return { label: 'Extreme', color: 'text-red-400', bgColor: 'bg-red-950' }
+    if (score >= 70) return { label: 'Critical', color: 'text-orange-400', bgColor: 'bg-orange-950' }
+    if (score >= 50) return { label: 'Significant', color: 'text-yellow-400', bgColor: 'bg-yellow-950' }
+    if (score >= 30) return { label: 'Notable', color: 'text-blue-400', bgColor: 'bg-blue-950' }
+    return { label: 'Routine', color: 'text-slate-400', bgColor: 'bg-slate-900' }
   }
-  if (score >= 85) return { label: 'Extreme', color: 'text-red-400', bgColor: 'bg-red-950' }
-  if (score >= 70) return { label: 'Critical', color: 'text-orange-400', bgColor: 'bg-orange-950' }
-  if (score >= 50) return { label: 'Significant', color: 'text-yellow-400', bgColor: 'bg-yellow-950' }
-  if (score >= 30) return { label: 'Notable', color: 'text-blue-400', bgColor: 'bg-blue-950' }
-  return { label: 'Routine', color: 'text-slate-400', bgColor: 'bg-slate-900' }
+  // Fall back to rule-based severity integer (set at ingest by prescore())
+  if (severity !== null && severity !== undefined) {
+    if (severity >= 4) return { label: 'Critical', color: 'text-orange-400', bgColor: 'bg-orange-950' }
+    if (severity >= 3) return { label: 'High', color: 'text-red-400', bgColor: 'bg-red-900' }
+    if (severity >= 2) return { label: 'Medium', color: 'text-yellow-400', bgColor: 'bg-yellow-950' }
+    return { label: 'Low', color: 'text-slate-400', bgColor: 'bg-slate-900' }
+  }
+  return { label: 'Monitoring', color: 'text-slate-400', bgColor: 'bg-slate-800' }
 }
 
 export function getLocationConfidenceLabel(confidence: number | null | undefined): { label: string; icon: string } {
@@ -298,7 +306,10 @@ export function sanitizeEventForClient(event: Record<string, unknown>): ClientEv
     country: typeof event.country_code === 'string' ? event.country_code : null,
     country_region: typeof event.region === 'string' ? event.region : null,
     event_type: typeof event.event_type === 'string' ? event.event_type : null,
-    significance_tier: getSignificanceTier(typeof event.significance_score === 'number' ? event.significance_score : null).label,
+    significance_tier: getSignificanceTier(
+      typeof event.significance_score === 'number' ? event.significance_score : null,
+      typeof event.severity === 'number' ? event.severity : null,
+    ).label,
     outlet_name: outletName,
     source_url: typeof event.source_url === 'string'
       ? event.source_url
