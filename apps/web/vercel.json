@@ -44,10 +44,6 @@
     {
       "path": "/api/cron/forecast",
       "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/send-alerts?token=codev1_3dc26d7b4fb024484b5d8a6d3a4887f0",
-      "schedule": "0 * * * *"
     }
   ]
 }
