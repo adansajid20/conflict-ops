@@ -2,6 +2,7 @@ import Parser from 'rss-parser'
 import { createServiceClient } from '../supabase/server'
 import { isBlocklisted, classifyByTitle, inferRegionFromTitle } from '../classification'
 import { cleanDescription } from './utils'
+import { classifyEvent } from '../pipeline/classify'
 
 const RSS_FEEDS = [
   { url: 'https://rsshub.app/reuters/world', outlet: 'Reuters', trust: 95, region: null },
@@ -326,6 +327,19 @@ async function parseFeed(
         return 1
       }
 
+      // AI classification (fast, async per event, falls back to keyword on error)
+      let aiSeverity = prescore(title, snippet)
+      let escalation_signal = false
+      let weapons_mentioned: string[] = []
+      let casualty_estimate: number | null = null
+      try {
+        const classified = await classifyEvent(title, snippet ?? '')
+        aiSeverity = classified.severity
+        escalation_signal = classified.escalation_signal
+        weapons_mentioned = classified.weapons_mentioned
+        casualty_estimate = classified.casualty_estimate
+      } catch { /* keep prescore fallback */ }
+
       batch.push({
         title: sanitizeWireTitle(title),
         description: snippet || null,
@@ -335,7 +349,10 @@ async function parseFeed(
         event_type: classifyByTitle(title),
         external_id: externalId,
         region,
-        severity: prescore(title, snippet),
+        severity: aiSeverity,
+        escalation_signal,
+        weapons_mentioned: weapons_mentioned.length ? weapons_mentioned : null,
+        casualty_estimate,
         is_humanitarian_report: false,
         raw: {
           outlet: feed.outlet,
