@@ -256,8 +256,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}>
-            <div className="mb-3">
+            <div className="mb-2 space-y-1">
               <NavLink item={{ href: '/settings', label: 'Settings', icon: Settings }} pathname={pathname} />
+              <NavLink item={{ href: '/settings/alerts', label: 'Alert Settings', icon: Bell }} pathname={pathname} />
             </div>
             <div className="mb-3 flex items-center gap-3 rounded-lg border p-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
               <div className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: 'var(--bg-active)', color: 'var(--primary-text)' }}>
