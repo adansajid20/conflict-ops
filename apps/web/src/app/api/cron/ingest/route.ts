@@ -102,21 +102,21 @@ export async function GET(req: Request) {
     console.error('[ingest] correlation/risk step failed:', e)
   }
 
-  // Update situations event counts
+  // Update situations event counts (country-keyword match only — no region/tag to avoid false positives)
   try {
     const { createServiceClient } = await import('@/lib/supabase/server')
     const supabase = createServiceClient()
-    const { data: situations } = await supabase.from('situations').select('id, primary_region, countries, tags')
+    const { data: situations } = await supabase.from('situations').select('id, countries')
+    const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     for (const sit of situations ?? []) {
-      const keywords = [
-        ...(sit.countries ?? []),
-        sit.primary_region,
-        ...(sit.tags ?? []),
-      ].filter(Boolean)
-      if (!keywords.length) continue
-      const orFilter = keywords.map((k: string) => `title.ilike.%${k}%`).join(',')
-      const { count } = await supabase.from('events').select('id', { count: 'exact', head: true }).or(orFilter).gte('occurred_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-      await supabase.from('situations').update({ event_count: count ?? 0, last_event_at: new Date().toISOString() }).eq('id', sit.id)
+      const countries: string[] = (sit.countries ?? []).filter(Boolean)
+      if (!countries.length) continue
+      const orFilter = countries.map((c: string) => `title.ilike.%${c}%`).join(',')
+      const { count } = await supabase.from('events')
+        .select('id', { count: 'exact', head: true })
+        .or(orFilter)
+        .gte('occurred_at', since30d)
+      await supabase.from('situations').update({ event_count: count ?? 0 }).eq('id', sit.id)
     }
   } catch (e) {
     console.error('[ingest] situations count update failed:', e)

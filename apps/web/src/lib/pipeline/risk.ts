@@ -58,12 +58,19 @@ export async function updateAllRegionRiskScores(): Promise<{ updated: number }> 
       const delta = parseFloat((newScore - prevScore).toFixed(2))
       const trend = delta > 0.5 ? 'escalating' : delta < -0.5 ? 'de-escalating' : 'stable'
 
+      // Delete today's existing row then insert fresh (avoids dupe constraint issues)
+      const todayStart = new Date()
+      todayStart.setUTCHours(0, 0, 0, 0)
+      await supabase.from('region_risk_scores').delete()
+        .eq('region', region)
+        .gte('calculated_at', todayStart.toISOString())
+
       await supabase.from('region_risk_scores').insert({
         region,
         risk_score: newScore,
         trend,
         trend_delta: delta,
-        valid_until: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // valid 30 min
+        valid_until: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       })
       updated++
     } catch (e) {
