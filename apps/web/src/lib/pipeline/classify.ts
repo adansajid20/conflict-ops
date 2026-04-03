@@ -21,7 +21,7 @@ function keywordClassify(title: string, description: string): ClassifyResult {
   const text = `${title} ${description}`.toLowerCase()
   const weapons_mentioned = WEAPONS.filter(w => text.includes(w))
   const casualty_match = text.match(/(\d+)\s*(people|civilians|soldiers|troops|killed|dead|casualties|fatalities)/i)
-  const casualty_estimate = casualty_match ? parseInt(casualty_match[1]) : null
+  const casualty_estimate = casualty_match && casualty_match[1] ? parseInt(casualty_match[1]) : null
 
   let severity: 1 | 2 | 3 | 4 = 1
   if (KEYWORD_CRITICAL.some(k => text.includes(k))) severity = 4
