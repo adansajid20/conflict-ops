@@ -1,5 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { isBlocklisted } from './utils'
+import { inferRegionFromTitle } from '../classification'
+import { classifyEvent } from '../pipeline/classify'
 
 const GDELT_LASTUPDATE_URL = 'http://data.gdeltproject.org/gdeltv2/lastupdate.txt'
 
@@ -101,15 +103,34 @@ export async function ingestGDELT(): Promise<IngestResult> {
   }
 
   for (const event of events) {
+    // AI classify + region inference
+    let severity = event.severity
+    let escalation_signal = false
+    let weapons_mentioned: string[] = []
+    let casualty_estimate: number | null = null
+    try {
+      const classified = await classifyEvent(event.title, '')
+      severity = classified.severity
+      escalation_signal = classified.escalation_signal
+      weapons_mentioned = classified.weapons_mentioned
+      casualty_estimate = classified.casualty_estimate
+    } catch { /* keep goldstein severity */ }
+
+    const region = inferRegionFromTitle(event.title + (event.location ? ' ' + event.location : '')) ?? null
+
     const { error } = await supabase.from('events').upsert(
       {
         title: event.title.slice(0, 500),
-        description: null,
+        description: event.location ? `Location: ${event.location}` : null,
         source: 'gdelt',
         source_id: event.source_url,
         occurred_at: event.occurred_at,
         location: event.location,
-        severity: event.severity,
+        region,
+        severity,
+        escalation_signal,
+        weapons_mentioned: weapons_mentioned.length ? weapons_mentioned : null,
+        casualty_estimate,
         event_type: 'armed_conflict',
         external_id: event.external_id,
         status: 'pending',

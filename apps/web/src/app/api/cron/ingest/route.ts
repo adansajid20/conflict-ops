@@ -102,5 +102,25 @@ export async function GET(req: Request) {
     console.error('[ingest] correlation/risk step failed:', e)
   }
 
+  // Update situations event counts
+  try {
+    const { createServiceClient } = await import('@/lib/supabase/server')
+    const supabase = createServiceClient()
+    const { data: situations } = await supabase.from('situations').select('id, primary_region, countries, tags')
+    for (const sit of situations ?? []) {
+      const keywords = [
+        ...(sit.countries ?? []),
+        sit.primary_region,
+        ...(sit.tags ?? []),
+      ].filter(Boolean)
+      if (!keywords.length) continue
+      const orFilter = keywords.map((k: string) => `title.ilike.%${k}%`).join(',')
+      const { count } = await supabase.from('events').select('id', { count: 'exact', head: true }).or(orFilter).gte('occurred_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      await supabase.from('situations').update({ event_count: count ?? 0, last_event_at: new Date().toISOString() }).eq('id', sit.id)
+    }
+  } catch (e) {
+    console.error('[ingest] situations count update failed:', e)
+  }
+
   return Response.json({ success: true, data: { totalInserted, results, newsApiSkipped, ...correlationResult } })
 }

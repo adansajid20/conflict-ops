@@ -18,12 +18,12 @@ export async function calculateRegionRisk(region: string): Promise<number> {
     { count: seismic },
     { count: outages },
   ] = await Promise.all([
-    supabase.from('events').select('id', { count: 'exact', head: true }).eq('region', region).gte('occurred_at', since7d),
-    supabase.from('events').select('id', { count: 'exact', head: true }).eq('region', region).gte('severity', 3).gte('occurred_at', since24h),
+    supabase.from('events').select('id', { count: 'exact', head: true }).or(`region.eq.${region},region.ilike.%${region.replace(/_/g,' ')}%`).gte('occurred_at', since7d),
+    supabase.from('events').select('id', { count: 'exact', head: true }).or(`region.eq.${region},region.ilike.%${region.replace(/_/g,' ')}%`).gte('severity', 3).gte('occurred_at', since24h),
     supabase.from('flight_tracks').select('id', { count: 'exact', head: true }).eq('conflict_zone', region).gte('recorded_at', since24h),
     supabase.from('vessel_tracks').select('id', { count: 'exact', head: true }).eq('maritime_zone', region).eq('ais_status', 'dark').gte('recorded_at', since7d),
     supabase.from('seismic_events').select('id', { count: 'exact', head: true }).eq('conflict_zone', region).eq('is_suspicious', true).gte('occurred_at', since24h),
-    supabase.from('internet_outages').select('id', { count: 'exact', head: true }).ilike('country', `%${region}%`).gte('started_at', since24h),
+    supabase.from('internet_outages').select('id', { count: 'exact', head: true }).ilike('country', `%${region.replace(/_/g,' ')}%`).gte('started_at', since24h),
   ])
 
   const score =

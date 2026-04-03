@@ -9,6 +9,8 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { detectEventType, isBlocklisted } from './utils'
 import { resolveOutletName } from '@/lib/outlet-resolver'
+import { inferRegionFromTitle } from '../classification'
+import { classifyEvent } from '../pipeline/classify'
 
 // Free tier: no quoted phrases allowed — single words only
 const CONFLICT_KEYWORDS = 'war OR airstrike OR bombing OR ceasefire OR invasion OR siege OR coup OR casualties OR offensive OR airstrike OR missile OR troops OR military OR killed OR attack OR rebel OR terrorist NOT (sports OR football OR soccer OR basketball OR movie OR celebrity)'
@@ -79,6 +81,19 @@ export async function ingestNewsAPI(): Promise<{ stored: number; skipped: number
       const fullText = `${article.title} ${description}`
       const evType = detectEventType(fullText)
 
+      // AI classify
+      let aiSeverity = 1
+      let escalation_signal = false
+      let weapons_mentioned: string[] = []
+      let casualty_estimate: number | null = null
+      try {
+        const classified = await classifyEvent(article.title, description)
+        aiSeverity = classified.severity
+        escalation_signal = classified.escalation_signal
+        weapons_mentioned = classified.weapons_mentioned
+        casualty_estimate = classified.casualty_estimate
+      } catch { /* keep default severity */ }
+
       const newsApiProvenance = {
         source: article.source.name ?? 'NewsAPI',
         attribution: `${article.source.name} (via NewsAPI)`,
@@ -91,9 +106,12 @@ export async function ingestNewsAPI(): Promise<{ stored: number; skipped: number
         event_type: evType,
         title: article.title.slice(0, 500),
         description: description.slice(0, 2000),
-        region: null,
+        region: inferRegionFromTitle(`${article.title} ${description}`),
         country_code: null,
-        severity: 1,
+        severity: aiSeverity,
+        escalation_signal,
+        weapons_mentioned: weapons_mentioned.length ? weapons_mentioned : null,
+        casualty_estimate,
         status: 'developing',
         occurred_at: pubDate.toISOString(),
         heavy_lane_processed: false,
