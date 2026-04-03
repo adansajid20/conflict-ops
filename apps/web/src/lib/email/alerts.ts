@@ -1,6 +1,11 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Lazy init — avoids crashing at build time when env var isn't present
+let _resend: Resend | null = null
+function getResend(): Resend {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY)
+  return _resend
+}
 
 export interface AlertEmailParams {
   to: string
@@ -104,7 +109,7 @@ export async function sendAlertEmail(params: AlertEmailParams): Promise<boolean>
 </html>`
 
   try {
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: 'ConflictRadar <alerts@conflictradar.co>',
       to,
       subject,
