@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   const since = new Date(Date.now() - 5 * 60 * 1000).toISOString()
 
   const { data: alerts, error: alertsError } = await supabase
-    .from('alerts')
+    .from('email_subscriptions')
     .select('id,email,name,conditions')
     .eq('is_active', true)
     .eq('frequency', 'realtime')
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
 
     if (ok) {
       sent += 1
-      await supabase.from('alerts').update({ last_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', alert.id)
+      await supabase.from('email_subscriptions').update({ last_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', alert.id)
     }
   }
 
