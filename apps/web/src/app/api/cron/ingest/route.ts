@@ -91,5 +91,16 @@ export async function GET(req: Request) {
     }
   }
 
-  return Response.json({ success: true, data: { totalInserted, results, newsApiSkipped } })
+  // Run correlation + risk score update after every ingest cycle
+  let correlationResult = { signals_created: 0, risk_scores_updated: 0 }
+  try {
+    const { detectCorrelationSignals } = await import('@/lib/pipeline/correlate')
+    const { updateAllRegionRiskScores } = await import('@/lib/pipeline/risk')
+    const [corr, risk] = await Promise.all([detectCorrelationSignals(), updateAllRegionRiskScores()])
+    correlationResult = { signals_created: corr.signals_created, risk_scores_updated: risk.updated }
+  } catch (e) {
+    console.error('[ingest] correlation/risk step failed:', e)
+  }
+
+  return Response.json({ success: true, data: { totalInserted, results, newsApiSkipped, ...correlationResult } })
 }
