@@ -104,7 +104,7 @@ export async function ingestGDELT(): Promise<IngestResult> {
 
   for (const event of events) {
     // AI classify + region inference
-    let severity = event.severity
+    let severity: 1 | 2 | 3 | 4 = event.severity
     let escalation_signal = false
     let weapons_mentioned: string[] = []
     let casualty_estimate: number | null = null
