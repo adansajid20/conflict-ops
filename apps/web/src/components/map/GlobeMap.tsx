@@ -475,19 +475,24 @@ export default function GlobeMap({ timeWindow, severity, activeLayers, onStatsUp
     const interactiveLayers = ['event-points', 'live-flights-layer', 'live-vessels-layer', 'live-seismic-layer']
 
     function onMouseEnter(e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) {
-      map.getCanvas().style.cursor = 'pointer'
+      const m = mapRef.current
+      if (!m) return
+      m.getCanvas().style.cursor = 'pointer'
       const f = e.features?.[0]
       if (!f) return
       const props = (f.properties ?? {}) as Record<string, unknown>
       const geom = f.geometry as GeoJSON.Point
       const html = buildHtml(props, (f.layer?.id as string) ?? '')
-      if (html) popup.setLngLat(geom.coordinates as [number, number]).setHTML(html).addTo(map)
+      if (html) popup.setLngLat(geom.coordinates as [number, number]).setHTML(html).addTo(m)
     }
     function onMouseLeave() {
-      map.getCanvas().style.cursor = ''
+      const m = mapRef.current
+      if (m) m.getCanvas().style.cursor = ''
       popup.remove()
     }
     function onClick(e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) {
+      const m = mapRef.current
+      if (!m) return
       const f = e.features?.[0]
       if (!f) return
       const props = (f.properties ?? {}) as Record<string, unknown>
@@ -495,11 +500,11 @@ export default function GlobeMap({ timeWindow, severity, activeLayers, onStatsUp
         onEventClick(props as unknown as MapEvent)
       }
       if (props.cluster_id) {
-        ;(map.getSource('events') as maplibregl.GeoJSONSource)
+        ;(m.getSource('events') as maplibregl.GeoJSONSource)
           .getClusterExpansionZoom(props.cluster_id as number)
           .then(zoom => {
             const geom = f.geometry as GeoJSON.Point
-            map.easeTo({ center: geom.coordinates as [number, number], zoom: zoom + 1, duration: 400 })
+            m.easeTo({ center: geom.coordinates as [number, number], zoom: zoom + 1, duration: 400 })
           })
           .catch(() => null)
       }
