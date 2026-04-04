@@ -9,6 +9,7 @@ export interface MapEvent {
   title: string
   severity: string
   event_type?: string
+  category?: string
   region?: string
   publishedAt?: string
   sourceUrl?: string
@@ -29,15 +30,20 @@ interface GlobeMapProps {
   timeWindow: string
   severity: string
   activeLayers: Set<string>
+  autoRotate: boolean
   onStatsUpdate: (stats: Stats) => void
-  onEventClick?: (event: MapEvent) => void
+  onEventClick: (event: MapEvent) => void
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+const SEV_COLORS: Record<string, string> = {
+  critical: '#ef4444',
+  high: '#f97316',
+  medium: '#eab308',
+  low: '#22c55e',
+}
+
 function getMapStyle(key: string | undefined): string {
-  if (key && key.length > 8) {
-    return `https://api.maptiler.com/maps/satellite/style.json?key=${key}`
-  }
+  if (key && key.length > 8) return `https://api.maptiler.com/maps/satellite/style.json?key=${key}`
   return 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
 }
 
@@ -58,14 +64,16 @@ function safeRemoveSource(map: maplibregl.Map, id: string) {
   try { if (map.getSource(id)) map.removeSource(id) } catch { /* ignore */ }
 }
 
-export default function GlobeMap({ timeWindow, severity, activeLayers, onStatsUpdate, onEventClick }: GlobeMapProps) {
+export default function GlobeMap({
+  timeWindow, severity, activeLayers, autoRotate, onStatsUpdate, onEventClick,
+}: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const popupRef = useRef<maplibregl.Popup | null>(null)
-  const rotateRef = useRef<number | null>(null)
+  const rotationRef = useRef<number | null>(null)
   const [mapReady, setMapReady] = useState(false)
 
-  // ── Init ─────────────────────────────────────────────────────────────────
+  // ── Initialize map ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
 
@@ -77,23 +85,23 @@ export default function GlobeMap({ timeWindow, severity, activeLayers, onStatsUp
       zoom: 2.0,
       minZoom: 1.5,
       maxZoom: 16,
+      pitch: 0,
+      bearing: 0,
       attributionControl: false,
       fadeDuration: 200,
     })
 
     map.on('style.load', () => {
-      // Globe projection
       try {
         ;(map as unknown as { setProjection: (p: unknown) => void }).setProjection({ type: 'globe' })
-      } catch { /* not supported in fallback style */ }
+      } catch { /* not supported by fallback style */ }
 
-      // Atmosphere (MapTiler only)
       if (key && key.length > 8) {
         try {
           ;(map as unknown as { setFog: (f: unknown) => void }).setFog({
-            'color': 'rgb(8, 15, 35)',
-            'high-color': 'rgb(15, 40, 100)',
-            'horizon-blend': 0.06,
+            'color': 'rgb(10, 14, 20)',
+            'high-color': 'rgb(20, 30, 60)',
+            'horizon-blend': 0.08,
             'space-color': 'rgb(3, 5, 18)',
             'star-intensity': 0.9,
           })
@@ -103,40 +111,11 @@ export default function GlobeMap({ timeWindow, severity, activeLayers, onStatsUp
       setMapReady(true)
     })
 
-    // Smooth auto-rotate
-    let lastTs = 0
-    function rotate(ts: number) {
-      if (!map.isMoving() && map.isStyleLoaded()) {
-        const delta = lastTs ? (ts - lastTs) / 1000 : 0
-        if (delta > 0 && delta < 0.2) {
-          const c = map.getCenter()
-          map.setCenter([c.lng - delta * 2.5, c.lat])
-        }
-      }
-      lastTs = ts
-      rotateRef.current = requestAnimationFrame(rotate)
-    }
-    rotateRef.current = requestAnimationFrame(rotate)
-
-    const stopRotate = () => {
-      if (rotateRef.current) { cancelAnimationFrame(rotateRef.current); rotateRef.current = null }
-    }
-    const resumeRotate = () => {
-      if (!rotateRef.current) { lastTs = 0; rotateRef.current = requestAnimationFrame(rotate) }
-    }
-
-    map.on('mousedown', stopRotate)
-    map.on('touchstart', stopRotate)
-    map.on('mouseup', () => setTimeout(resumeRotate, 5000))
-    map.on('touchend', () => setTimeout(resumeRotate, 5000))
-    map.on('wheel', () => { stopRotate(); setTimeout(resumeRotate, 5000) })
-
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right')
-
+    map.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: true }), 'bottom-right')
     mapRef.current = map
 
     return () => {
-      stopRotate()
+      if (rotationRef.current) cancelAnimationFrame(rotationRef.current)
       popupRef.current?.remove()
       map.remove()
       mapRef.current = null
@@ -144,7 +123,52 @@ export default function GlobeMap({ timeWindow, severity, activeLayers, onStatsUp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Load events ──────────────────────────────────────────────────────────
+  // ── Auto-rotate (controlled by parent, OFF by default) ───────────────────
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    if (rotationRef.current) { cancelAnimationFrame(rotationRef.current); rotationRef.current = null }
+    if (!autoRotate) return
+
+    let lastTime = 0
+    let paused = false
+
+    function rotate(ts: number) {
+      const m = mapRef.current
+      if (!m) return
+      if (!paused && !m.isMoving()) {
+        if (lastTime) {
+          const delta = (ts - lastTime) / 1000
+          const c = m.getCenter()
+          m.setCenter([c.lng - delta * 2, c.lat])
+        }
+        lastTime = ts
+      }
+      rotationRef.current = requestAnimationFrame(rotate)
+    }
+    rotationRef.current = requestAnimationFrame(rotate)
+
+    const pause = () => { paused = true }
+    const resume = () => { setTimeout(() => { paused = false; lastTime = 0 }, 8000) }
+
+    map.on('mousedown', pause)
+    map.on('touchstart', pause)
+    map.on('wheel', pause)
+    map.on('mouseup', resume)
+    map.on('touchend', resume)
+
+    return () => {
+      if (rotationRef.current) { cancelAnimationFrame(rotationRef.current); rotationRef.current = null }
+      map.off('mousedown', pause)
+      map.off('touchstart', pause)
+      map.off('wheel', pause)
+      map.off('mouseup', resume)
+      map.off('touchend', resume)
+    }
+  }, [autoRotate])
+
+  // ── Load events (static pins) ─────────────────────────────────────────────
   const loadEvents = useCallback(async () => {
     const map = mapRef.current
     if (!map || !mapReady) return
@@ -157,7 +181,6 @@ export default function GlobeMap({ timeWindow, severity, activeLayers, onStatsUp
       if (!res.ok) return
       const data = await res.json()
 
-      // Update stats from meta
       if (data.meta) {
         onStatsUpdate({
           tracked: data.meta.total ?? 0,
@@ -168,229 +191,222 @@ export default function GlobeMap({ timeWindow, severity, activeLayers, onStatsUp
         })
       }
 
-      // Remove old layers/sources
-      const layerIds = ['event-pulse', 'event-points', 'cluster-count', 'event-clusters']
-      for (const id of layerIds) safeRemoveLayer(map, id)
+      for (const id of ['event-pulse', 'event-points', 'cluster-count', 'event-clusters']) safeRemoveLayer(map, id)
       safeRemoveSource(map, 'events')
 
-      // Add source
       map.addSource('events', {
         type: 'geojson',
-        data: data,
+        data,
         cluster: true,
         clusterMaxZoom: 10,
         clusterRadius: 50,
       })
 
-      // Cluster circles — color by count
       map.addLayer({
-        id: 'event-clusters',
-        type: 'circle',
-        source: 'events',
+        id: 'event-clusters', type: 'circle', source: 'events',
         filter: ['has', 'point_count'],
         paint: {
-          'circle-color': [
-            'step', ['get', 'point_count'],
-            '#3b82f6', 10, '#f97316', 50, '#ef4444',
-          ],
+          'circle-color': ['step', ['get', 'point_count'], '#3b82f6', 10, '#f97316', 50, '#ef4444'],
           'circle-radius': ['step', ['get', 'point_count'], 16, 10, 22, 50, 30],
           'circle-opacity': 0.85,
           'circle-stroke-width': 2,
-          'circle-stroke-color': 'rgba(255,255,255,0.3)',
+          'circle-stroke-color': 'rgba(255,255,255,0.25)',
         },
       })
 
-      // Cluster count labels
       map.addLayer({
-        id: 'cluster-count',
-        type: 'symbol',
-        source: 'events',
+        id: 'cluster-count', type: 'symbol', source: 'events',
         filter: ['has', 'point_count'],
         layout: {
           'text-field': '{point_count_abbreviated}',
           'text-size': 12,
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
         },
-        paint: { 'text-color': '#ffffff' },
+        paint: { 'text-color': '#fff' },
       })
 
-      // Individual event points — colored by severity string
       map.addLayer({
-        id: 'event-points',
-        type: 'circle',
-        source: 'events',
+        id: 'event-points', type: 'circle', source: 'events',
         filter: ['!', ['has', 'point_count']],
         paint: {
-          'circle-radius': ['match', ['get', 'severity'], 'critical', 8, 'high', 7, 'medium', 6, 5],
-          'circle-color': [
-            'match', ['get', 'severity'],
-            'critical', '#ef4444',
-            'high', '#f97316',
-            'medium', '#eab308',
-            '#22c55e',
-          ],
-          'circle-opacity': 0.92,
+          'circle-radius': ['match', ['get', 'severity'], 'critical', 8, 'high', 7, 'medium', 6, 'low', 5, 5],
+          'circle-color': ['match', ['get', 'severity'], 'critical', '#ef4444', 'high', '#f97316', 'medium', '#eab308', 'low', '#22c55e', '#6b7280'],
+          'circle-opacity': 0.9,
           'circle-stroke-width': 1.5,
-          'circle-stroke-color': [
-            'match', ['get', 'severity'],
-            'critical', 'rgba(254,202,202,0.6)',
-            'high', 'rgba(254,215,170,0.6)',
-            'medium', 'rgba(254,240,138,0.5)',
-            'rgba(187,247,208,0.5)',
-          ],
+          'circle-stroke-color': 'rgba(255,255,255,0.4)',
         },
       })
 
-      // Pulse ring for breaking events
       map.addLayer({
-        id: 'event-pulse',
-        type: 'circle',
-        source: 'events',
+        id: 'event-pulse', type: 'circle', source: 'events',
         filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'isBreaking'], true]],
         paint: {
           'circle-radius': 16,
           'circle-color': 'transparent',
           'circle-stroke-width': 2,
           'circle-stroke-color': '#ef4444',
-          'circle-stroke-opacity': 0.55,
+          'circle-stroke-opacity': 0.5,
         },
       })
-
     } catch (err) {
       console.warn('[GlobeMap] loadEvents error:', err)
     }
   }, [timeWindow, severity, mapReady, onStatsUpdate])
 
-  // ── Load live layer ───────────────────────────────────────────────────────
-  const loadLiveLayer = useCallback(async (layerId: string) => {
+  // ── Load flights (live, smooth update via setData) ────────────────────────
+  const loadFlights = useCallback(async () => {
     const map = mapRef.current
     if (!map || !mapReady) return
     await waitForStyle(map)
 
-    const endpoints: Record<string, string> = {
-      flights: '/api/v1/live/flights',
-      vessels: '/api/v1/live/vessels',
-      seismic: '/api/v1/live/seismic',
-      fires: '/api/v1/live/fires',
-      nuclear: '/api/v1/live/nuclear',
-      outages: '/api/v1/live/outages',
-    }
-    const colors: Record<string, string> = {
-      flights: '#60a5fa', vessels: '#34d399', seismic: '#f59e0b',
-      fires: '#ff4500', nuclear: '#a78bfa', outages: '#8b5cf6',
-    }
-
-    const endpoint = endpoints[layerId]
-    if (!endpoint) return
-
     try {
-      const res = await fetch(endpoint, { signal: AbortSignal.timeout(12000) })
+      const res = await fetch('/api/v1/live/flights', { signal: AbortSignal.timeout(12000) })
       if (!res.ok) return
       const data = await res.json()
 
-      const srcId = `live-${layerId}`
-      const lyrId = `live-${layerId}-layer`
-      const lblId = `live-${layerId}-label`
-
-      safeRemoveLayer(map, lblId)
-      safeRemoveLayer(map, lyrId)
-      safeRemoveSource(map, srcId)
+      const srcId = 'live-flights'
+      const existing = map.getSource(srcId) as maplibregl.GeoJSONSource | undefined
+      if (existing) { existing.setData(data); return } // smooth position update
 
       map.addSource(srcId, { type: 'geojson', data })
-      const col = colors[layerId] ?? '#94a3b8'
 
-      if (layerId === 'flights') {
-        map.addLayer({
-          id: lyrId, type: 'circle', source: srcId,
-          paint: {
-            'circle-radius': ['case', ['==', ['get', 'is_military'], true], 6, 4],
-            'circle-color': ['case', ['==', ['get', 'is_military'], true], '#ef4444', col],
-            'circle-opacity': 0.85,
-            'circle-stroke-width': 1,
-            'circle-stroke-color': 'rgba(255,255,255,0.3)',
-          },
-        })
-        map.addLayer({
-          id: lblId, type: 'symbol', source: srcId,
-          filter: ['==', ['get', 'is_military'], true],
-          layout: {
-            'text-field': ['get', 'callsign'],
-            'text-size': 9,
-            'text-offset': [0, 1.4],
-            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-          },
-          paint: {
-            'text-color': '#ef4444',
-            'text-halo-color': 'rgba(0,0,0,0.8)',
-            'text-halo-width': 1,
-          },
-        })
-      } else if (layerId === 'vessels') {
-        map.addLayer({
-          id: lyrId, type: 'circle', source: srcId,
-          paint: {
-            'circle-radius': ['case', ['==', ['get', 'is_dark'], true], 6, 4],
-            'circle-color': ['case', ['==', ['get', 'is_dark'], true], '#ef4444', col],
-            'circle-opacity': 0.8,
-            'circle-stroke-width': ['case', ['==', ['get', 'is_dark'], true], 2, 1],
-            'circle-stroke-color': ['case', ['==', ['get', 'is_dark'], true], '#fca5a5', 'rgba(255,255,255,0.2)'],
-          },
-        })
-      } else if (layerId === 'seismic') {
-        map.addLayer({
-          id: lyrId, type: 'circle', source: srcId,
-          paint: {
-            'circle-radius': ['interpolate', ['linear'], ['get', 'mag'], 2.5, 4, 4.0, 8, 5.0, 14, 6.0, 22, 7.0, 32],
-            'circle-color': ['case', ['==', ['get', 'is_suspicious'], true], '#ef4444', col],
-            'circle-opacity': 0.5,
-            'circle-stroke-width': 1.5,
-            'circle-stroke-color': col,
-          },
-        })
-        map.addLayer({
-          id: lblId, type: 'symbol', source: srcId,
-          filter: ['>=', ['get', 'mag'], 4.5],
-          layout: {
-            'text-field': ['concat', 'M', ['to-string', ['get', 'mag']]],
-            'text-size': 10,
-            'text-offset': [0, 1.2],
-            'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-          },
-          paint: {
-            'text-color': '#fff',
-            'text-halo-color': 'rgba(0,0,0,0.8)',
-            'text-halo-width': 1,
-          },
-        })
-      } else {
-        // fires, nuclear, outages — simple circles
-        map.addLayer({
-          id: lyrId, type: 'circle', source: srcId,
-          paint: {
-            'circle-radius': 5,
-            'circle-color': col,
-            'circle-opacity': 0.8,
-            'circle-stroke-width': 1,
-            'circle-stroke-color': `${col}60`,
-          },
-        })
-      }
+      map.addLayer({
+        id: 'live-flights-layer', type: 'circle', source: srcId,
+        paint: {
+          'circle-radius': ['case', ['==', ['get', 'is_military'], true], 7, 4],
+          'circle-color': ['case', ['==', ['get', 'is_military'], true], '#ef4444', '#60a5fa'],
+          'circle-opacity': 0.9,
+          'circle-stroke-width': ['case', ['==', ['get', 'is_military'], true], 2, 1],
+          'circle-stroke-color': ['case', ['==', ['get', 'is_military'], true], '#fca5a5', 'rgba(255,255,255,0.3)'],
+        },
+      })
 
-      // Setup interaction for live layer
-      map.on('mouseenter', lyrId, () => { map.getCanvas().style.cursor = 'pointer' })
-      map.on('mouseleave', lyrId, () => { map.getCanvas().style.cursor = '' })
+      map.addLayer({
+        id: 'live-flights-labels', type: 'symbol', source: srcId,
+        filter: ['==', ['get', 'is_military'], true],
+        layout: {
+          'text-field': ['get', 'callsign'],
+          'text-size': 9,
+          'text-offset': [0, 1.5],
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': '#ef4444',
+          'text-halo-color': 'rgba(0,0,0,0.9)',
+          'text-halo-width': 1,
+        },
+      })
     } catch (err) {
-      console.warn(`[GlobeMap] loadLiveLayer(${layerId}) error:`, err)
+      console.warn('[GlobeMap] loadFlights error:', err)
     }
   }, [mapReady])
 
-  const removeLiveLayer = useCallback(async (layerId: string) => {
+  // ── Load vessels (live, smooth update via setData) ────────────────────────
+  const loadVessels = useCallback(async () => {
     const map = mapRef.current
     if (!map || !mapReady) return
     await waitForStyle(map)
-    safeRemoveLayer(map, `live-${layerId}-label`)
-    safeRemoveLayer(map, `live-${layerId}-layer`)
-    safeRemoveSource(map, `live-${layerId}`)
+
+    try {
+      const res = await fetch('/api/v1/live/vessels', { signal: AbortSignal.timeout(12000) })
+      if (!res.ok) return
+      const data = await res.json()
+
+      const srcId = 'live-vessels'
+      const existing = map.getSource(srcId) as maplibregl.GeoJSONSource | undefined
+      if (existing) { existing.setData(data); return }
+
+      map.addSource(srcId, { type: 'geojson', data })
+
+      map.addLayer({
+        id: 'live-vessels-layer', type: 'circle', source: srcId,
+        paint: {
+          'circle-radius': ['case', ['==', ['get', 'is_dark'], true], 7, 4],
+          'circle-color': ['case', ['==', ['get', 'is_dark'], true], '#ef4444', '#34d399'],
+          'circle-opacity': 0.85,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': ['case', ['==', ['get', 'is_dark'], true], '#fca5a5', 'rgba(255,255,255,0.2)'],
+        },
+      })
+
+      map.addLayer({
+        id: 'live-vessels-dark-pulse', type: 'circle', source: srcId,
+        filter: ['==', ['get', 'is_dark'], true],
+        paint: {
+          'circle-radius': 14,
+          'circle-color': 'transparent',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ef4444',
+          'circle-stroke-opacity': 0.4,
+        },
+      })
+    } catch (err) {
+      console.warn('[GlobeMap] loadVessels error:', err)
+    }
+  }, [mapReady])
+
+  // ── Load seismic (live, smooth update via setData) ────────────────────────
+  const loadSeismic = useCallback(async () => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    await waitForStyle(map)
+
+    try {
+      const res = await fetch('/api/v1/live/seismic', { signal: AbortSignal.timeout(12000) })
+      if (!res.ok) return
+      const data = await res.json()
+
+      const srcId = 'live-seismic'
+      const existing = map.getSource(srcId) as maplibregl.GeoJSONSource | undefined
+      if (existing) { existing.setData(data); return }
+
+      map.addSource(srcId, { type: 'geojson', data })
+
+      map.addLayer({
+        id: 'live-seismic-layer', type: 'circle', source: srcId,
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['get', 'magnitude'], 2.5, 4, 4.0, 8, 5.0, 14, 6.0, 22, 7.0, 32],
+          'circle-color': ['case', ['==', ['get', 'is_conflict_zone'], true], '#ef4444', '#f59e0b'],
+          'circle-opacity': 0.45,
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': '#f59e0b',
+        },
+      })
+
+      map.addLayer({
+        id: 'live-seismic-labels', type: 'symbol', source: srcId,
+        filter: ['>=', ['get', 'magnitude'], 4.5],
+        layout: {
+          'text-field': ['concat', 'M', ['to-string', ['get', 'magnitude']]],
+          'text-size': 10,
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-offset': [0, 1.2],
+        },
+        paint: {
+          'text-color': '#fff',
+          'text-halo-color': 'rgba(0,0,0,0.8)',
+          'text-halo-width': 1,
+        },
+      })
+    } catch (err) {
+      console.warn('[GlobeMap] loadSeismic error:', err)
+    }
+  }, [mapReady])
+
+  // ── Remove a live layer group ─────────────────────────────────────────────
+  const removeLiveLayer = useCallback(async (type: string) => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    await waitForStyle(map)
+    const prefix = `live-${type}`
+    const style = map.getStyle()
+    if (style?.layers) {
+      for (const layer of style.layers) {
+        if ((layer.id as string).startsWith(prefix)) safeRemoveLayer(map, layer.id as string)
+      }
+    }
+    safeRemoveSource(map, prefix)
   }, [mapReady])
 
   // ── React to filter changes ───────────────────────────────────────────────
@@ -399,25 +415,30 @@ export default function GlobeMap({ timeWindow, severity, activeLayers, onStatsUp
   // ── React to layer toggles ────────────────────────────────────────────────
   useEffect(() => {
     if (!mapReady) return
-    const allLayers = ['flights', 'vessels', 'seismic', 'nuclear', 'outages', 'fires']
-    for (const layer of allLayers) {
-      if (activeLayers.has(layer)) {
-        void loadLiveLayer(layer)
+    const loaders: Record<string, () => Promise<void>> = {
+      flights: loadFlights,
+      vessels: loadVessels,
+      seismic: loadSeismic,
+    }
+    const all = ['flights', 'vessels', 'seismic', 'nuclear', 'outages', 'fires']
+    for (const layer of all) {
+      if (activeLayers.has(layer) && loaders[layer]) {
+        void loaders[layer]()
       } else {
         void removeLiveLayer(layer)
       }
     }
-  }, [activeLayers, mapReady, loadLiveLayer, removeLiveLayer])
+  }, [activeLayers, mapReady, loadFlights, loadVessels, loadSeismic, removeLiveLayer])
 
-  // ── Auto-refresh every 60s ────────────────────────────────────────────────
+  // ── Refresh intervals ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapReady) return
-    const t = setInterval(() => {
-      void loadEvents()
-      activeLayers.forEach(l => { if (l !== 'events') void loadLiveLayer(l) })
-    }, 60000)
-    return () => clearInterval(t)
-  }, [mapReady, activeLayers, loadEvents, loadLiveLayer])
+    const evtInt = setInterval(() => { void loadEvents() }, 60000)
+    const fltInt = setInterval(() => { if (activeLayers.has('flights')) void loadFlights() }, 30000)
+    const vslInt = setInterval(() => { if (activeLayers.has('vessels')) void loadVessels() }, 60000)
+    const seisInt = setInterval(() => { if (activeLayers.has('seismic')) void loadSeismic() }, 120000)
+    return () => { clearInterval(evtInt); clearInterval(fltInt); clearInterval(vslInt); clearInterval(seisInt) }
+  }, [mapReady, activeLayers, loadEvents, loadFlights, loadVessels, loadSeismic])
 
   // ── Hover popup + click handlers ─────────────────────────────────────────
   useEffect(() => {
@@ -425,56 +446,83 @@ export default function GlobeMap({ timeWindow, severity, activeLayers, onStatsUp
     if (!map || !mapReady) return
 
     const popup = new maplibregl.Popup({
-      closeButton: false, closeOnClick: false, className: 'cr-popup', maxWidth: '280px',
+      closeButton: false, closeOnClick: false, className: 'cr-popup', maxWidth: '300px',
     })
     popupRef.current = popup
 
     function buildHtml(props: Record<string, unknown>, layerId: string): string {
-      const sevColors: Record<string, string> = {
-        critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e',
+      // Flight
+      if (props.callsign !== undefined || props.icao24 !== undefined) {
+        const isMil = props.is_military === true || props.is_military === 'true'
+        return `<div style="font-family:-apple-system,sans-serif;min-width:180px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="font-size:14px">${isMil ? '🎖️' : '✈️'}</span>
+            <span style="font-size:10px;font-weight:700;color:${isMil ? '#ef4444' : '#60a5fa'};text-transform:uppercase">${isMil ? 'Military Aircraft' : 'Aircraft'}</span>
+          </div>
+          <div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:6px">${String(props.callsign ?? props.icao24 ?? '')}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px">
+            <span style="color:#64748b">Country</span><span style="color:#94a3b8">${String(props.origin_country ?? 'Unknown')}</span>
+            <span style="color:#64748b">Altitude</span><span style="color:#94a3b8">${props.altitude ? Number(props.altitude).toLocaleString() + ' ft' : 'N/A'}</span>
+            <span style="color:#64748b">Speed</span><span style="color:#94a3b8">${Math.round(Number(props.velocity ?? 0))} kts</span>
+            <span style="color:#64748b">Zone</span><span style="color:#94a3b8">${String(props.zone_name ?? 'N/A')}</span>
+          </div>
+          ${isMil ? '<div style="margin-top:6px;padding:4px 8px;background:rgba(239,68,68,0.12);border-radius:4px;font-size:10px;color:#ef4444;font-weight:600">⚠ Military zone activity</div>' : ''}
+        </div>`
       }
+      // Vessel
+      if (props.mmsi !== undefined) {
+        const isDark = props.is_dark === true || props.is_dark === 'true'
+        return `<div style="font-family:-apple-system,sans-serif;min-width:180px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="font-size:14px">${isDark ? '⚠️' : '🚢'}</span>
+            <span style="font-size:10px;font-weight:700;color:${isDark ? '#ef4444' : '#34d399'};text-transform:uppercase">${isDark ? 'Dark Ship' : 'Vessel'}</span>
+          </div>
+          <div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:6px">${String(props.name ?? 'Unknown')}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px">
+            <span style="color:#64748b">Type</span><span style="color:#94a3b8;text-transform:capitalize">${String(props.ship_type ?? 'Unknown')}</span>
+            <span style="color:#64748b">Flag</span><span style="color:#94a3b8">${String(props.flag ?? 'Unknown')}</span>
+            <span style="color:#64748b">Speed</span><span style="color:#94a3b8">${Math.round(Number(props.speed ?? 0))} kts</span>
+            <span style="color:#64748b">Zone</span><span style="color:#94a3b8">${String(props.zone_name ?? 'N/A')}</span>
+          </div>
+          ${isDark ? '<div style="margin-top:6px;padding:4px 8px;background:rgba(239,68,68,0.12);border-radius:4px;font-size:10px;color:#ef4444;font-weight:600">⚠ AIS silent — possible ops or evasion</div>' : ''}
+        </div>`
+      }
+      // Seismic (via magnitude, mag, or is_suspicious)
+      if (props.magnitude !== undefined || props.mag !== undefined || layerId.includes('seismic')) {
+        const mag = props.magnitude ?? props.mag
+        const isConflict = props.is_conflict_zone === true || props.is_conflict_zone === 'true' ||
+          props.is_suspicious === true || props.is_suspicious === 'true'
+        return `<div style="font-family:-apple-system,sans-serif;min-width:160px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="font-size:14px">${isConflict ? '⚠️' : '🌍'}</span>
+            <span style="font-size:10px;font-weight:700;color:${isConflict ? '#ef4444' : '#f59e0b'};text-transform:uppercase">${isConflict ? 'Conflict Zone Seismic' : 'Seismic Event'}</span>
+          </div>
+          <div style="font-size:20px;font-weight:700;color:#e2e8f0;margin-bottom:4px">M${mag}</div>
+          <div style="font-size:11px;color:#94a3b8">Depth: ${String(props.depth ?? '?')}km</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px">${String(props.place ?? '')}</div>
+          ${isConflict ? '<div style="margin-top:6px;padding:4px 8px;background:rgba(239,68,68,0.12);border-radius:4px;font-size:10px;color:#ef4444;font-weight:600">⚠ Possible explosion or weapons test</div>' : ''}
+        </div>`
+      }
+      // Event
       if (props.title) {
         const sev = String(props.severity ?? 'low')
-        const col = sevColors[sev] ?? '#6b7280'
-        return `<div style="font-family:system-ui,sans-serif">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-            <span style="width:8px;height:8px;border-radius:50%;background:${col};display:inline-block"></span>
+        const col = SEV_COLORS[sev] ?? '#6b7280'
+        const isBreaking = props.isBreaking === true || props.isBreaking === 'true'
+        return `<div style="font-family:-apple-system,sans-serif;min-width:200px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="width:8px;height:8px;border-radius:50%;background:${col}"></span>
             <span style="font-size:10px;font-weight:700;color:${col};text-transform:uppercase">${sev}</span>
+            ${isBreaking ? '<span style="font-size:9px;font-weight:700;color:#ef4444;background:rgba(239,68,68,0.15);padding:1px 6px;border-radius:3px">BREAKING</span>' : ''}
           </div>
-          <div style="font-size:12px;font-weight:600;color:#e2e8f0;line-height:1.3;margin-bottom:4px">${String(props.title).substring(0, 100)}</div>
-          <div style="font-size:10px;color:#94a3b8">${props.region ? String(props.region).replace(/_/g, ' ') : ''} ${props.source ? '· ' + String(props.source) : ''}</div>
-        </div>`
-      }
-      if (layerId.includes('flights')) {
-        const isMil = props.is_military === true || props.is_military === 'true'
-        return `<div style="font-family:system-ui,sans-serif">
-          <div style="font-size:10px;font-weight:700;color:${isMil ? '#ef4444' : '#60a5fa'};text-transform:uppercase;margin-bottom:2px">${isMil ? '🎖 MILITARY' : '✈️ FLIGHT'}</div>
-          <div style="font-size:12px;font-weight:600;color:#e2e8f0">${String(props.callsign ?? props.icao24 ?? '')}</div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:2px">${String(props.origin_country ?? '')} · ${Math.round(Number(props.altitude ?? 0)).toLocaleString()}ft</div>
-        </div>`
-      }
-      if (layerId.includes('vessels')) {
-        const isDark = props.is_dark === true || props.is_dark === 'true'
-        return `<div style="font-family:system-ui,sans-serif">
-          <div style="font-size:10px;font-weight:700;color:${isDark ? '#ef4444' : '#34d399'};text-transform:uppercase;margin-bottom:2px">${isDark ? '⚠️ DARK SHIP' : '🚢 VESSEL'}</div>
-          <div style="font-size:12px;font-weight:600;color:#e2e8f0">${String(props.name ?? props.mmsi ?? '')}</div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:2px">${String(props.ship_type ?? '')} · ${Math.round(Number(props.speed ?? 0))} kts</div>
-        </div>`
-      }
-      if (layerId.includes('seismic')) {
-        const isConflict = props.is_suspicious === true || props.is_suspicious === 'true'
-        return `<div style="font-family:system-ui,sans-serif">
-          <div style="font-size:10px;font-weight:700;color:${isConflict ? '#ef4444' : '#f59e0b'};text-transform:uppercase;margin-bottom:2px">${isConflict ? '⚠️ CONFLICT SEISMIC' : '🌍 SEISMIC'}</div>
-          <div style="font-size:16px;font-weight:700;color:#e2e8f0">M${props.mag ?? props.magnitude ?? '?'}</div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:2px">${String(props.place ?? '')} · ${Math.round(Number(props.depth ?? 0))}km depth</div>
+          <div style="font-size:12px;font-weight:600;color:#e2e8f0;line-height:1.4;margin-bottom:6px">${String(props.title).substring(0, 120)}</div>
+          <div style="font-size:10px;color:#64748b">${String(props.region ?? '').replace(/_/g, ' ')} ${props.source ? '· ' + String(props.source) : ''}</div>
+          <div style="margin-top:6px;font-size:10px;color:#3b82f6">Click for intel brief →</div>
         </div>`
       }
       return ''
     }
 
-    const interactiveLayers = ['event-points', 'live-flights-layer', 'live-vessels-layer', 'live-seismic-layer']
-
-    function onMouseEnter(e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) {
+    const handleHover = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
       const m = mapRef.current
       if (!m) return
       m.getCanvas().style.cursor = 'pointer'
@@ -485,66 +533,92 @@ export default function GlobeMap({ timeWindow, severity, activeLayers, onStatsUp
       const html = buildHtml(props, (f.layer?.id as string) ?? '')
       if (html) popup.setLngLat(geom.coordinates as [number, number]).setHTML(html).addTo(m)
     }
-    function onMouseLeave() {
+
+    const handleLeave = () => {
       const m = mapRef.current
       if (m) m.getCanvas().style.cursor = ''
       popup.remove()
     }
-    function onClick(e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) {
+
+    const handleEventClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
       const m = mapRef.current
       if (!m) return
       const f = e.features?.[0]
       if (!f) return
-      const props = (f.properties ?? {}) as Record<string, unknown>
-      if (props.title && onEventClick) {
-        onEventClick(props as unknown as MapEvent)
+      const p = (f.properties ?? {}) as Record<string, unknown>
+      if (!p.title) return
+
+      const eventData: MapEvent = {
+        id: String(p.id ?? ''),
+        title: String(p.title ?? ''),
+        severity: String(p.severity ?? 'low'),
+        event_type: String(p.event_type ?? ''),
+        category: String(p.event_type ?? 'general'),
+        region: p.region ? String(p.region) : undefined,
+        publishedAt: p.publishedAt ? String(p.publishedAt) : undefined,
+        sourceUrl: p.sourceUrl ? String(p.sourceUrl) : undefined,
+        summary: p.summary ? String(p.summary) : undefined,
+        isBreaking: p.isBreaking === true || p.isBreaking === 'true',
+        source: p.source ? String(p.source) : undefined,
       }
-      if (props.cluster_id) {
-        ;(m.getSource('events') as maplibregl.GeoJSONSource)
-          .getClusterExpansionZoom(props.cluster_id as number)
-          .then(zoom => {
-            const geom = f.geometry as GeoJSON.Point
-            m.easeTo({ center: geom.coordinates as [number, number], zoom: zoom + 1, duration: 400 })
-          })
-          .catch(() => null)
-      }
+      onEventClick(eventData)
+
+      const geom = f.geometry as GeoJSON.Point
+      m.flyTo({ center: geom.coordinates as [number, number], zoom: Math.max(m.getZoom(), 5), duration: 800 })
     }
 
-    for (const lyr of interactiveLayers) {
-      map.on('mouseenter', lyr, onMouseEnter)
-      map.on('mouseleave', lyr, onMouseLeave)
+    const handleClusterClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+      const m = mapRef.current
+      if (!m) return
+      const f = e.features?.[0]
+      if (!f) return
+      const clusterId = (f.properties as Record<string, unknown>)?.cluster_id as number | undefined
+      if (!clusterId) return
+      ;(m.getSource('events') as maplibregl.GeoJSONSource)
+        .getClusterExpansionZoom(clusterId)
+        .then(zoom => {
+          const geom = f.geometry as GeoJSON.Point
+          m.flyTo({ center: geom.coordinates as [number, number], zoom: zoom + 1, duration: 500 })
+        })
+        .catch(() => null)
     }
-    map.on('click', 'event-points', onClick)
-    map.on('click', 'event-clusters', onClick)
+
+    const hoverLayers = ['event-points', 'event-clusters', 'live-flights-layer', 'live-vessels-layer', 'live-seismic-layer']
+    for (const layer of hoverLayers) {
+      map.on('mouseenter', layer, handleHover)
+      map.on('mouseleave', layer, handleLeave)
+    }
+    map.on('click', 'event-points', handleEventClick)
+    map.on('click', 'event-clusters', handleClusterClick)
 
     return () => {
-      for (const lyr of interactiveLayers) {
-        map.off('mouseenter', lyr, onMouseEnter)
-        map.off('mouseleave', lyr, onMouseLeave)
+      for (const layer of hoverLayers) {
+        map.off('mouseenter', layer, handleHover)
+        map.off('mouseleave', layer, handleLeave)
       }
-      map.off('click', 'event-points', onClick)
-      map.off('click', 'event-clusters', onClick)
+      map.off('click', 'event-points', handleEventClick)
+      map.off('click', 'event-clusters', handleClusterClick)
       popup.remove()
     }
   }, [mapReady, onEventClick])
 
   return (
     <>
-      <div ref={containerRef} style={{ position: 'absolute', inset: 0, background: '#060a10' }} />
+      <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} />
       <style>{`
         .cr-popup .maplibregl-popup-content {
-          background: rgba(10,13,20,0.96) !important;
+          background: rgba(13,17,23,0.96) !important;
           border: 1px solid rgba(255,255,255,0.1) !important;
-          border-radius: 10px !important;
-          padding: 10px 13px !important;
+          border-radius: 12px !important;
+          padding: 12px 14px !important;
           box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
-          backdrop-filter: blur(12px) !important;
+          backdrop-filter: blur(16px) !important;
         }
-        .cr-popup .maplibregl-popup-tip { border-top-color: rgba(10,13,20,0.96) !important; }
-        .maplibregl-ctrl-attrib { background: rgba(0,0,0,0.5) !important; color: rgba(255,255,255,0.3) !important; font-size: 9px !important; }
-        .maplibregl-ctrl-group { background: rgba(10,13,20,0.9) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 8px !important; overflow: hidden; }
-        .maplibregl-ctrl-group button { background: transparent !important; color: #9ca3af !important; }
-        .maplibregl-ctrl-group button:hover { background: rgba(255,255,255,0.08) !important; color: #fff !important; }
+        .cr-popup .maplibregl-popup-tip { border-top-color: rgba(13,17,23,0.96) !important; }
+        .maplibregl-ctrl-group { background: rgba(13,17,23,0.85) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 8px !important; overflow: hidden !important; }
+        .maplibregl-ctrl-group button { background: transparent !important; border-color: rgba(255,255,255,0.05) !important; }
+        .maplibregl-ctrl-group button span { filter: invert(1) !important; }
+        .maplibregl-ctrl-attrib { background: rgba(0,0,0,0.4) !important; color: rgba(255,255,255,0.3) !important; font-size: 9px !important; }
       `}</style>
     </>
   )
