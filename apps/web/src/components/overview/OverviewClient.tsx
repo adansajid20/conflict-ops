@@ -199,6 +199,72 @@ function QuickActions({ data, hasOrg }: { data: OverviewData; hasOrg: boolean })
   )
 }
 
+interface RegionRisk { region: string; risk_score: number; trend: string; trend_delta: number }
+interface SituationSummary { id: string; name: string; slug: string; severity: string; risk_score: number; event_count: number; status: string }
+
+const RISK_COLOR = (s: number) => s >= 8 ? '#ef4444' : s >= 6 ? '#f97316' : s >= 4 ? '#eab308' : '#22c55e'
+const TREND_ICON = (t: string) => t === 'escalating' ? '↑' : t === 'de-escalating' ? '↓' : '→'
+
+function RiskScoreWidget({ scores }: { scores: RegionRisk[] }) {
+  if (!scores.length) return null
+  const top = [...scores].sort((a, b) => b.risk_score - a.risk_score).slice(0, 6)
+  return (
+    <section className="overflow-hidden rounded-lg border" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+      <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--border)' }}>
+        <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Regional Risk Scores</h2>
+        <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>0–10</span>
+      </div>
+      <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+        {top.map(r => (
+          <div key={r.region} className="flex items-center gap-3 px-4 py-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                {r.region.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+              </div>
+              <div className="mt-1 h-1.5 w-full rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                <div className="h-full rounded-full transition-all" style={{ width: `${(r.risk_score / 10) * 100}%`, background: RISK_COLOR(r.risk_score) }} />
+              </div>
+            </div>
+            <div className="shrink-0 flex items-center gap-1.5">
+              <span className="text-[10px]" style={{ color: RISK_COLOR(r.risk_score) }}>{TREND_ICON(r.trend)}</span>
+              <span className="text-sm font-bold tabular-nums" style={{ color: RISK_COLOR(r.risk_score), fontFamily: 'JetBrains Mono, monospace' }}>
+                {r.risk_score.toFixed(1)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function ActiveSituationsWidget({ situations }: { situations: SituationSummary[] }) {
+  if (!situations.length) return null
+  const top = situations.slice(0, 5)
+  return (
+    <section className="overflow-hidden rounded-lg border" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+      <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--border)' }}>
+        <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Active Situations</h2>
+        <Link href="/situations" className="text-[11px] hover:opacity-70" style={{ color: 'var(--text-muted)' }}>View all →</Link>
+      </div>
+      <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+        {top.map(s => (
+          <Link key={s.id} href={`/situations/${s.slug}`}
+            className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/5 block">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{s.name}</div>
+              <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.event_count.toLocaleString()} events · {s.status}</div>
+            </div>
+            <div className="shrink-0 text-sm font-bold tabular-nums" style={{ color: RISK_COLOR(s.risk_score), fontFamily: 'JetBrains Mono, monospace' }}>
+              {s.risk_score.toFixed(1)}
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export function OverviewClient() {
   const [win, setWin] = useState<Window>('24h')
   const [loading, setLoading] = useState(true)
@@ -208,6 +274,8 @@ export function OverviewClient() {
   const [lastSeenAt, setLastSeenAt] = useState<Date>(() => new Date())
   const [newEventCount, setNewEventCount] = useState(0)
   const [showBanner, setShowBanner] = useState(false)
+  const [riskScores, setRiskScores] = useState<RegionRisk[]>([])
+  const [activeSituations, setActiveSituations] = useState<SituationSummary[]>([])
   const cache = useRef<Partial<Record<Window, OverviewData>>>({})
 
   const fetchOverview = useCallback(async (window: Window) => {
@@ -257,6 +325,17 @@ export function OverviewClient() {
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [win, fetchOverview])
+
+  // Fetch risk scores + situations once on mount
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/v1/region-risk').then(r => r.json()).catch(() => ({ data: [] })),
+      fetch('/api/v1/situations').then(r => r.json()).catch(() => ({ data: [] })),
+    ]).then(([risk, sits]) => {
+      setRiskScores(risk.data ?? [])
+      setActiveSituations(sits.data ?? [])
+    })
+  }, [])
 
   useEffect(() => {
     if (!data) return
@@ -414,6 +493,8 @@ export function OverviewClient() {
                 </div>
               </section>
 
+              <RiskScoreWidget scores={riskScores} />
+              <ActiveSituationsWidget situations={activeSituations} />
               <QuickActions data={data} hasOrg={data.hasOrg} />
             </div>
           </div>

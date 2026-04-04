@@ -102,6 +102,15 @@ export async function GET(req: Request) {
     console.error('[ingest] correlation/risk step failed:', e)
   }
 
+  // Narrative cluster detection
+  try {
+    const { detectCorrelationSignals: _unused } = await import('@/lib/pipeline/correlate') // keep import warm
+    void _unused
+    await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://conflictradar.co'}/api/cron/narratives?token=${process.env.INTERNAL_SECRET ?? ''}`, {
+      signal: AbortSignal.timeout(20000),
+    }).catch(() => null)
+  } catch { /* non-fatal */ }
+
   // Update situations event counts (country-keyword match only — no region/tag to avoid false positives)
   try {
     const { createServiceClient } = await import('@/lib/supabase/server')
