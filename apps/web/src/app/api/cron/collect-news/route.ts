@@ -5,7 +5,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
 function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
+  const token = new URL(req.url).searchParams.get('token')
+  if (token && token === process.env.INTERNAL_SECRET) return true
+  const auth = req.headers.get('authorization')
+  if (auth && process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true
+  return false
 }
 
 const CONFLICT_KEYWORDS = ['airstrike','missile','bombing','attack','military','troops','conflict','war','ceasefire','sanctions','coup','explosion','insurgent','rebel','militia','drone strike','nuclear','refugee','humanitarian crisis','territorial dispute','naval blockade','cyber attack','assassination','ethnic cleansing','arms deal','mercenary','Wagner','NATO','UN Security Council','martial law','border clash','ceasefire violation','peace talks','embargo','proxy war']

@@ -223,7 +223,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
     supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', since7d),
     supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', since).gte('severity', 3),
     supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', since).in('status', ['developing', 'pending']),
-    supabase.from('events').select('ingested_at').eq('is_humanitarian_report', false).order('ingested_at', { ascending: false, nullsFirst: false }).limit(1).single(),
+    supabase.from('events').select('ingested_at').eq('is_humanitarian_report', false).not('source', 'in', '("noaa","nasa_eonet","nasa-eonet","usgs","gdacs")').not('title', 'ilike', '%thunderstorm warning%').not('title', 'ilike', '%weather alert%').not('title', 'ilike', '%red flag warning%').order('ingested_at', { ascending: false, nullsFirst: false }).limit(1).single(),
     userId ? supabase.from('users').select('org_id').eq('clerk_user_id', userId).single() : Promise.resolve({ data: null, error: null }),
     supabase.from('alerts').select('id', { count: 'exact', head: true }).eq('read', false),
     supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()).gte('severity', 3),

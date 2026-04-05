@@ -46,6 +46,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/rss",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/collect-news",
       "schedule": "*/5 * * * *"
     },
