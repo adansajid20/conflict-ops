@@ -22,6 +22,9 @@ export function FreshnessBanner() {
   const ingestAgeMin = ingestAgeMs / 60000
   const adminMode = isAdminMode()
 
+  // Only show staleness warnings to admins
+  if (!adminMode) return null
+
   // Fresh (< 30 min): hide banner entirely
   if (ingestAgeMin < 30) return null
 

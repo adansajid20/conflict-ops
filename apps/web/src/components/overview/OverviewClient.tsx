@@ -368,6 +368,10 @@ export function OverviewClient() {
 
   const headerDate = useMemo(() => new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), [])
   const freshnessBadge = getFreshnessBadge(data?.lastUpdatedAt ?? null)
+  const isAdmin = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).get('admin') === '1' ||
+    process.env['NEXT_PUBLIC_ADMIN_MODE'] === 'true'
+  )
 
   return (
     <div className="mx-auto max-w-[1400px] p-6">
@@ -375,7 +379,7 @@ export function OverviewClient() {
         <div>
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-[22px] font-semibold" style={{ color: 'var(--text-primary)' }}>Situation Overview</h1>
-            {data && (
+            {data && isAdmin && (
               <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: `${freshnessBadge.color}18`, color: freshnessBadge.color, border: `1px solid ${freshnessBadge.color}30` }}>
                 {freshnessBadge.label}
               </span>

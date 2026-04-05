@@ -283,7 +283,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>{user?.primaryEmailAddress?.emailAddress ?? 'Signed in'}</div>
               </div>
             </div>
-            <SidebarStatus lastIngestAt={lastIngestAt} liveFeeds={liveFeeds} totalFeeds={totalFeeds} />
+            {isAdminMode && <SidebarStatus lastIngestAt={lastIngestAt} liveFeeds={liveFeeds} totalFeeds={totalFeeds} />}
           </div>
         </aside>
 
