@@ -19,13 +19,16 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/react": "^18.3.28",
     "prettier": "^3.0.0",
     "turbo": "latest",
     "typescript": "^5.0.0"
   },
-
   "engines": {
     "node": ">=18"
   },
-  "packageManager": "npm@10.0.0"
+  "packageManager": "npm@10.0.0",
+  "overrides": {
+    "@types/react": "18.3.28"
+  }
 }

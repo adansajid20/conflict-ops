@@ -10,6 +10,7 @@ import {
   Brain,
   Globe,
   LayoutDashboard,
+  MapPin,
   Plane,
   Radio,
   ScanSearch,
@@ -50,7 +51,9 @@ const ANALYSIS_NAV: NavItem[] = [
   { href: '/analysis/trends', label: 'Trends', icon: TrendingUp },
   { href: '/analysis/predictions', label: 'Predictions', icon: Brain },
   { href: '/analysis/actors', label: 'Actor Network', icon: Globe },
-  { href: '/analysis/reports', label: 'Reports', icon: Activity, comingSoon: true },
+  { href: '/analysis/reports', label: 'Reports', icon: Activity },
+  { href: '/analysis/market', label: 'Market Impact', icon: TrendingUp },
+  { href: '/analysis/countries', label: 'Country Profiles', icon: MapPin },
 ]
 
 const TOOLS_NAV: NavItem[] = [
@@ -58,6 +61,11 @@ const TOOLS_NAV: NavItem[] = [
   { href: '/geoverify', label: 'GeoVerify', icon: ScanSearch },
   { href: '/workbench', label: 'Workbench', icon: Activity },
   { href: '/tools/similarity', label: 'Similarity Search', icon: Brain },
+  { href: '/tools/simulator', label: 'Scenario Simulator', icon: Brain },
+  { href: '/tools/sanctions', label: 'Sanctions Monitor', icon: Activity },
+  { href: '/tools/personnel', label: 'Personnel Safety', icon: Activity },
+  { href: '/tools/supply-chain', label: 'Supply Chain', icon: Activity },
+  { href: '/analyst', label: 'AI Analyst (Radar)', icon: Brain },
 ]
 
 function NavLink({ item, pathname, alertCount = 0 }: { item: NavItem; pathname: string; alertCount?: number }) {
