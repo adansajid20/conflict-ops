@@ -52,6 +52,7 @@ export default function CesiumGlobe() {
   const issIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [cesiumReady, setCesiumReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [eventCount, setEventCount] = useState(0);
   const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
   const [mapMode, setMapMode] = useState<'globe' | 'map'>('globe');
@@ -288,6 +289,14 @@ export default function CesiumGlobe() {
     }
   }, []);
 
+  // Safety timeout — stop spinning after 20s if Cesium never loaded
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (isLoading) { setIsLoading(false); setLoadError(true); }
+    }, 20000);
+    return () => clearTimeout(t);
+  }, [isLoading]);
+
   useEffect(() => {
     return () => {
       if (rotationRef.current) clearInterval(rotationRef.current);
@@ -305,13 +314,18 @@ export default function CesiumGlobe() {
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link rel="stylesheet" href={`${CESIUM_CDN}/Widgets/widgets.css`} />
 
-      {/* Load Cesium JS from CDN — onLoad fires initCesium */}
+      {/* Load Cesium JS from CDN */}
       <Script
         src={`${CESIUM_CDN}/Cesium.js`}
         strategy="afterInteractive"
         onLoad={() => {
           window.CESIUM_BASE_URL = `${CESIUM_CDN}/`;
-          initCesium();
+          // Small delay ensures DOM ref is mounted
+          setTimeout(() => initCesium(), 100);
+        }}
+        onError={(e) => {
+          console.error('Cesium CDN failed to load', e);
+          setIsLoading(false);
         }}
       />
 
@@ -387,11 +401,24 @@ export default function CesiumGlobe() {
       </div>
 
       {/* Loading */}
-      {isLoading && (
+      {isLoading && !loadError && (
         <div className="absolute inset-0 bg-black z-20 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
             <p className="text-xs text-gray-600 tracking-wider uppercase">Loading 3D globe…</p>
+            <p className="text-[10px] text-gray-700">Fetching Cesium from CDN</p>
+          </div>
+        </div>
+      )}
+      {loadError && (
+        <div className="absolute inset-0 bg-black z-20 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-400 text-sm font-semibold mb-2">Globe failed to load</p>
+            <p className="text-gray-600 text-xs mb-4">Cesium CDN unreachable or blocked</p>
+            <button onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-500">
+              Retry
+            </button>
           </div>
         </div>
       )}
