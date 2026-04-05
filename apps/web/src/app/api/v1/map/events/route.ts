@@ -206,6 +206,9 @@ export async function GET(request: NextRequest) {
     const isBreaking = event.is_breaking === true ||
       (event.occurred_at != null && now - new Date(event.occurred_at).getTime() < 30 * 60 * 1000)
 
+    const SEVERITY_COLORS: Record<string, string> = {
+      critical: '#ff2d2d', high: '#ff8c00', medium: '#ffd700', low: '#4a9eff',
+    }
     features.push({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [coords[1], coords[0]] }, // [lon, lat]
@@ -213,7 +216,9 @@ export async function GET(request: NextRequest) {
         id: event.id,
         title: event.title ?? 'Untitled',
         severity: sevStr,
+        severityNum: sevStrToInt(sevStr),   // needed by MapLibre paint expressions
         severityInt: sevStrToInt(sevStr),
+        color: SEVERITY_COLORS[sevStr] ?? '#4a9eff',  // pre-computed color for paint
         event_type: event.event_type ?? 'general',
         category: event.event_type ?? 'general',
         region: event.region,

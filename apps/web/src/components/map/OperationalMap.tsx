@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapSidebar from './MapSidebar';
 
 // ═══════════════════════════════════════════════════════
-// TYPES
+// TYPES (exported — MapSidebar imports these)
 // ═══════════════════════════════════════════════════════
 
 export interface MapEvent {
@@ -45,36 +45,69 @@ export interface TrackingState {
 }
 
 // ═══════════════════════════════════════════════════════
-// MAP STYLE — Esri satellite, dark globe, space background
+// CONSTANTS
+// ═══════════════════════════════════════════════════════
+
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: '#ff2d2d',
+  high:     '#ff8c00',
+  medium:   '#ffd700',
+  low:      '#4a9eff',
+};
+
+const SEVERITY_NUM: Record<string, number> = {
+  critical: 4, high: 3, medium: 2, low: 1,
+};
+
+// ═══════════════════════════════════════════════════════
+// MAP STYLE — dark Esri base + NASA city lights
+// NOTE: no 'sky' property — it breaks style.load in MapLibre
 // ═══════════════════════════════════════════════════════
 
 const MAP_STYLE = {
   version: 8,
-  name: 'ConflictRadar',
+  name: 'ConflictRadar Dark Globe',
   glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
   sources: {
-    'esri-satellite': {
+    'satellite-base': {
       type: 'raster',
-      tiles: [
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      ],
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
       tileSize: 256,
       attribution: '© Esri',
       maxzoom: 18,
     },
+    'city-lights': {
+      type: 'raster',
+      tiles: ['https://map1.vis.earthdata.nasa.gov/wmts-webmerc/VIIRS_CityLights_2012/default/2012-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpg'],
+      tileSize: 256,
+      attribution: '© NASA',
+      maxzoom: 8,
+    },
   },
   layers: [
-    { id: 'background', type: 'background', paint: { 'background-color': '#000000' } },
+    { id: 'space-bg', type: 'background', paint: { 'background-color': '#000000' } },
     {
-      id: 'satellite',
+      id: 'satellite-layer',
       type: 'raster',
-      source: 'esri-satellite',
+      source: 'satellite-base',
       paint: {
+        'raster-brightness-max': 0.25,
         'raster-brightness-min': 0.0,
-        'raster-brightness-max': 0.85,
-        'raster-contrast': 0.15,
-        'raster-saturation': -0.2,
-        'raster-fade-duration': 300,
+        'raster-saturation': -0.6,
+        'raster-contrast': 0.3,
+        'raster-opacity': 0.75,
+      },
+    },
+    {
+      id: 'city-lights-layer',
+      type: 'raster',
+      source: 'city-lights',
+      paint: {
+        'raster-brightness-max': 1.0,
+        'raster-brightness-min': 0.0,
+        'raster-saturation': -0.1,
+        'raster-contrast': 0.5,
+        'raster-opacity': 0.9,
       },
     },
   ],
@@ -85,15 +118,16 @@ const MAP_STYLE = {
 // ═══════════════════════════════════════════════════════
 
 export default function OperationalMap() {
-  const mapContainer = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const animationRef = useRef<number | null>(null);
   const issMarkerRef = useRef<maplibregl.Marker | null>(null);
   const issIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rotationRef = useRef<number | null>(null);
+  const pulseRafRef = useRef<number | null>(null);
 
+  const [isLoading, setIsLoading] = useState(true);
   const [mapMode, setMapMode] = useState<'globe' | 'map'>('globe');
   const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [eventCount, setEventCount] = useState(0);
 
   const [layers, setLayers] = useState<LayerState>({
@@ -118,8 +152,8 @@ export default function OperationalMap() {
     thermal: false,
   });
 
-  // ── FETCH EVENTS — /api/v1/map/events returns GeoJSON FeatureCollection ──
-  const fetchAndDisplayEvents = useCallback(async (f: FilterState) => {
+  // ── FETCH EVENTS ─────────────────────────────────────────────────
+  const fetchAndDisplay = useCallback(async (f: FilterState) => {
     try {
       const timeMap: Record<string, number> = { '24h': 24, '7d': 168, '30d': 720 };
       const hours = timeMap[f.timeWindow] ?? 168;
@@ -129,41 +163,37 @@ export default function OperationalMap() {
       if (f.region) url += `&region=${encodeURIComponent(f.region)}`;
 
       const res = await fetch(url);
-      // API returns GeoJSON FeatureCollection with meta.total
       const geojson = await res.json() as GeoJSON.FeatureCollection & { meta?: { total: number } };
-
       setEventCount(geojson.meta?.total ?? geojson.features?.length ?? 0);
 
       const map = mapRef.current;
       if (!map) return;
       const src = map.getSource('events-src') as maplibregl.GeoJSONSource | undefined;
       if (!src) return;
-
-      // Pass GeoJSON directly — MapLibre consumes it natively
       src.setData(geojson);
     } catch (err) {
-      console.error('[MAP] Failed to fetch events:', err);
+      console.error('[MAP] fetch error:', err);
     }
   }, []);
 
-  // Refetch when filters change
   useEffect(() => {
-    if (mapRef.current) void fetchAndDisplayEvents(filters);
-  }, [filters, fetchAndDisplayEvents]);
+    if (mapRef.current) void fetchAndDisplay(filters);
+  }, [filters, fetchAndDisplay]);
 
-  // ── LAYER VISIBILITY ──────────────────────────────────────────────────────
+  // ── LAYER VISIBILITY ─────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const vis = (id: string, show: boolean) => {
       if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', show ? 'visible' : 'none');
     };
-    vis('events-circles', layers.conflictEvents);
-    vis('events-pulse', layers.conflictEvents);
+    vis('events-dots', layers.conflictEvents);
+    vis('events-risk-glow', layers.riskOverlay);
     vis('events-heatmap', layers.heatmap);
+    vis('events-critical-pulse', layers.conflictEvents);
   }, [layers]);
 
-  // ── ISS TRACKER ───────────────────────────────────────────────────────────
+  // ── ISS TRACKER ──────────────────────────────────────────────────
   useEffect(() => {
     if (!tracking.iss) {
       issMarkerRef.current?.remove();
@@ -175,13 +205,10 @@ export default function OperationalMap() {
     async function updateISS() {
       if (!mapRef.current) return;
       try {
-        const d = await fetch('https://api.wheretheiss.at/v1/satellites/25544').then(r => r.json()) as { longitude: number; latitude: number; altitude: number; velocity: number };
+        const d = await fetch('https://api.wheretheiss.at/v1/satellites/25544').then(r => r.json()) as { longitude: number; latitude: number };
         if (!issMarkerRef.current && mapRef.current) {
           const el = document.createElement('div');
-          el.innerHTML = `<div style="position:relative">
-            <div style="width:10px;height:10px;background:#a855f7;border-radius:50%;border:2px solid #c084fc;box-shadow:0 0 10px #a855f7"></div>
-            <span style="position:absolute;left:16px;top:-2px;color:#c084fc;font-size:10px;font-family:monospace;white-space:nowrap">ISS</span>
-          </div>`;
+          el.innerHTML = `<div style="width:16px;height:16px;background:#a855f7;border-radius:50%;border:2px solid rgba(168,85,247,0.4);animation:iss-glow 2s ease-in-out infinite;"></div>`;
           issMarkerRef.current = new maplibregl.Marker({ element: el })
             .setLngLat([d.longitude, d.latitude])
             .addTo(mapRef.current);
@@ -196,7 +223,7 @@ export default function OperationalMap() {
     return () => { if (issIntervalRef.current) clearInterval(issIntervalRef.current); };
   }, [tracking.iss]);
 
-  // ── GLOBE/MAP TOGGLE ──────────────────────────────────────────────────────
+  // ── GLOBE/MAP TOGGLE ─────────────────────────────────────────────
   function handleToggleMode(mode: 'globe' | 'map') {
     const map = mapRef.current;
     if (!map || mode === mapMode) return;
@@ -209,50 +236,48 @@ export default function OperationalMap() {
     setMapMode(mode);
   }
 
-  // ── INIT MAP ──────────────────────────────────────────────────────────────
+  // ── INIT MAP ─────────────────────────────────────────────────────
   useEffect(() => {
-    if (!mapContainer.current || mapRef.current) return;
+    if (!containerRef.current || mapRef.current) return;
 
     const map = new maplibregl.Map({
-      container: mapContainer.current,
+      container: containerRef.current,
       style: MAP_STYLE,
       center: [30, 20],
       zoom: 1.8,
-      minZoom: 1,
-      maxZoom: 18,
+      minZoom: 1.2,
+      maxZoom: 16,
       attributionControl: false,
     });
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: true }), 'top-left');
 
-    // style.load is more reliable than load — fires once style is parsed + tiles requested
+    // CRITICAL: style.load — more reliable than 'load'; fires once style tiles are parsed
     map.on('style.load', () => {
       // Globe projection
       try {
         (map as unknown as { setProjection: (p: unknown) => void }).setProjection({ type: 'globe' });
       } catch { /* flat fallback */ }
 
-      // Deep space atmosphere
+      // Deep space atmosphere — setFog must be inside style.load (not before)
       try {
         (map as unknown as { setFog: (f: unknown) => void }).setFog({
-          'color': 'rgb(5, 8, 15)',
-          'high-color': 'rgb(10, 20, 50)',
-          'horizon-blend': 0.06,
-          'space-color': 'rgb(2, 3, 12)',
-          'star-intensity': 1.0,
+          'color': '#000000',
+          'high-color': '#000030',
+          'horizon-blend': 0.03,
+          'space-color': '#000000',
+          'star-intensity': 0.6,
         });
       } catch { /* ignore */ }
 
       mapRef.current = map;
       setIsLoading(false);
 
-      // ── Sources ────────────────────────────────────────────────────────
+      // ── Sources ──────────────────────────────────────────────
       const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
       map.addSource('events-src', { type: 'geojson', data: empty });
-      map.addSource('attack-vectors-src', { type: 'geojson', data: empty });
-      map.addSource('risk-overlay-src', { type: 'geojson', data: empty });
 
-      // ── Layers ─────────────────────────────────────────────────────────
+      // ── Heatmap ──────────────────────────────────────────────
       map.addLayer({
         id: 'events-heatmap',
         type: 'heatmap',
@@ -260,94 +285,133 @@ export default function OperationalMap() {
         maxzoom: 8,
         layout: { visibility: 'none' },
         paint: {
-          'heatmap-weight': ['match', ['get', 'severity'], 'critical', 1, 'high', 0.7, 'medium', 0.4, 'low', 0.2, 0.3],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 0.5, 8, 2],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 8, 8, 30],
+          'heatmap-weight': ['interpolate', ['linear'], ['get', 'severityNum'], 1, 0.2, 4, 1.0],
+          'heatmap-intensity': 1.2,
+          'heatmap-radius': 25,
           'heatmap-color': [
             'interpolate', ['linear'], ['heatmap-density'],
-            0, 'rgba(0,0,0,0)', 0.2, 'rgba(103,169,207,0.4)',
-            0.4, 'rgba(209,229,143,0.5)', 0.6, 'rgba(253,219,93,0.6)',
-            0.8, 'rgba(239,138,98,0.8)', 1.0, 'rgba(178,24,43,0.9)',
+            0, 'rgba(0,0,0,0)',
+            0.15, 'rgba(0,50,200,0.3)',
+            0.3, 'rgba(0,100,255,0.5)',
+            0.5, 'rgba(255,200,0,0.6)',
+            0.7, 'rgba(255,120,0,0.7)',
+            1.0, 'rgba(255,0,0,1)',
           ],
+          'heatmap-opacity': 0.7,
         },
       });
 
+      // ── Risk glow halos ───────────────────────────────────────
       map.addLayer({
-        id: 'events-pulse',
+        id: 'events-risk-glow',
+        type: 'circle',
+        source: 'events-src',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['get', 'severityNum'], 1, 12, 2, 18, 3, 25, 4, 35],
+          'circle-color': ['get', 'color'],
+          'circle-opacity': 0.08,
+          'circle-blur': 1.0,
+        },
+      });
+
+      // ── Event dots ────────────────────────────────────────────
+      map.addLayer({
+        id: 'events-dots',
+        type: 'circle',
+        source: 'events-src',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['get', 'severityNum'], 1, 3.5, 2, 5, 3, 6.5, 4, 8],
+          'circle-color': ['get', 'color'],
+          'circle-opacity': 0.9,
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': 'rgba(255,255,255,0.15)',
+        },
+      });
+
+      // ── Critical pulse ring ───────────────────────────────────
+      map.addLayer({
+        id: 'events-critical-pulse',
         type: 'circle',
         source: 'events-src',
         filter: ['==', ['get', 'severity'], 'critical'],
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 0, 14, 5, 22, 10, 35],
-          'circle-color': '#ef4444',
-          'circle-opacity': 0.12,
-          'circle-stroke-width': 1.5,
-          'circle-stroke-color': '#ef4444',
-          'circle-stroke-opacity': 0.25,
+          'circle-radius': 16,
+          'circle-color': '#ff2d2d',
+          'circle-opacity': 0.2,
+          'circle-blur': 0.8,
         },
       });
 
-      map.addLayer({
-        id: 'events-circles',
-        type: 'circle',
-        source: 'events-src',
-        paint: {
-          'circle-radius': ['match', ['get', 'severity'], 'critical', 7, 'high', 5.5, 'medium', 4.5, 'low', 3.5, 4],
-          'circle-color': ['match', ['get', 'severity'], 'critical', '#ef4444', 'high', '#f97316', 'medium', '#eab308', 'low', '#6b7280', '#6b7280'],
-          'circle-stroke-width': 1.5,
-          'circle-stroke-color': ['match', ['get', 'severity'], 'critical', '#fca5a5', 'high', '#fdba74', 'medium', '#fde047', 'low', '#9ca3af', '#9ca3af'],
-          'circle-opacity': 0.9,
-        },
-      });
+      // ── Animated pulse for critical rings ─────────────────────
+      let pulsePhase = 0;
+      function animatePulse() {
+        pulsePhase = (pulsePhase + 0.02) % 1;
+        const r = 12 + Math.sin(pulsePhase * Math.PI * 2) * 8;
+        const o = 0.15 + Math.sin(pulsePhase * Math.PI * 2) * 0.1;
+        try {
+          if (map.getLayer('events-critical-pulse')) {
+            map.setPaintProperty('events-critical-pulse', 'circle-radius', r);
+            map.setPaintProperty('events-critical-pulse', 'circle-opacity', o);
+          }
+        } catch { /* ignore */ }
+        pulseRafRef.current = requestAnimationFrame(animatePulse);
+      }
+      animatePulse();
 
-      // ── Click handler ──────────────────────────────────────────────────
-      map.on('click', 'events-circles', (e) => {
+      // ── Click handler ─────────────────────────────────────────
+      map.on('click', 'events-dots', (e) => {
         const f = (e.features as maplibregl.MapGeoJSONFeature[] | undefined)?.[0];
         if (!f?.properties) return;
         const p = f.properties;
-        // Geometry gives us the real coordinates
         const geom = f.geometry as GeoJSON.Point;
         setSelectedEvent({
           id: p.id as string,
           title: p.title as string,
           severity: p.severity as MapEvent['severity'],
-          category: p.category as string,
+          category: (p.category ?? '') as string,
           country_region: (p.region ?? p.country_region ?? '') as string,
           latitude: (geom.coordinates[1] ?? 0) as number,
           longitude: (geom.coordinates[0] ?? 0) as number,
-          summary: p.summary as string | undefined,
+          summary: (p.summary ?? '') as string,
           created_at: (p.publishedAt ?? p.created_at ?? '') as string,
-          source_name: (p.source ?? p.source_name ?? '') as string | undefined,
+          source_name: (p.source ?? '') as string,
         });
       });
 
-      map.on('mouseenter', 'events-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', 'events-circles', () => { map.getCanvas().style.cursor = ''; });
+      map.on('mouseenter', 'events-dots', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'events-dots', () => { map.getCanvas().style.cursor = ''; });
 
-      // ── Auto-rotation ──────────────────────────────────────────────────
+      // ── Auto-rotation — slow, cinematic ──────────────────────
       let userInteracting = false;
-      map.on('mousedown', () => { userInteracting = true; });
-      map.on('mouseup', () => { userInteracting = false; });
-      map.on('dragend', () => { userInteracting = false; });
-      map.on('touchstart', () => { userInteracting = true; });
-      map.on('touchend', () => { userInteracting = false; });
+      const ROTATION_SPEED = 0.012;
 
-      function spin() {
-        if (!mapRef.current) return;
-        if (!userInteracting && mapRef.current.getZoom() < 4) {
+      function rotate() {
+        if (!userInteracting && mapRef.current) {
           const c = mapRef.current.getCenter();
-          c.lng += 0.25;
-          mapRef.current.easeTo({ center: c, duration: 1000, easing: (t) => t });
+          c.lng += ROTATION_SPEED;
+          mapRef.current.setCenter(c);
         }
-        animationRef.current = requestAnimationFrame(spin);
+        rotationRef.current = requestAnimationFrame(rotate);
       }
-      spin();
+      rotate();
 
-      void fetchAndDisplayEvents(filters);
+      const stopRotate = () => {
+        userInteracting = true;
+        setTimeout(() => { userInteracting = false; }, 3000);
+      };
+      map.on('mousedown', () => { userInteracting = true; });
+      map.on('touchstart', () => { userInteracting = true; });
+      map.on('mouseup', stopRotate);
+      map.on('touchend', stopRotate);
+      map.on('wheel', stopRotate);
+
+      // Initial data load
+      void fetchAndDisplay(filters);
     });
 
     return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (rotationRef.current) cancelAnimationFrame(rotationRef.current);
+      if (pulseRafRef.current) cancelAnimationFrame(pulseRafRef.current);
       issMarkerRef.current?.remove();
       issMarkerRef.current = null;
       if (issIntervalRef.current) clearInterval(issIntervalRef.current);
@@ -357,39 +421,65 @@ export default function OperationalMap() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Rebuild GeoJSON when events need severity color enrichment ──
+  // (our API already returns correct GeoJSON but needs color + severityNum props)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    // Wait for source to exist
+    const src = map.getSource('events-src') as maplibregl.GeoJSONSource | undefined;
+    if (!src) return;
+    // Re-fetch to get fresh data with current filters
+    void fetchAndDisplay(filters);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ═══════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════
 
   return (
-    <div className="relative w-full h-full bg-black overflow-hidden">
+    <div className="relative w-full h-full overflow-hidden bg-black">
 
-      {/* MAP */}
-      <div ref={mapContainer} className="absolute inset-0 z-0" />
+      {/* Star field */}
+      <div className="absolute inset-0 z-0 star-field" />
 
-      {/* HEADER — top-left */}
+      {/* Map canvas */}
+      <div ref={containerRef} className="absolute inset-0 z-[1]" />
+
+      {/* HEADER */}
       <div className="absolute top-4 left-14 z-10">
-        <div className="flex items-center gap-3 mb-0.5">
-          <h1 className="text-white font-mono text-sm font-bold tracking-[0.2em]">OPERATIONAL MAP</h1>
-          <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-600 text-white leading-none">β</span>
+        <div className="flex items-center gap-2 mb-0.5">
+          <h1 className="text-sm font-bold tracking-[0.2em] text-white/90 uppercase">Operational Map</h1>
+          <span className="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full font-medium">β</span>
         </div>
-        <p className="text-gray-500 text-[11px]">Real-time conflict intelligence overlay</p>
-        <div className="flex gap-2 mt-3">
-          <button className="px-4 py-1.5 text-[12px] font-medium rounded-lg bg-gray-800/80 border border-gray-600/50 text-white backdrop-blur-md">Map</button>
-          <button className="px-4 py-1.5 text-[12px] font-medium rounded-lg bg-gray-800/40 border border-gray-700/30 text-gray-500 hover:text-gray-300 backdrop-blur-md transition-colors">Chokepoints</button>
+        <p className="text-[10px] text-gray-500 tracking-wide">Real-time conflict intelligence overlay</p>
+
+        {/* Map / Chokepoints tabs */}
+        <div className="flex gap-1 mt-3 bg-[#111827]/60 backdrop-blur-sm rounded-lg p-0.5 border border-white/5 w-fit">
+          <button className="px-3 py-1 text-[10px] font-medium tracking-wider uppercase bg-blue-500/20 text-blue-400 rounded-md">
+            Map
+          </button>
+          <button className="px-3 py-1 text-[10px] font-medium tracking-wider uppercase text-gray-500 hover:text-gray-300 rounded-md transition">
+            Chokepoints
+          </button>
         </div>
       </div>
 
-      {/* GLOBE/MAP TOGGLE — top-right */}
+      {/* Event count */}
+      <div className="absolute top-[72px] left-14 z-10 text-[10px] text-gray-500 mt-1">
+        <span className="text-white font-semibold">{eventCount}</span> events tracked
+      </div>
+
+      {/* GLOBE/MAP TOGGLE */}
       <div className="absolute top-4 right-[300px] z-10">
-        <div className="flex bg-gray-900/80 backdrop-blur-md border border-gray-700/50 rounded-xl overflow-hidden">
+        <div className="flex bg-[#111827]/60 backdrop-blur-sm border border-white/5 rounded-lg p-0.5">
           <button onClick={() => handleToggleMode('globe')}
-            className={`px-4 py-2 text-[12px] font-medium flex items-center gap-1.5 transition-all ${mapMode === 'globe' ? 'bg-gray-700/60 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+            className={`px-3 py-1.5 text-[10px] font-medium tracking-wider uppercase rounded-md transition ${mapMode === 'globe' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>
             🌐 Globe
           </button>
-          <div className="w-px bg-gray-700/50" />
           <button onClick={() => handleToggleMode('map')}
-            className={`px-4 py-2 text-[12px] font-medium flex items-center gap-1.5 transition-all ${mapMode === 'map' ? 'bg-gray-700/60 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+            className={`px-3 py-1.5 text-[10px] font-medium tracking-wider uppercase rounded-md transition ${mapMode === 'map' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>
             🗺️ Map
           </button>
         </div>
@@ -407,35 +497,37 @@ export default function OperationalMap() {
         eventCount={eventCount}
       />
 
-      {/* SEVERITY LEGEND — bottom-left */}
+      {/* SEVERITY LEGEND */}
       <div className="absolute bottom-12 left-4 z-10">
-        <div className="bg-gray-900/80 backdrop-blur-md border border-gray-700/50 rounded-xl p-3">
-          <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Severity</h3>
-          <div className="space-y-1">
+        <div className="bg-[#0d1117]/80 backdrop-blur-xl border border-gray-700/30 rounded-xl p-3 shadow-lg shadow-black/30">
+          <p className="text-[9px] font-bold tracking-[0.15em] text-gray-400 uppercase mb-2">Severity</p>
+          <div className="space-y-1.5">
             {[
-              { color: 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]', label: 'Critical — pulse rings' },
-              { color: 'bg-orange-500', label: 'High' },
-              { color: 'bg-yellow-500', label: 'Medium' },
-              { color: 'bg-gray-500', label: 'Low' },
+              { color: '#ff2d2d', label: 'Critical — pulse rings', glow: true },
+              { color: '#ff8c00', label: 'High' },
+              { color: '#ffd700', label: 'Medium' },
+              { color: '#4a9eff', label: 'Low' },
             ].map(i => (
               <div key={i.label} className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${i.color}`} />
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: i.color, boxShadow: i.glow ? `0 0 6px ${i.color}` : 'none' }} />
                 <span className="text-[10px] text-gray-400">{i.label}</span>
               </div>
             ))}
           </div>
-          <div className="mt-2 pt-2 border-t border-gray-700/30 space-y-1">
+          <div className="mt-2 pt-2 border-t border-gray-700/30 space-y-1.5">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-0 border-t border-dashed border-red-500" />
-              <span className="text-[10px] text-gray-400">Attack vectors</span>
+              <div className="w-3 h-0.5 bg-red-500/60 rounded flex-shrink-0" />
+              <span className="text-[10px] text-gray-500">Attack vectors</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-sm bg-red-500/30 border border-red-500/50" />
-              <span className="text-[10px] text-gray-400">Risk overlay</span>
+              <div className="w-2.5 h-2.5 rounded-sm bg-orange-500/20 border border-orange-500/30 flex-shrink-0" />
+              <span className="text-[10px] text-gray-500">Risk overlay</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_4px_rgba(168,85,247,0.6)]" />
-              <span className="text-[10px] text-gray-400">ISS (live)</span>
+              <div className="w-2.5 h-2.5 rounded-full bg-purple-500 flex-shrink-0"
+                style={{ boxShadow: '0 0 6px #a855f7' }} />
+              <span className="text-[10px] text-gray-500">ISS (live)</span>
             </div>
           </div>
         </div>
@@ -443,20 +535,32 @@ export default function OperationalMap() {
 
       {/* BOTTOM HINT */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-        <div className="bg-gray-900/60 backdrop-blur border border-gray-700/30 rounded-lg px-3 py-1.5 text-[10px] text-gray-500">
-          Click marker · Drag to rotate · Scroll to zoom
-        </div>
+        <p className="text-[10px] text-gray-600 tracking-wide">Click marker · Drag to rotate · Scroll to zoom</p>
       </div>
 
       {/* LOADING */}
       {isLoading && (
         <div className="absolute inset-0 bg-black z-20 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-3" />
-            <p className="text-gray-400 text-xs font-mono">INITIALIZING OPERATIONAL MAP...</p>
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+            <p className="text-xs text-gray-600 tracking-wider uppercase">Initializing globe…</p>
           </div>
         </div>
       )}
     </div>
   );
+}
+
+// ── GeoJSON feature enrichment — adds color + severityNum props ──────────
+// Called in /api/v1/map/events — but we ensure properties exist for paint expressions
+export function enrichFeature(feature: GeoJSON.Feature): GeoJSON.Feature {
+  const sev = ((feature.properties?.severity as string) ?? 'low').toLowerCase();
+  return {
+    ...feature,
+    properties: {
+      ...feature.properties,
+      color: SEVERITY_COLORS[sev] ?? '#4a9eff',
+      severityNum: SEVERITY_NUM[sev] ?? 1,
+    },
+  };
 }
