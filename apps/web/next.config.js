@@ -4,14 +4,25 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.supabase.co' },
+      { protocol: 'https', hostname: '**.cesium.com' },
+      { protocol: 'https', hostname: '**.bing.com' },
+      { protocol: 'https', hostname: '**.virtualearth.net' },
     ],
   },
-  // Monorepo: resolve modules from root node_modules
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.resolve.alias = {
         ...(config.resolve.alias || {}),
         'maplibre-gl': false,
+        'cesium': false,
+      }
+    }
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        url: false,
       }
     }
     return config
@@ -30,6 +41,12 @@ const nextConfig = {
         source: '/_next/static/(.*)',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      {
+        source: '/cesium/(.*)',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=604800, immutable' },
         ],
       },
     ]

@@ -485,3 +485,21 @@ body {
 .maplibregl-popup-tip {
   border-top-color: #111827 !important;
 }
+
+/* ═══ Cesium Globe Dark Theme ═══ */
+.cesium-viewer-bottom,
+.cesium-viewer-toolbar,
+.cesium-widget-credits,
+.cesium-credit-logoContainer,
+.cesium-credit-expand-link { display: none !important; }
+.cesium-infoBox {
+  background: rgba(17,24,39,0.95) !important;
+  color: #e5e7eb !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+}
+.cesium-infoBox-title { color: #fff !important; font-size: 13px !important; font-weight: 600 !important; }
+.cesium-viewer, .cesium-viewer-cesiumWidgetContainer,
+.cesium-widget, .cesium-widget canvas { width: 100% !important; height: 100% !important; }
+.cesium-viewer-dark { position: absolute !important; inset: 0 !important; }

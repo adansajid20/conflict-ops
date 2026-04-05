@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "npm run copy-cesium && next dev",
+    "build": "npm run copy-cesium && next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "copy-cesium": "cpx \"node_modules/cesium/Build/Cesium/{Workers/**,ThirdParty/**,Assets/**,Widgets/**}\" public/cesium"
   },
   "dependencies": {
     "@clerk/nextjs": "^5.7.5",
@@ -17,7 +18,9 @@
     "@types/three": "^0.183.1",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
+    "cesium": "^1.140.0",
     "clsx": "^2.1.1",
+    "cpx2": "^8.0.1",
     "framer-motion": "^12.38.0",
     "globe.gl": "^2.45.1",
     "html2canvas": "^1.4.1",
@@ -30,6 +33,7 @@
     "reactflow": "^11.11.4",
     "recharts": "^2.15.4",
     "resend": "^3.5.0",
+    "resium": "^1.20.0",
     "rss-parser": "^3.13.0",
     "stripe": "^15.12.0",
     "svix": "^1.89.0",
