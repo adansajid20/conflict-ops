@@ -54,11 +54,64 @@ export const PLAN_LIMITS: Record<PlanId, {
   actors: string | false; tools: string[]
   api: boolean; workbench: boolean
   predictions: string | false; similarity: boolean
+  analyst_chat: number; scenarios: number; market: boolean
+  sanctions: boolean; multi_lang: string | false
+  country_profiles: string; personnel: number
+  supply_chain: number; custom_dashboards: number
+  timelines: boolean; compare: boolean
+  export_briefs: string | false; force_tracker: string | false
+  api_calls_per_day: number
 }> = {
-  free:     { feed_days: 1,        alerts: 3,        channels: ['in_app'],                      reports: false,              trends: false,    actors: false,    tools: [],                                          api: false, workbench: false, predictions: false,    similarity: false },
-  scout:    { feed_days: 7,        alerts: 10,       channels: ['in_app','email'],               reports: ['daily_briefing'], trends: 'basic',  actors: 'view',   tools: ['travel_risk'],                           api: false, workbench: false, predictions: 'view',   similarity: false },
-  analyst:  { feed_days: 30,       alerts: 50,       channels: ['in_app','email','webhook'],     reports: 'all',              trends: 'full',   actors: 'full',   tools: ['travel_risk','geoverify','similarity'],    api: true,  workbench: false, predictions: 'full',   similarity: true  },
-  operator: { feed_days: Infinity, alerts: Infinity, channels: ['in_app','email','webhook'],     reports: 'all',              trends: 'full',   actors: 'full',   tools: ['travel_risk','geoverify','similarity','workbench'], api: true, workbench: true, predictions: 'full', similarity: true },
+  free: {
+    feed_days: 1, alerts: 3, channels: ['in_app'],
+    reports: false, trends: false, actors: false, tools: [], api: false, workbench: false,
+    predictions: false, similarity: false,
+    analyst_chat: 0, scenarios: 0, market: false,
+    sanctions: false, multi_lang: false,
+    country_profiles: 'basic', personnel: 0,
+    supply_chain: 0, custom_dashboards: 0,
+    timelines: false, compare: false,
+    export_briefs: false, force_tracker: false,
+    api_calls_per_day: 0,
+  },
+  scout: {
+    feed_days: 7, alerts: 10, channels: ['in_app','email'],
+    reports: ['daily_briefing'], trends: 'basic', actors: 'view', tools: ['travel_risk'],
+    api: false, workbench: false, predictions: 'view', similarity: false,
+    analyst_chat: 3, scenarios: 0, market: false,
+    sanctions: false, multi_lang: 'badges',
+    country_profiles: 'full', personnel: 0,
+    supply_chain: 0, custom_dashboards: 0,
+    timelines: false, compare: false,
+    export_briefs: 'daily_digest', force_tracker: 'basic',
+    api_calls_per_day: 0,
+  },
+  analyst: {
+    feed_days: 30, alerts: 50, channels: ['in_app','email','webhook'],
+    reports: 'all', trends: 'full', actors: 'full',
+    tools: ['travel_risk','geoverify','similarity'], api: true, workbench: false,
+    predictions: 'full', similarity: true,
+    analyst_chat: Infinity, scenarios: 3, market: true,
+    sanctions: true, multi_lang: 'full',
+    country_profiles: 'full_ai', personnel: 0,
+    supply_chain: 0, custom_dashboards: 3,
+    timelines: true, compare: true,
+    export_briefs: 'all', force_tracker: 'full',
+    api_calls_per_day: 1000,
+  },
+  operator: {
+    feed_days: Infinity, alerts: Infinity, channels: ['in_app','email','webhook'],
+    reports: 'all', trends: 'full', actors: 'full',
+    tools: ['travel_risk','geoverify','similarity','workbench'], api: true, workbench: true,
+    predictions: 'full', similarity: true,
+    analyst_chat: Infinity, scenarios: Infinity, market: true,
+    sanctions: true, multi_lang: 'full',
+    country_profiles: 'full_compare', personnel: 50,
+    supply_chain: 20, custom_dashboards: Infinity,
+    timelines: true, compare: true,
+    export_briefs: 'white_label', force_tracker: 'full_posture',
+    api_calls_per_day: Infinity,
+  },
 }
 
 export function canAccess(planId: PlanId, feature: keyof typeof PLAN_LIMITS['free']): boolean {

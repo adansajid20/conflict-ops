@@ -36,6 +36,34 @@ const MIL_ICAO_RANGES: [string, string][] = [
   ['780000','7BFFFF'],
 ]
 
+// Feature 14: Force Tracker — military aircraft identification database
+const AIRCRAFT_DATABASE: Record<string, { type: string; role: string; significance: string }> = {
+  'FORTE':  { type: 'RQ-4B Global Hawk', role: 'High-Altitude Reconnaissance', significance: 'Long-endurance ISR UAV. Presence signals active surveillance mission over conflict zone.' },
+  'HOMER':  { type: 'RQ-4B Global Hawk', role: 'High-Altitude Reconnaissance', significance: 'Long-endurance ISR. Surveys 100,000 sq km in 24h.' },
+  'JAKE':   { type: 'RC-135 Rivet Joint', role: 'Signals Intelligence', significance: 'SIGINT aircraft intercepting electronic emissions. Indicates active comms surveillance.' },
+  'TOPCAT': { type: 'P-8A Poseidon', role: 'Maritime Patrol / ASW', significance: 'Maritime surveillance and anti-submarine. Monitors ships and submarines.' },
+  'BONE':   { type: 'B-1B Lancer', role: 'Strategic Bomber', significance: 'Supersonic heavy bomber. Deployment signals potential strike positioning.' },
+  'REACH':  { type: 'C-17 Globemaster III', role: 'Strategic Airlift', significance: 'Heavy transport. Multiple flights indicate major equipment/troop movement.' },
+  'RCH':    { type: 'C-17 Globemaster III', role: 'Strategic Airlift', significance: 'Heavy transport aircraft. Sustained flights = large-scale logistical operation.' },
+  'LAGR':   { type: 'KC-135 Stratotanker', role: 'Aerial Refueling', significance: 'Tanker sustaining other aircraft for extended operations.' },
+  'ETHYL':  { type: 'KC-135 Stratotanker', role: 'Aerial Refueling', significance: 'Presence of multiple tankers = large, sustained air operation nearby.' },
+  'SENTRY': { type: 'E-3 Sentry AWACS', role: 'Airborne Early Warning', significance: 'Battle management and radar surveillance. Indicates heightened operational readiness.' },
+  'AWACS':  { type: 'E-3 Sentry AWACS', role: 'Airborne Early Warning', significance: 'Provides real-time tactical picture over 250,000 sq km.' },
+  'MAGIC':  { type: 'E-3 Sentry AWACS', role: 'Airborne Early Warning', significance: 'NATO AWACS. Activation indicates multinational air operation.' },
+  'REAPER': { type: 'MQ-9 Reaper', role: 'Armed Reconnaissance UAV', significance: 'Armed drone with 27h endurance. Indicates precision surveillance or strike readiness.' },
+  'GHOST':  { type: 'U-2 Dragon Lady', role: 'Strategic Reconnaissance', significance: 'High-altitude recon at 70,000ft. Extremely rare flight = high-priority ISR mission.' },
+  'SHADOW': { type: 'RC-135W Rivet Joint', role: 'Signals Intelligence', significance: 'Electronic intelligence. Monitors radar and communication emissions.' },
+  'IRON':   { type: 'E-8C JSTARS', role: 'Ground Surveillance', significance: 'Tracks ground vehicles and troop movements using SAR radar.' },
+}
+
+function enrichAircraftType(callsign: string): { type: string; role: string; significance: string } | null {
+  const cs = callsign.toUpperCase()
+  for (const [prefix, data] of Object.entries(AIRCRAFT_DATABASE)) {
+    if (cs.startsWith(prefix)) return data
+  }
+  return null
+}
+
 function isMilitary(callsign: string | null, icao24: string): boolean {
   const cs = (callsign ?? '').trim().toUpperCase()
   if (MIL_PREFIXES.some(p => cs.startsWith(p))) return true
@@ -79,12 +107,16 @@ export async function GET(req: NextRequest) {
         if (!lat || !lng) continue
         const mil = isMilitary(callsign, icao24)
         if (mil) militaryCount++
+        const cs = (callsign ?? '').trim()
+        const aircraftEnrich = mil ? enrichAircraftType(cs) : null
 
         await supabase.from('flight_tracks').upsert({
-          icao24, callsign: (callsign ?? '').trim(), origin_country: origin,
+          icao24, callsign: cs, origin_country: origin,
           longitude: lng, latitude: lat, altitude: alt, velocity: vel, heading: hdg, vertical_rate: vr,
           on_ground: false, is_military: mil,
-          military_type: mil ? getMilType((callsign ?? '').trim()) : null,
+          military_type: mil ? (aircraftEnrich?.role ?? getMilType(cs)) : null,
+          aircraft_type: aircraftEnrich?.type ?? null,
+          aircraft_significance: aircraftEnrich?.significance ?? null,
           zone_name: name, squawk: squawk ?? null, last_seen: new Date().toISOString(),
         }, { onConflict: 'icao24' })
         totalTracked++

@@ -62,9 +62,12 @@ const TOOLS_NAV: NavItem[] = [
   { href: '/workbench', label: 'Workbench', icon: Activity },
   { href: '/tools/similarity', label: 'Similarity Search', icon: Brain },
   { href: '/tools/simulator', label: 'Scenario Simulator', icon: Brain },
-  { href: '/tools/sanctions', label: 'Sanctions Monitor', icon: Activity },
-  { href: '/tools/personnel', label: 'Personnel Safety', icon: Activity },
+  { href: '/tools/timeline', label: 'Event Timeline', icon: Activity },
+  { href: '/tools/compare', label: 'Compare Regions', icon: Activity },
+  { href: '/tools/sanctions', label: 'Sanctions Monitor', icon: Shield },
+  { href: '/tools/personnel', label: 'Personnel Safety', icon: Shield },
   { href: '/tools/supply-chain', label: 'Supply Chain', icon: Activity },
+  { href: '/custom', label: 'Custom Dashboard', icon: LayoutDashboard },
   { href: '/analyst', label: 'AI Analyst (Radar)', icon: Brain },
 ]
 
