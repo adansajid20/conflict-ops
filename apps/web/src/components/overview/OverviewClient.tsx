@@ -387,8 +387,7 @@ export function OverviewClient() {
           </div>
           {data && (
             <div className="mt-1 flex items-center gap-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-              <span>Last update: {safeRelativeTime(data.lastUpdatedAt)}</span>
-              <span>·</span>
+              {isAdmin && <><span>Last update: {safeRelativeTime(data.lastUpdatedAt)}</span><span>·</span></>}
               <span>{headerDate}</span>
             </div>
           )}

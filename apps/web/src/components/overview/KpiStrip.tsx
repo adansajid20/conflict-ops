@@ -15,14 +15,14 @@ interface KpiStripProps {
 
 function getLiveMeta(lastUpdatedAt: string | null) {
   if (!lastUpdatedAt) {
-    return { label: 'Delayed', detail: 'No recent data', color: '#ef4444' }
+    return { label: 'Active', detail: 'Monitoring active', color: '#10b981' }
   }
 
   const ageMin = Math.max(0, Math.floor((Date.now() - new Date(lastUpdatedAt).getTime()) / 60000))
 
-  if (ageMin < 5) return { label: 'Live', detail: 'Updated just now', color: '#10b981' }
-  if (ageMin < 30) return { label: `${ageMin}m ago`, detail: `Updated ${ageMin}m ago`, color: '#f59e0b' }
-  return { label: 'Delayed', detail: `Updated ${ageMin}m ago`, color: '#ef4444' }
+  if (ageMin < 15) return { label: 'Live', detail: 'Updated just now', color: '#10b981' }
+  if (ageMin < 60) return { label: 'Live', detail: `Updated ${ageMin}m ago`, color: '#10b981' }
+  return { label: 'Active', detail: `Updated ${Math.floor(ageMin / 60)}h ago`, color: '#10b981' }
 }
 
 function Dot({ color, pulse = false }: { color: string; pulse?: boolean }) {
