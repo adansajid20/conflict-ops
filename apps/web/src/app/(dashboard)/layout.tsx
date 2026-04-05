@@ -7,6 +7,7 @@ import { useUser } from '@clerk/nextjs'
 import {
   Activity,
   Bell,
+  Brain,
   Globe,
   LayoutDashboard,
   Plane,
@@ -46,9 +47,10 @@ const ADMIN_NAV: NavItem[] = [
 ]
 
 const ANALYSIS_NAV: NavItem[] = [
-  { href: '/trends', label: 'Trends', icon: TrendingUp, comingSoon: true },
-  { href: '/actors', label: 'Actor Network', icon: Globe, comingSoon: true },
-  { href: '/reports', label: 'Reports', icon: Activity, comingSoon: true },
+  { href: '/analysis/trends', label: 'Trends', icon: TrendingUp },
+  { href: '/analysis/predictions', label: 'Predictions', icon: Brain },
+  { href: '/analysis/actors', label: 'Actor Network', icon: Globe },
+  { href: '/analysis/reports', label: 'Reports', icon: Activity, comingSoon: true },
 ]
 
 const TOOLS_NAV: NavItem[] = [

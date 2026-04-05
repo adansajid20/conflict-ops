@@ -41,9 +41,23 @@
     }
   ],
   "crons": [
-    {
-      "path": "/api/cron/forecast",
-      "schedule": "0 2 * * *"
-    }
+    { "path": "/api/cron/ingest",                  "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/collect-flights",          "schedule": "*/5 * * * *"  },
+    { "path": "/api/cron/collect-vessels",          "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/collect-seismic",          "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/collect-fires",            "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/collect-outages",          "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/enrich-events",            "schedule": "*/3 * * * *"  },
+    { "path": "/api/cron/generate-embeddings",      "schedule": "*/5 * * * *"  },
+    { "path": "/api/cron/cluster-events",           "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/correlate",                "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/detect-patterns",          "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/generate-predictions",     "schedule": "0 * * * *"    },
+    { "path": "/api/cron/evaluate-predictions",     "schedule": "0 * * * *"    },
+    { "path": "/api/cron/evaluate-alerts",          "schedule": "*/3 * * * *"  },
+    { "path": "/api/cron/send-alerts",              "schedule": "*/5 * * * *"  },
+    { "path": "/api/cron/calculate-flywheel",       "schedule": "0 */4 * * *"  },
+    { "path": "/api/cron/generate-daily-brief",     "schedule": "0 6 * * *"    },
+    { "path": "/api/cron/cleanup",                  "schedule": "0 3 * * *"    }
   ]
 }
