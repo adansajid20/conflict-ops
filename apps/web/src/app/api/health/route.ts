@@ -28,65 +28,82 @@ async function checkTable(
   }
 }
 
+// Only count sources that are actually configured/expected to have data
+function isConfigured(envKey: string | null): boolean {
+  if (!envKey) return true // no key needed = always enabled
+  return !!(process.env[envKey])
+}
+
 export async function GET() {
   const supabase = createServiceClient()
 
-  // ── Source freshness checks ────────────────────────────────────────────────
-  const [newsCheck, seismicCheck, firesCheck, flightsCheck, vesselsCheck] = await Promise.all([
-    checkTable(supabase, 'events', 'occurred_at'),
-    checkTable(supabase, 'seismic_events', 'occurred_at'),
-    checkTable(supabase, 'fire_detections', 'created_at'),
-    checkTable(supabase, 'flight_tracks', 'last_seen'),
-    checkTable(supabase, 'vessel_tracks', 'last_seen'),
-  ])
-
-  const sourceDetail = [
-    { name: 'News/Events', ok: newsCheck.ok, age_minutes: newsCheck.age_minutes },
-    { name: 'Seismic', ok: seismicCheck.ok, age_minutes: seismicCheck.age_minutes },
-    { name: 'Fire Detections', ok: firesCheck.ok, age_minutes: firesCheck.age_minutes },
-    { name: 'Flights', ok: flightsCheck.ok, age_minutes: flightsCheck.age_minutes },
-    { name: 'Vessels', ok: vesselsCheck.ok, age_minutes: vesselsCheck.age_minutes },
+  const SOURCE_DEFS = [
+    { name: 'News/Events', table: 'events', timeCol: 'occurred_at', envKey: null },
+    { name: 'Seismic',     table: 'seismic_events', timeCol: 'occurred_at', envKey: null },       // USGS — free
+    { name: 'Fires',       table: 'fire_detections', timeCol: 'created_at', envKey: 'NASA_FIRMS_API_KEY' },
+    { name: 'Flights',     table: 'flight_tracks',   timeCol: 'last_seen',  envKey: 'OPENSKY_USERNAME' },
+    { name: 'Vessels',     table: 'vessel_tracks',   timeCol: 'last_seen',  envKey: 'AISHUB_USERNAME' },
   ]
 
-  const liveCount = sourceDetail.filter(s => s.ok).length
+  // Only check sources that are configured
+  const activeSources = SOURCE_DEFS.filter(s => isConfigured(s.envKey))
 
-  // ── Event stats ────────────────────────────────────────────────────────────
-  const { count: totalEvents } = await supabase
-    .from('events')
-    .select('*', { count: 'exact', head: true })
+  const checks = await Promise.all(
+    activeSources.map(async s => {
+      const result = await checkTable(supabase, s.table, s.timeCol)
+      return { name: s.name, ...result, configured: true }
+    })
+  )
 
-  // ── Last ingest (most recent event) ───────────────────────────────────────
-  const { data: latestEvent } = await supabase
-    .from('events')
-    .select('occurred_at')
-    .order('occurred_at', { ascending: false })
-    .limit(1)
-    .single()
+  const liveCount = checks.filter(s => s.ok).length
+  const totalCount = activeSources.length
 
-  const lastSuccessAt = latestEvent?.occurred_at ?? null
+  // Last ingest: check system_status first, fall back to last event
+  let lastSuccessAt: string | null = null
+  try {
+    const { data: ss } = await supabase
+      .from('system_status')
+      .select('last_ingest_at')
+      .eq('id', 'singleton')
+      .single()
+    lastSuccessAt = (ss as { last_ingest_at: string | null } | null)?.last_ingest_at ?? null
+  } catch { /* table may not exist yet */ }
+
+  if (!lastSuccessAt) {
+    const { data: latestEvent } = await supabase
+      .from('events')
+      .select('occurred_at')
+      .order('occurred_at', { ascending: false })
+      .limit(1)
+      .single()
+    lastSuccessAt = (latestEvent as { occurred_at: string | null } | null)?.occurred_at ?? null
+  }
+
   const ingestAgeMin = lastSuccessAt
     ? Math.round((Date.now() - new Date(lastSuccessAt).getTime()) / 60000)
     : null
+
+  // Event count
+  const { count: totalEvents } = await supabase
+    .from('events')
+    .select('*', { count: 'exact', head: true })
 
   const healthy = liveCount > 0 && (ingestAgeMin === null || ingestAgeMin < 60)
 
   return NextResponse.json({
     healthy,
-    // Shape expected by layout.tsx SidebarStatus
     sources: {
       live: liveCount,
-      enabled: sourceDetail.length,
-      detail: sourceDetail,
+      enabled: totalCount,
+      detail: checks,
     },
     ingest: {
       last_success_at: lastSuccessAt,
       age_minutes: ingestAgeMin,
     },
-    events: {
-      total: totalEvents ?? 0,
-    },
-    // Legacy fallback shape (SidebarStatus.tsx in components/)
-    enabledSources: sourceDetail,
+    events: { total: totalEvents ?? 0 },
+    // Legacy shape
+    enabledSources: checks,
     lastIngestAt: lastSuccessAt,
     eventCount: totalEvents ?? 0,
     safe_mode: false,

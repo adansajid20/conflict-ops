@@ -133,5 +133,20 @@ export async function GET(req: Request) {
     console.error('[ingest] situations count update failed:', e)
   }
 
+  // Update system_status with ingest heartbeat
+  try {
+    const { createServiceClient: _sc } = await import('@/lib/supabase/server')
+    const _sb = _sc()
+    const todayStart = new Date(); todayStart.setUTCHours(0,0,0,0)
+    const { count: eventsToday } = await _sb.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', todayStart.toISOString())
+    await _sb.from('system_status').upsert({
+      id: 'singleton',
+      last_ingest_at: new Date().toISOString(),
+      last_ingest_count: totalInserted,
+      events_today: eventsToday ?? 0,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' })
+  } catch { /* non-fatal */ }
+
   return Response.json({ success: true, data: { totalInserted, results, newsApiSkipped, ...correlationResult } })
 }

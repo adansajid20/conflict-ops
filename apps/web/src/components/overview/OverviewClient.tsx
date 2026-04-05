@@ -48,8 +48,8 @@ function formatRelativeOccurredTime(occurredAt: string | null | undefined): stri
 function getFreshnessBadge(lastUpdatedAt: string | null) {
   if (!lastUpdatedAt) return { label: 'Stale', color: '#ef4444' }
   const ageMin = Math.max(0, Math.floor((Date.now() - new Date(lastUpdatedAt).getTime()) / 60000))
-  if (ageMin < 5) return { label: 'Live', color: '#10b981' }
-  if (ageMin < 30) return { label: 'Delayed', color: '#f59e0b' }
+  if (ageMin < 15) return { label: 'Live', color: '#10b981' }
+  if (ageMin < 60) return { label: 'Delayed', color: '#f59e0b' }
   return { label: 'Stale', color: '#ef4444' }
 }
 
