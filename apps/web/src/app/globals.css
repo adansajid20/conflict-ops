@@ -390,3 +390,25 @@ body {
 .cr-tooltip .maplibregl-popup-tip {
   border-top-color: rgba(13, 17, 23, 0.95);
 }
+
+/* ─── MapLibre dark theme overrides ─────────────── */
+.maplibregl-ctrl-group {
+  background: rgba(17,17,17,0.9) !important;
+  border: 1px solid rgba(75,75,75,0.5) !important;
+  border-radius: 8px !important;
+  backdrop-filter: blur(8px);
+}
+.maplibregl-ctrl-group button { border-color: rgba(75,75,75,0.3) !important; }
+.maplibregl-ctrl-group button + button { border-top-color: rgba(75,75,75,0.3) !important; }
+.maplibregl-ctrl-group button:hover { background-color: rgba(50,50,50,0.8) !important; }
+.maplibregl-ctrl-group button span { filter: invert(1); }
+.maplibregl-ctrl-attrib-inner { color: rgba(120,120,120,0.6) !important; font-size: 9px !important; }
+.maplibregl-ctrl-attrib-inner a { color: rgba(120,120,120,0.6) !important; }
+.maplibregl-ctrl-logo { display: none !important; }
+.maplibregl-popup-content { background: #111 !important; color: #e2e8f0 !important; border: 1px solid rgba(75,75,75,0.5) !important; border-radius: 8px !important; padding: 0 !important; }
+.maplibregl-popup-tip { border-top-color: #111 !important; }
+
+/* ─── Sidebar scrollbar ──────────────────────────── */
+.scrollbar-thin::-webkit-scrollbar { width: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(75,75,75,0.5); border-radius: 2px; }
