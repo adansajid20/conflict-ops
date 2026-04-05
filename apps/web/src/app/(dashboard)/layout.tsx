@@ -54,9 +54,10 @@ const ANALYSIS_NAV: NavItem[] = [
 ]
 
 const TOOLS_NAV: NavItem[] = [
-  { href: '/travel', label: 'Travel Risk', icon: Plane, comingSoon: true },
-  { href: '/geocheck', label: 'GeoVerify', icon: ScanSearch, comingSoon: true },
-  { href: '/workbench', label: 'Workbench', icon: Activity, comingSoon: true },
+  { href: '/travel', label: 'Travel Risk', icon: Plane },
+  { href: '/geoverify', label: 'GeoVerify', icon: ScanSearch },
+  { href: '/workbench', label: 'Workbench', icon: Activity },
+  { href: '/tools/similarity', label: 'Similarity Search', icon: Brain },
 ]
 
 function NavLink({ item, pathname, alertCount = 0 }: { item: NavItem; pathname: string; alertCount?: number }) {

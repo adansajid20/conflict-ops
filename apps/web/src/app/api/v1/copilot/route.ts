@@ -1,8 +1,10 @@
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServiceClient } from '@/lib/supabase/server'
-import { copilotTools, type CopilotToolName } from '@/lib/ai/copilot-tools'
 import type { ApiResponse } from '@conflict-ops/shared'
 
 const MessageSchema = z.object({
@@ -11,7 +13,7 @@ const MessageSchema = z.object({
 })
 
 const RequestSchema = z.object({
-  org_id: z.string().uuid(),
+  org_id: z.string().optional(),
   messages: z.array(MessageSchema).min(1).max(20),
   top_stories: z.array(z.object({
     id: z.string().optional(),
@@ -20,7 +22,6 @@ const RequestSchema = z.object({
     event_type: z.string().nullable().optional(),
     severity: z.number().nullable().optional(),
     occurred_at: z.string().nullable().optional(),
-    outlet_name: z.string().nullable().optional(),
     description: z.string().nullable().optional(),
   })).max(20).optional(),
 })
@@ -28,80 +29,24 @@ const RequestSchema = z.object({
 type ChatMessage = z.infer<typeof MessageSchema>
 type CopilotResponse = { response: string; grounded: boolean; unavailable?: boolean }
 
-const OPENAI_API_BASE = 'https://api.openai.com/v1'
-
-async function verifyOrg(userId: string, orgId: string): Promise<boolean> {
-  const supabase = createServiceClient()
-  const { data } = await supabase.from('users').select('org_id').eq('clerk_user_id', userId).single()
-  return data?.org_id === orgId
-}
-
-async function callOpenAI(messages: Array<Record<string, unknown>>, tools: Array<Record<string, unknown>>): Promise<Record<string, unknown>> {
-  const response = await fetch(`${OPENAI_API_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env['OPENAI_API_KEY']}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      temperature: 0,
-      messages,
-      tools,
-      tool_choice: 'auto',
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(await response.text())
-  }
-
-  return response.json() as Promise<Record<string, unknown>>
-}
-
-function toolSpecs(): Array<Record<string, unknown>> {
-  return [
-    {
-      type: 'function',
-      function: {
-        name: 'search_events',
-        description: 'Search recent events for the current org context. Use for what is happening, high severity, countries, time windows.',
-        parameters: { type: 'object', properties: { query: { type: 'string' }, country_code: { type: 'string' }, region: { type: 'string' }, severity_gte: { type: 'number' }, hours: { type: 'number' }, limit: { type: 'number' } } },
-      },
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'get_mission',
-        description: 'Fetch a mission by ID or fuzzy name for mission summaries.',
-        parameters: { type: 'object', properties: { mission_id: { type: 'string' }, mission_name: { type: 'string' } } },
-      },
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'get_forecast',
-        description: 'Fetch grounded forecast records for a region or country.',
-        parameters: { type: 'object', properties: { region: { type: 'string' }, country_code: { type: 'string' }, horizon_days: { type: 'number' } } },
-      },
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'get_alerts',
-        description: 'Fetch recent alerts for the organization.',
-        parameters: { type: 'object', properties: { severity_gte: { type: 'number' }, unread_only: { type: 'boolean' }, limit: { type: 'number' } } },
-      },
-    },
-  ]
+async function buildContext(supabase: ReturnType<typeof createServiceClient>) {
+  const h24 = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const [{ data: events }, { data: hotspots }, { data: predictions }, { data: patterns }] = await Promise.all([
+    supabase.from('events').select('id,title,severity,region,category,occurred_at,summary').gte('occurred_at', h24).gte('severity', 3).order('severity', { ascending: false }).limit(15),
+    supabase.from('region_risk_scores').select('region,score,trend,event_count_24h').order('score', { ascending: false }).limit(8),
+    supabase.from('predictions').select('title,probability,region,prediction_type,expires_at').is('outcome', null).gt('expires_at', new Date().toISOString()).order('probability', { ascending: false }).limit(5),
+    supabase.from('correlation_signals').select('description,pattern_type,region,confidence').gt('detected_at', h24).order('confidence', { ascending: false }).limit(5),
+  ])
+  return { events: events ?? [], hotspots: hotspots ?? [], predictions: predictions ?? [], patterns: patterns ?? [] }
 }
 
 export async function POST(req: Request): Promise<NextResponse<ApiResponse<CopilotResponse>>> {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
-  if (!process.env['OPENAI_API_KEY']) {
-    return NextResponse.json({ success: true, data: { response: 'AI Co-pilot unavailable', grounded: false, unavailable: true } })
+  const anthropicKey = process.env.ANTHROPIC_API_KEY
+  if (!anthropicKey) {
+    return NextResponse.json({ success: true, data: { response: 'AI Co-pilot unavailable — no API key configured.', grounded: false, unavailable: true } })
   }
 
   let body: unknown
@@ -109,66 +54,59 @@ export async function POST(req: Request): Promise<NextResponse<ApiResponse<Copil
   const parsed = RequestSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.message }, { status: 400 })
 
-  const allowed = await verifyOrg(userId, parsed.data.org_id)
-  if (!allowed) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+  const supabase = createServiceClient()
+  const ctx = await buildContext(supabase)
 
-  const overviewContext = (parsed.data.top_stories ?? []).map((event, index) => ({
-    rank: index + 1,
-    id: event.id ?? null,
-    title: event.title ?? null,
-    region: event.region ?? null,
-    event_type: event.event_type ?? null,
-    severity: event.severity ?? null,
-    occurred_at: event.occurred_at ?? null,
-    outlet_name: event.outlet_name ?? null,
-    description: event.description ?? null,
-  }))
+  const topStoriesCtx = (parsed.data.top_stories ?? []).slice(0, 15).map((e, i) => `${i+1}. [${e.severity ?? '?'}] ${e.region ?? '?'}: ${e.title ?? '(no title)'} (${(e.occurred_at ?? '').slice(0,16)})`).join('\n')
 
-  const messages: Array<Record<string, unknown>> = [
-    {
-      role: 'system',
-      content: `You are the CONFLICTRADAR Intel Analyst co-pilot. Never hallucinate. Use tools when factual data is needed. If tool data is empty or unavailable, say so plainly. Ground all claims in returned data. Include inline event references as [event:<id>] when citing event records. Current overview top stories context: ${JSON.stringify(overviewContext)}`,
-    },
-    ...parsed.data.messages.map((message: ChatMessage) => ({ role: message.role, content: message.content })),
-  ]
+  const systemPrompt = `You are the CONFLICTRADAR Intel Analyst Co-pilot — an expert geopolitical intelligence assistant grounded in real-time platform data.
+
+LIVE DATA (last 24h):
+
+## HIGH-SEVERITY EVENTS
+${ctx.events.map(e => `- [sev:${e.severity}] ${e.region}: ${e.title}${e.summary ? ` — ${e.summary.slice(0,100)}` : ''}`).join('\n') || 'None'}
+
+## RISK HOTSPOTS
+${ctx.hotspots.map(h => `- ${h.region}: ${h.score}/10 (${h.trend}), ${h.event_count_24h} events/24h`).join('\n') || 'None'}
+
+## ACTIVE PREDICTIONS
+${ctx.predictions.map(p => `- ${p.region} ${p.prediction_type}: ${p.title} (${Math.round((p.probability ?? 0)*100)}%)`).join('\n') || 'None'}
+
+## CORRELATION SIGNALS
+${ctx.patterns.map(p => `- [${p.pattern_type}/${Math.round((p.confidence ?? 0)*100)}%] ${p.description}`).join('\n') || 'None'}
+
+${topStoriesCtx ? `## OVERVIEW CONTEXT\n${topStoriesCtx}` : ''}
+
+RULES:
+- Only answer from the above data. Do not hallucinate.
+- If asked about something not in the data, say "No data available for that in the current window."
+- Be concise, analytical, and direct. Use bullet points for multi-part answers.
+- Reference specific regions, scores, and events when available.
+- If asked for predictions or forecasts, use the Predictions section above.`
+
+  const conversationMessages = parsed.data.messages
+    .filter(m => m.role !== 'system')
+    .map((m: ChatMessage) => ({ role: m.role, content: m.content }))
 
   try {
-    const firstPass = await callOpenAI(messages, toolSpecs())
-    const choice = (((firstPass.choices as Array<Record<string, unknown>> | undefined) ?? [])[0] ?? {}) as Record<string, unknown>
-    const message = (choice.message as Record<string, unknown> | undefined) ?? {}
-    const toolCalls = (message.tool_calls as Array<Record<string, unknown>> | undefined) ?? []
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: conversationMessages,
+      }),
+      signal: AbortSignal.timeout(30000),
+    })
 
-    if (toolCalls.length === 0) {
-      const content = typeof message.content === 'string' ? message.content : 'No grounded response available.'
-      return NextResponse.json({ success: true, data: { response: content, grounded: false } })
-    }
-
-    const nextMessages = [...messages, message]
-
-    for (const toolCall of toolCalls) {
-      const functionRecord = (toolCall.function as Record<string, unknown> | undefined) ?? {}
-      const rawName = functionRecord.name
-      if (typeof rawName !== 'string' || !(rawName in copilotTools)) continue
-      const argsText = typeof functionRecord.arguments === 'string' ? functionRecord.arguments : '{}'
-      let args: Record<string, unknown> = {}
-      try { args = JSON.parse(argsText) as Record<string, unknown> } catch { args = {} }
-      const toolName = rawName as CopilotToolName
-      const result = await copilotTools[toolName]({ ...args, org_id: parsed.data.org_id } as never)
-      nextMessages.push({
-        role: 'tool',
-        tool_call_id: toolCall.id,
-        content: JSON.stringify(result),
-      })
-    }
-
-    const finalPass = await callOpenAI(nextMessages, toolSpecs())
-    const finalChoice = ((((finalPass.choices as Array<Record<string, unknown>> | undefined) ?? [])[0] ?? {}) as Record<string, unknown>)
-    const finalMessage = (finalChoice.message as Record<string, unknown> | undefined) ?? {}
-    const content = typeof finalMessage.content === 'string' ? finalMessage.content : 'No grounded response available.'
-
+    if (!res.ok) throw new Error(`Anthropic error: ${res.status}`)
+    const data = await res.json() as { content: Array<{ type: string; text: string }> }
+    const content = data.content.find(c => c.type === 'text')?.text ?? 'No response available.'
     return NextResponse.json({ success: true, data: { response: content, grounded: true } })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Copilot failed'
-    return NextResponse.json({ success: true, data: { response: `AI Co-pilot temporarily unavailable: ${message}`, grounded: false, unavailable: true } })
+    const msg = error instanceof Error ? error.message : 'Copilot failed'
+    return NextResponse.json({ success: true, data: { response: `Co-pilot temporarily unavailable: ${msg}`, grounded: false, unavailable: true } })
   }
 }
