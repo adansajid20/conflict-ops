@@ -3,8 +3,9 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import Script from 'next/script';
 import MapSidebar from './MapSidebar';
-import type { LayerState, FilterState, TrackingState, MapEvent } from './OperationalMap';
+import { EventCardModal } from './EventCardModal';
 
+// ─── Cesium CDN — loaded as global, NOT bundled via webpack ──────────────────
 const CESIUM_VERSION = '1.140.0';
 const CESIUM_CDN = `https://cdn.jsdelivr.net/npm/cesium@${CESIUM_VERSION}/Build/Cesium`;
 
@@ -15,136 +16,337 @@ declare global {
   }
 }
 
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: '#ff3333', high: '#ff8800', medium: '#ffdd00', low: '#44aaff',
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface Flight {
+  icao24: string; callsign: string; originCountry: string;
+  latitude: number; longitude: number; altitude: number;
+  onGround: boolean; velocity: number; heading: number;
+  verticalRate: number; squawk?: string;
+}
+interface Vessel {
+  mmsi: string; name: string; latitude: number; longitude: number;
+  speed: number; course: number; type: number; destination: string;
+}
+interface EventData {
+  id?: string; title?: string; description?: string; summary?: string;
+  severity?: string; category?: string; country_region?: string;
+  created_at?: string; source_url?: string; publishedAt?: string;
+}
+
+// ─── Severity config ──────────────────────────────────────────────────────────
+const SEV_COLORS: Record<string, string> = {
+  critical: '#ff2d2d', high: '#ff8c00', medium: '#ffd700', low: '#3b9dff',
 };
-const SEVERITY_SIZE: Record<string, number> = {
+const SEV_SIZE: Record<string, number> = {
   critical: 16, high: 12, medium: 9, low: 7,
 };
 
-// ── helpers ──────────────────────────────────────────────────────────────────
-function getVal(p: Record<string, unknown>, key: string): string {
-  const v = p[key];
-  if (!v) return '';
-  if (typeof v === 'object' && typeof (v as { getValue?: () => unknown }).getValue === 'function') {
-    return String((v as { getValue: () => unknown }).getValue() ?? '');
-  }
-  return String(v);
-}
+// ─── Helper ───────────────────────────────────────────────────────────────────
+type CesiumViewer = {
+  entities: {
+    values: Array<{ id: string }>;
+    getById: (id: string) => unknown;
+    add: (e: unknown) => unknown;
+    remove: (e: unknown) => void;
+    removeAll: () => void;
+  };
+  camera: {
+    flyTo: (o: unknown) => void;
+    setView: (o: unknown) => void;
+    rotate: (axis: unknown, angle: number) => void;
+  };
+  scene: {
+    canvas: HTMLCanvasElement;
+    pick: (pos: unknown) => unknown;
+    globe: { enableLighting: boolean };
+    skyAtmosphere: { brightnessShift: number; saturationShift: number } | undefined;
+    morphTo2D: (d: number) => void;
+    morphTo3D: (d: number) => void;
+  };
+  imageryLayers: { removeAll: () => void; addImageryProvider: (p: unknown) => void };
+  terrainProvider: unknown;
+  destroy: () => void;
+  isDestroyed: () => boolean;
+};
 
+// ═══════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════
 export default function CesiumGlobe() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<unknown>(null);
+  const viewerRef = useRef<CesiumViewer | null>(null);
   const rotationRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const issIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const flightIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
+  // State
   const [cesiumReady, setCesiumReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [eventCount, setEventCount] = useState(0);
-  const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
   const [mapMode, setMapMode] = useState<'globe' | 'map'>('globe');
 
-  const [layers, setLayers] = useState<LayerState>({
-    conflictEvents: true, heatmap: false, riskOverlay: true,
-    attackVectors: true, shippingLanes: false,
-  });
-  const [filters, setFilters] = useState<FilterState>({
-    timeWindow: '7d', severity: 'all', category: 'all', region: '',
-  });
-  const [tracking, setTracking] = useState<TrackingState>({
-    iss: true, flights: false, vessels: false, thermal: false,
-  });
+  // Counts
+  const [eventCount, setEventCount] = useState(0);
+  const [flightCount, setFlightCount] = useState(0);
+  const [vesselCount, setVesselCount] = useState(0);
 
-  // ── FETCH + PLOT EVENTS ───────────────────────────────────────────
-  const plotEvents = useCallback(async (f: FilterState) => {
-    const Ce = window.Cesium;
-    const viewer = viewerRef.current as {
-      entities: { values: unknown[]; getById: (id: string) => unknown; removeAll: () => void; add: (e: unknown) => void };
-      camera: { flyTo: (o: unknown) => void };
-      scene: { pick: (pos: unknown) => unknown };
-    } | null;
-    if (!Ce || !viewer) return;
+  // Layers
+  const [showEvents, setShowEvents] = useState(true);
+  const [showFlights, setShowFlights] = useState(false);
+  const [showVessels, setShowVessels] = useState(false);
+  const [showISS, setShowISS] = useState(true);
+
+  // Filters
+  const [timeWindow, setTimeWindow] = useState('7d');
+  const [severity, setSeverity] = useState('all');
+  const [category, setCategory] = useState('all');
+  const [region, setRegion] = useState('');
+
+  // Selected items
+  const [selectedEvent, setSelectedEvent] = useState<Record<string, unknown> | null>(null);
+  const [selectedFlight, setSelectedFlight] = useState<Record<string, unknown> | null>(null);
+  const [selectedVessel, setSelectedVessel] = useState<Record<string, unknown> | null>(null);
+  const [showModal, setShowModal] = useState(false);
+
+  // ── HELPERS ───────────────────────────────────────────────────────
+  const getViewer = () => viewerRef.current;
+  const getCe = () => (typeof window !== 'undefined' ? window.Cesium : null);
+
+  function flyTo(lng: number, lat: number, alt: number, tilt = -60) {
+    const v = getViewer(); const Ce = getCe();
+    if (!v || !Ce) return;
+    v.camera.flyTo({
+      destination: Ce.Cartesian3.fromDegrees(lng, lat, alt),
+      duration: 1.5,
+      orientation: { heading: 0, pitch: Ce.Math.toRadians(tilt), roll: 0 },
+    });
+  }
+
+  function removeEntitiesByPrefix(prefix: string) {
+    const v = getViewer();
+    if (!v) return;
+    const toRemove = v.entities.values.filter(e => e.id.startsWith(prefix));
+    for (const e of toRemove) {
+      const entity = v.entities.getById(e.id);
+      if (entity) v.entities.remove(entity);
+    }
+  }
+
+  // ── FETCH EVENTS ──────────────────────────────────────────────────
+  const plotEvents = useCallback(async (tw: string, sev: string, cat: string, reg: string) => {
+    const Ce = getCe(); const v = getViewer();
+    if (!Ce || !v) return;
+
+    const timeMap: Record<string, number> = { '24h': 24, '7d': 168, '30d': 720, all: 8760 };
+    const hours = timeMap[tw] ?? 168;
+    let url = `/api/v1/map/events?hours=${hours}&limit=600`;
+    if (sev !== 'all') url += `&severity=${sev}`;
+    if (cat !== 'all') url += `&category=${cat}`;
+    if (reg) url += `&region=${encodeURIComponent(reg)}`;
 
     try {
-      const timeMap: Record<string, number> = { '24h': 24, '7d': 168, '30d': 720 };
-      const hours = timeMap[f.timeWindow] ?? 168;
-      let url = `/api/v1/map/events?hours=${hours}&limit=500`;
-      if (f.severity !== 'all') url += `&severity=${f.severity}`;
-      if (f.category !== 'all') url += `&category=${f.category}`;
-      if (f.region) url += `&region=${encodeURIComponent(f.region)}`;
-
       const res = await fetch(url);
       const geojson = await res.json() as {
-        features: Array<{ geometry: { coordinates: [number, number] }; properties: Record<string, unknown> }>;
+        features: Array<{
+          geometry: { coordinates: [number, number] };
+          properties: Record<string, unknown>;
+        }>;
         meta?: { total: number };
       };
 
       setEventCount(geojson.meta?.total ?? geojson.features?.length ?? 0);
 
-      // Remove only event entities (keep ISS)
-      const toRemove = (viewer.entities.values as Array<{ id: string }>).filter(e => e.id !== 'iss');
-      for (const e of toRemove) {
-        const entity = viewer.entities.getById(e.id);
-        if (entity) (viewer.entities as unknown as { remove: (e: unknown) => void }).remove(entity);
-      }
+      // Remove old event entities
+      removeEntitiesByPrefix('evt-');
 
       for (const feature of (geojson.features ?? [])) {
         const p = feature.properties;
-        const sev = ((p.severity as string) ?? 'low').toLowerCase();
-        const color = Ce.Color.fromCssColorString(SEVERITY_COLORS[sev] ?? '#44aaff');
-        const size = SEVERITY_SIZE[sev] ?? 7;
+        const sevStr = ((p.severity as string) ?? 'low').toLowerCase();
+        const color = Ce.Color.fromCssColorString(SEV_COLORS[sevStr] ?? '#3b9dff');
+        const size = SEV_SIZE[sevStr] ?? 7;
         const [lon, lat] = feature.geometry.coordinates;
 
-        viewer.entities.add({
-          id: `evt-${String(p.id ?? Math.random())}`,
+        v.entities.add({
+          id: `evt-${String(p.id ?? Math.random().toString(36).slice(2))}`,
           position: Ce.Cartesian3.fromDegrees(lon, lat, 0),
           name: String(p.title ?? 'Event'),
-          description: `<div style="background:#111827;padding:12px;color:#e5e7eb;font-family:sans-serif;border-radius:8px">
-            <p style="color:${SEVERITY_COLORS[sev]};font-weight:700;text-transform:uppercase;font-size:11px;margin:0 0 6px">${sev} · ${String(p.category ?? 'general')}</p>
-            <p style="font-size:14px;font-weight:600;margin:0 0 8px">${String(p.title ?? '')}</p>
-            <p style="font-size:12px;color:#9ca3af;margin:0 0 8px">${String(p.summary ?? '').slice(0, 400)}</p>
-            <p style="font-size:10px;color:#6b7280">${String(p.region ?? '')} · ${String(p.publishedAt ?? '')}</p>
-          </div>`,
+          // Store all props for click handler
+          properties: {
+            _type: 'event',
+            severity: sevStr,
+            title: String(p.title ?? ''),
+            summary: String(p.summary ?? ''),
+            description: String(p.summary ?? ''),
+            category: String(p.category ?? p.event_type ?? 'general'),
+            country_region: String(p.region ?? ''),
+            created_at: String(p.publishedAt ?? ''),
+            source_url: String(p.sourceUrl ?? ''),
+            _lat: lat, _lon: lon,
+          },
           point: {
             pixelSize: size,
             color,
-            outlineColor: Ce.Color.WHITE.withAlpha(0.6),
-            outlineWidth: sev === 'critical' ? 3 : 2,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY, // always on top
-            scaleByDistance: new Ce.NearFarScalar(1e5, 2.0, 2e7, 0.6),
+            outlineColor: Ce.Color.WHITE.withAlpha(0.5),
+            outlineWidth: sevStr === 'critical' ? 3 : 2,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            scaleByDistance: new Ce.NearFarScalar(1.5e5, 2.0, 2e7, 0.5),
           },
-          properties: new Ce.PropertyBag(p as Record<string, never>),
         } as never);
       }
     } catch (err) {
       console.error('[CESIUM] plotEvents error:', err);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Replot on filter change
   useEffect(() => {
-    if (cesiumReady) void plotEvents(filters);
-  }, [filters, cesiumReady, plotEvents]);
+    if (cesiumReady) {
+      if (showEvents) void plotEvents(timeWindow, severity, category, region);
+      else removeEntitiesByPrefix('evt-');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cesiumReady, showEvents, timeWindow, severity, category, region]);
+
+  // ── FLIGHTS ───────────────────────────────────────────────────────
+  const fetchFlights = useCallback(async () => {
+    const Ce = getCe(); const v = getViewer();
+    if (!Ce || !v) return;
+    try {
+      const res = await fetch('/api/flights');
+      const d = await res.json() as { flights: Flight[] };
+      const airborne = (d.flights ?? []).filter(f => !f.onGround);
+      setFlightCount(airborne.length);
+
+      removeEntitiesByPrefix('flt-');
+      for (const f of airborne.slice(0, 3000)) {
+        v.entities.add({
+          id: `flt-${f.icao24}`,
+          position: Ce.Cartesian3.fromDegrees(f.longitude, f.latitude, f.altitude || 10000),
+          properties: { _type: 'flight', ...f },
+          point: {
+            pixelSize: 4,
+            color: Ce.Color.fromCssColorString('#00e5ff'),
+            outlineColor: Ce.Color.fromCssColorString('rgba(0,229,255,0.3)'),
+            outlineWidth: 1,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            scaleByDistance: new Ce.NearFarScalar(1e5, 1.5, 5e7, 0.2),
+          },
+        } as never);
+      }
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => {
+    if (!cesiumReady) return;
+    if (!showFlights) {
+      removeEntitiesByPrefix('flt-');
+      setFlightCount(0);
+      if (flightIntervalRef.current) clearInterval(flightIntervalRef.current);
+      return;
+    }
+    void fetchFlights();
+    flightIntervalRef.current = setInterval(() => void fetchFlights(), 15000);
+    return () => { if (flightIntervalRef.current) clearInterval(flightIntervalRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cesiumReady, showFlights]);
+
+  // ── VESSELS (AIS WebSocket) ────────────────────────────────────────
+  useEffect(() => {
+    if (!cesiumReady) return;
+    if (!showVessels) {
+      wsRef.current?.close();
+      wsRef.current = null;
+      removeEntitiesByPrefix('vsl-');
+      setVesselCount(0);
+      return;
+    }
+    const key = process.env.NEXT_PUBLIC_AISSTREAM_API_KEY;
+    if (!key) return;
+
+    const Ce = getCe(); const v = getViewer();
+    if (!Ce || !v) return;
+
+    const vesselMap = new Map<string, Vessel>();
+    try {
+      const ws = new WebSocket('wss://stream.aisstream.io/v0/stream');
+      wsRef.current = ws;
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          Apikey: key,
+          BoundingBoxes: [[[-90, -180], [90, 180]]],
+          FilterMessageTypes: ['PositionReport'],
+        }));
+      };
+      ws.onmessage = (msg) => {
+        try {
+          const d = JSON.parse(String(msg.data)) as {
+            MessageType: string;
+            Message?: { PositionReport?: { Latitude: number; Longitude: number; Sog: number; Cog: number } };
+            MetaData?: { MMSI: number; ShipName: string; ShipType: number; Destination: string };
+          };
+          if (d.MessageType === 'PositionReport' && d.Message?.PositionReport && d.MetaData) {
+            const p = d.Message.PositionReport;
+            const m = d.MetaData;
+            vesselMap.set(String(m.MMSI), {
+              mmsi: String(m.MMSI), name: (m.ShipName ?? '').trim() || 'Unknown',
+              latitude: p.Latitude, longitude: p.Longitude,
+              speed: p.Sog ?? 0, course: p.Cog ?? 0,
+              type: m.ShipType ?? 0, destination: (m.Destination ?? '').trim(),
+            });
+          }
+        } catch { /* ignore */ }
+      };
+
+      // Replot vessels every 5s
+      const plotInterval = setInterval(() => {
+        const vessels = Array.from(vesselMap.values()).slice(0, 2000);
+        setVesselCount(vessels.length);
+        removeEntitiesByPrefix('vsl-');
+        for (const vsl of vessels) {
+          v.entities.add({
+            id: `vsl-${vsl.mmsi}`,
+            position: Ce.Cartesian3.fromDegrees(vsl.longitude, vsl.latitude, 0),
+            properties: { _type: 'vessel', ...vsl },
+            point: {
+              pixelSize: 5,
+              color: Ce.Color.fromCssColorString('#34d399'),
+              outlineColor: Ce.Color.fromCssColorString('rgba(52,211,153,0.3)'),
+              outlineWidth: 1,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              scaleByDistance: new Ce.NearFarScalar(1e5, 1.2, 5e7, 0.2),
+            },
+          } as never);
+        }
+      }, 5000);
+
+      return () => {
+        clearInterval(plotInterval);
+        ws.close();
+        wsRef.current = null;
+        removeEntitiesByPrefix('vsl-');
+      };
+    } catch { /* silent */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cesiumReady, showVessels]);
 
   // ── ISS ───────────────────────────────────────────────────────────
   const updateISS = useCallback(async () => {
-    const Ce = window.Cesium;
-    const viewer = viewerRef.current as { entities: { getById: (id: string) => unknown; add: (e: unknown) => void } } | null;
-    if (!Ce || !viewer) return;
+    const Ce = getCe(); const v = getViewer();
+    if (!Ce || !v) return;
     try {
       const d = await fetch('https://api.wheretheiss.at/v1/satellites/25544').then(r => r.json()) as { longitude: number; latitude: number };
-      const existing = viewer.entities.getById('iss') as { position: unknown } | undefined;
+      const existing = v.entities.getById('iss') as { position: unknown } | undefined;
       if (existing) {
         existing.position = new Ce.ConstantPositionProperty(Ce.Cartesian3.fromDegrees(d.longitude, d.latitude, 408_000)) as never;
       } else {
-        viewer.entities.add({
+        v.entities.add({
           id: 'iss',
           position: Ce.Cartesian3.fromDegrees(d.longitude, d.latitude, 408_000),
           name: 'ISS — International Space Station',
-          description: '<div style="background:#111827;padding:12px;color:#a855f7;font-family:sans-serif"><b>International Space Station</b><br>Tracking live · ~408km altitude · 27,600 km/h</div>',
+          properties: { _type: 'iss' },
           point: {
-            pixelSize: 14,
+            pixelSize: 12,
             color: Ce.Color.fromCssColorString('#a855f7'),
             outlineColor: Ce.Color.fromCssColorString('#c084fc'),
             outlineWidth: 4,
@@ -157,26 +359,26 @@ export default function CesiumGlobe() {
 
   useEffect(() => {
     if (!cesiumReady) return;
-    if (!tracking.iss) {
+    if (!showISS) {
       if (issIntervalRef.current) clearInterval(issIntervalRef.current);
-      const viewer = viewerRef.current as { entities: { getById: (id: string) => unknown; remove: (e: unknown) => void } } | null;
-      if (viewer) { const e = viewer.entities.getById('iss'); if (e) viewer.entities.remove(e); }
+      const v = getViewer();
+      if (v) { const e = v.entities.getById('iss'); if (e) v.entities.remove(e); }
       return;
     }
     void updateISS();
     issIntervalRef.current = setInterval(() => void updateISS(), 5000);
     return () => { if (issIntervalRef.current) clearInterval(issIntervalRef.current); };
-  }, [tracking.iss, cesiumReady, updateISS]);
+  }, [cesiumReady, showISS, updateISS]);
 
   // ── GLOBE/MAP TOGGLE ─────────────────────────────────────────────
   useEffect(() => {
-    const viewer = viewerRef.current as { scene: { morphTo2D: (d: number) => void; morphTo3D: (d: number) => void } } | null;
-    if (!viewer || !cesiumReady) return;
-    if (mapMode === 'globe') viewer.scene.morphTo3D(1.0);
-    else viewer.scene.morphTo2D(1.0);
+    const v = getViewer();
+    if (!v || !cesiumReady) return;
+    if (mapMode === 'globe') v.scene.morphTo3D(1.0);
+    else v.scene.morphTo2D(1.0);
   }, [mapMode, cesiumReady]);
 
-  // ── INIT ─────────────────────────────────────────────────────────
+  // ── INIT CESIUM ───────────────────────────────────────────────────
   const initCesium = useCallback(() => {
     if (!containerRef.current || viewerRef.current || !window.Cesium) return;
     const Ce = window.Cesium;
@@ -188,56 +390,53 @@ export default function CesiumGlobe() {
         sceneModePicker: false, projectionPicker: false,
         baseLayerPicker: false, navigationHelpButton: false,
         geocoder: false, fullscreenButton: false,
-        selectionIndicator: false,  // use custom sidebar instead
-        infoBox: true,
+        selectionIndicator: false, infoBox: false,
         scene3DOnly: false,
         creditContainer: document.createElement('div'),
-      });
+      }) as unknown as CesiumViewer;
 
-      // ── Bing Maps WITH labels (city names, country names, borders) ──
-      void Ce.createWorldImageryAsync({
-        style: (Ce as { IonWorldImageryStyle?: { AERIAL_WITH_LABELS?: unknown } }).IonWorldImageryStyle?.AERIAL_WITH_LABELS as never ?? 2,
-      }).then(provider => {
+      // Bing Maps with labels (country names, city names)
+      void (Ce.createWorldImageryAsync as (opts: { style: unknown }) => Promise<unknown>)({
+        style: (Ce as unknown as { IonWorldImageryStyle: Record<string, unknown> }).IonWorldImageryStyle?.AERIAL_WITH_LABELS ?? 3,
+      }).then((provider: unknown) => {
         viewer.imageryLayers.removeAll();
         viewer.imageryLayers.addImageryProvider(provider);
       }).catch(() => {
-        // Fall back: plain Bing aerial
-        void Ce.IonImageryProvider.fromAssetId(2).then(p => {
+        void Ce.IonImageryProvider.fromAssetId(2).then((p: unknown) => {
           viewer.imageryLayers.removeAll();
           viewer.imageryLayers.addImageryProvider(p);
         }).catch(() => null);
       });
 
-      // ── Terrain ──
-      void Ce.createWorldTerrainAsync().then(t => { viewer.terrainProvider = t; }).catch(() => null);
+      // Terrain
+      void Ce.createWorldTerrainAsync().then((t: unknown) => { viewer.terrainProvider = t; }).catch(() => null);
 
-      // ── NO lighting — globe is uniformly bright, no dark side ──
+      // Globe settings — NO dark side
       viewer.scene.globe.enableLighting = false;
-
-      // ── Atmosphere is real but don't darken the globe ──
       if (viewer.scene.skyAtmosphere) {
-        viewer.scene.skyAtmosphere.brightnessShift = 0.0;
+        viewer.scene.skyAtmosphere.brightnessShift = -0.1;
+        viewer.scene.skyAtmosphere.saturationShift = -0.1;
       }
 
-      // ── Initial position — tilt toward conflict zones ──
+      // Initial view
       viewer.camera.setView({
         destination: Ce.Cartesian3.fromDegrees(35, 20, 20_000_000),
         orientation: { heading: 0, pitch: Ce.Math.toRadians(-90), roll: 0 },
       });
 
-      // ── Click handler ─────────────────────────────────────────────
+      // ── CLICK HANDLER ─────────────────────────────────────────────
       const handler = new Ce.ScreenSpaceEventHandler(viewer.scene.canvas);
       handler.setInputAction((movement: { position: { x: number; y: number } }) => {
-        const picked = viewer.scene.pick(movement.position as never);
+        const picked = viewer.scene.pick(movement.position as never) as { id?: unknown } | undefined;
         if (!picked?.id) return;
 
         const entity = picked.id as {
-          id: string; name: string;
-          position?: { getValue: (t: unknown) => unknown };
+          id: string;
+          position?: { getValue: (t: unknown) => { x: number; y: number; z: number } | undefined };
           properties?: Record<string, unknown>;
         };
 
-        // Get coordinates from entity position
+        // Get lat/lng from entity position
         let lat = 0, lng = 0;
         if (entity.position) {
           const pos3d = entity.position.getValue(Ce.JulianDate.now());
@@ -248,39 +447,64 @@ export default function CesiumGlobe() {
           }
         }
 
-        // Fly to event — zoom to 600km altitude
-        if (lng !== 0 || lat !== 0) {
-          viewer.camera.flyTo({
-            destination: Ce.Cartesian3.fromDegrees(lng, lat, 600_000),
-            duration: 1.8,
-            orientation: { heading: 0, pitch: Ce.Math.toRadians(-45), roll: 0 },
-          });
-        }
+        // Read properties (Cesium wraps them in PropertyBag getters)
+        const rawProps = entity.properties;
+        if (!rawProps) return;
 
-        // Update sidebar
-        if (entity.properties && entity.name !== 'ISS — International Space Station') {
-          const p = entity.properties;
-          setSelectedEvent({
+        const getP = (key: string): unknown => {
+          const v = rawProps[key];
+          if (v && typeof (v as { getValue?: () => unknown }).getValue === 'function') {
+            return (v as { getValue: () => unknown }).getValue();
+          }
+          return v;
+        };
+
+        const type = String(getP('_type') ?? '');
+
+        if (type === 'event') {
+          const ev: Record<string, unknown> = {
             id: entity.id,
-            title: getVal(p, 'title'),
-            severity: getVal(p, 'severity') as MapEvent['severity'],
-            category: getVal(p, 'category'),
-            country_region: getVal(p, 'region'),
-            latitude: lat, longitude: lng,
-            summary: getVal(p, 'summary'),
-            created_at: getVal(p, 'publishedAt'),
-            source_name: getVal(p, 'source'),
-          });
+            title: getP('title'), summary: getP('summary'),
+            severity: getP('severity'), category: getP('category'),
+            country_region: getP('country_region'),
+            created_at: getP('created_at'), source_url: getP('source_url'),
+          };
+          setSelectedEvent(ev);
+          setSelectedFlight(null);
+          setSelectedVessel(null);
+          setShowModal(true);
+          flyTo(lng, lat, 600_000, -45);
+        } else if (type === 'flight') {
+          const f: Record<string, unknown> = {
+            icao24: getP('icao24'), callsign: getP('callsign'),
+            originCountry: getP('originCountry'), altitude: getP('altitude'),
+            velocity: getP('velocity'), heading: getP('heading'), squawk: getP('squawk'),
+          };
+          setSelectedFlight(f);
+          setSelectedEvent(null);
+          setSelectedVessel(null);
+          setShowModal(false);
+          flyTo(lng, lat, 500_000, -45);
+        } else if (type === 'vessel') {
+          const vsl: Record<string, unknown> = {
+            mmsi: getP('mmsi'), name: getP('name'),
+            speed: getP('speed'), course: getP('course'), destination: getP('destination'),
+          };
+          setSelectedVessel(vsl);
+          setSelectedEvent(null);
+          setSelectedFlight(null);
+          setShowModal(false);
+          flyTo(lng, lat, 300_000, -45);
         }
       }, Ce.ScreenSpaceEventType.LEFT_CLICK);
 
-      // ── Hover cursor ──────────────────────────────────────────────
+      // Hover cursor
       handler.setInputAction((movement: { endPosition: { x: number; y: number } }) => {
         const picked = viewer.scene.pick(movement.endPosition as never);
-        viewer.scene.canvas.style.cursor = picked?.id ? 'pointer' : 'default';
+        viewer.scene.canvas.style.cursor = (picked as { id?: unknown } | undefined)?.id ? 'pointer' : 'default';
       }, Ce.ScreenSpaceEventType.MOUSE_MOVE);
 
-      // ── Slow cinematic rotation ───────────────────────────────────
+      // Slow cinematic rotation
       let userInteracting = false;
       const pause = () => { userInteracting = true; setTimeout(() => { userInteracting = false; }, 4000); };
       viewer.scene.canvas.addEventListener('mousedown', () => { userInteracting = true; });
@@ -297,7 +521,7 @@ export default function CesiumGlobe() {
       setIsLoading(false);
       setCesiumReady(true);
     } catch (err) {
-      console.error('[CESIUM] init failed:', err);
+      console.error('[CESIUM] init error:', err);
       setIsLoading(false);
       setLoadError(true);
     }
@@ -311,19 +535,29 @@ export default function CesiumGlobe() {
     return () => clearTimeout(t);
   }, [isLoading]);
 
+  // Cleanup
   useEffect(() => {
     return () => {
       if (rotationRef.current) clearInterval(rotationRef.current);
       if (issIntervalRef.current) clearInterval(issIntervalRef.current);
-      const v = viewerRef.current as { destroy: () => void; isDestroyed: () => boolean } | null;
+      if (flightIntervalRef.current) clearInterval(flightIntervalRef.current);
+      wsRef.current?.close();
+      const v = viewerRef.current;
       if (v && !v.isDestroyed()) v.destroy();
       viewerRef.current = null;
     };
   }, []);
 
+  // ═══════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════
   return (
     <div className="relative w-full h-full overflow-hidden bg-black">
+
+      {/* Cesium CSS */}
       <link rel="stylesheet" href={`${CESIUM_CDN}/Widgets/widgets.css`} />
+
+      {/* Cesium JS from CDN */}
       <Script
         src={`${CESIUM_CDN}/Cesium.js`}
         strategy="afterInteractive"
@@ -334,74 +568,145 @@ export default function CesiumGlobe() {
         onError={() => { setIsLoading(false); setLoadError(true); }}
       />
 
-      {/* Cesium canvas */}
-      <div ref={containerRef} className="absolute inset-0 z-[1] cesium-viewer-dark" />
+      {/* Globe canvas */}
+      <div ref={containerRef} className="absolute inset-0 z-[1] cr-viewer" />
 
-      {/* Header */}
+      {/* HEADER */}
       <div className="absolute top-4 left-4 z-10 pointer-events-none">
         <div className="flex items-center gap-2 mb-0.5">
           <h1 className="text-sm font-bold tracking-[0.2em] text-white/90 uppercase">Operational Map</h1>
           <span className="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full font-medium">β</span>
         </div>
-        <p className="text-[10px] text-gray-500">Real-time conflict intelligence overlay</p>
-        <p className="text-[10px] text-gray-500 mt-0.5">
-          <span className="text-white font-semibold">{eventCount}</span> events tracked
-        </p>
+        <p className="text-[10px] text-gray-500 tracking-wide">Real-time conflict intelligence overlay</p>
+        <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
+          <span><span className="text-white font-semibold">{eventCount.toLocaleString()}</span> events</span>
+          {showFlights && <span><span className="text-cyan-400 font-semibold">{flightCount.toLocaleString()}</span> flights</span>}
+          {showVessels && <span><span className="text-emerald-400 font-semibold">{vesselCount.toLocaleString()}</span> vessels</span>}
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="absolute top-4 left-60 z-10 flex gap-1 bg-[#111827]/60 backdrop-blur-sm rounded-lg p-0.5 border border-white/5 pointer-events-auto">
-        <button className="px-3 py-1 text-[10px] font-medium tracking-wider uppercase bg-blue-500/20 text-blue-400 rounded-md">Map</button>
-        <button className="px-3 py-1 text-[10px] font-medium tracking-wider uppercase text-gray-500 hover:text-gray-300 rounded-md transition">Chokepoints</button>
-      </div>
-
-      {/* Globe/2D toggle */}
-      <div className="absolute top-4 right-[300px] z-10 flex bg-[#111827]/60 backdrop-blur-sm rounded-lg p-0.5 border border-white/5 pointer-events-auto">
-        <button onClick={() => setMapMode('globe')}
-          className={`px-3 py-1.5 text-[10px] font-medium tracking-wider uppercase rounded-md transition ${mapMode === 'globe' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>
-          🌐 Globe
-        </button>
-        <button onClick={() => setMapMode('map')}
-          className={`px-3 py-1.5 text-[10px] font-medium tracking-wider uppercase rounded-md transition ${mapMode === 'map' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>
-          🗺️ 2D Map
-        </button>
+      {/* Globe / 2D toggle */}
+      <div className="absolute top-4 right-[310px] z-10 flex bg-[#111827]/70 backdrop-blur-sm rounded-lg p-0.5 border border-white/5 pointer-events-auto">
+        {(['globe', 'map'] as const).map(m => (
+          <button key={m} onClick={() => setMapMode(m)}
+            className={`px-3 py-1.5 text-[10px] font-medium tracking-wider uppercase rounded-md transition
+              ${mapMode === m ? 'bg-blue-500/20 text-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>
+            {m === 'globe' ? '🌐 Globe' : '🗺️ 2D'}
+          </button>
+        ))}
       </div>
 
       {/* Sidebar */}
       <MapSidebar
-        layers={layers} setLayers={setLayers}
-        filters={filters} setFilters={setFilters}
-        tracking={tracking} setTracking={setTracking}
-        selectedEvent={selectedEvent} eventCount={eventCount}
+        eventCount={eventCount} flightCount={flightCount} vesselCount={vesselCount}
+        showEvents={showEvents} onToggleEvents={() => setShowEvents(p => !p)}
+        showFlights={showFlights} onToggleFlights={() => setShowFlights(p => !p)}
+        showVessels={showVessels} onToggleVessels={() => setShowVessels(p => !p)}
+        showISS={showISS} onToggleISS={() => setShowISS(p => !p)}
+        timeWindow={timeWindow} onTimeWindowChange={setTimeWindow}
+        severity={severity} onSeverityChange={setSeverity}
+        category={category} onCategoryChange={setCategory}
+        region={region} onRegionChange={setRegion}
+        viewMode={mapMode} onViewModeChange={setMapMode}
+        selectedEvent={selectedEvent} selectedFlight={selectedFlight} selectedVessel={selectedVessel}
       />
 
       {/* Legend */}
-      <div className="absolute bottom-12 left-4 z-10 pointer-events-none">
+      <div className="absolute bottom-16 left-4 z-10 pointer-events-none">
         <div className="bg-[#0d1117]/80 backdrop-blur-xl border border-gray-700/30 rounded-xl p-3">
-          <p className="text-[9px] font-bold tracking-[0.15em] text-gray-400 uppercase mb-2">Severity</p>
-          <div className="space-y-1.5">
+          <p className="text-[9px] font-bold tracking-[0.15em] text-gray-400 uppercase mb-2">Legend</p>
+          <div className="flex flex-col gap-1.5">
             {[
-              { color: '#ff3333', label: 'Critical' },
-              { color: '#ff8800', label: 'High' },
-              { color: '#ffdd00', label: 'Medium' },
-              { color: '#44aaff', label: 'Low' },
+              { c: '#ff2d2d', l: 'Critical', sz: 12 }, { c: '#ff8c00', l: 'High', sz: 9 },
+              { c: '#ffd700', l: 'Medium', sz: 7 }, { c: '#3b9dff', l: 'Low', sz: 6 },
             ].map(i => (
-              <div key={i.label} className="flex items-center gap-2">
-                <div className="rounded-full flex-shrink-0" style={{ width: 8, height: 8, backgroundColor: i.color, boxShadow: `0 0 4px ${i.color}` }} />
-                <span className="text-[10px] text-gray-400">{i.label}</span>
+              <div key={i.l} className="flex items-center gap-2">
+                <div className="rounded-full flex-shrink-0"
+                  style={{ width: i.sz, height: i.sz, backgroundColor: i.c, boxShadow: `0 0 4px ${i.c}` }} />
+                <span className="text-[10px] text-gray-400">{i.l}</span>
               </div>
             ))}
-            <div className="flex items-center gap-2 pt-1 border-t border-gray-700/30">
-              <div className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0" style={{ boxShadow: '0 0 6px #a855f7' }} />
-              <span className="text-[10px] text-gray-500">ISS (live)</span>
+            <div className="mt-1 pt-1 border-t border-gray-700/30 flex flex-col gap-1.5">
+              {showFlights && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-cyan-400" style={{ boxShadow: '0 0 4px #00e5ff' }} /><span className="text-[10px] text-gray-500">Flights</span></div>}
+              {showVessels && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 4px #34d399' }} /><span className="text-[10px] text-gray-500">Vessels</span></div>}
+              {showISS && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-purple-500" style={{ boxShadow: '0 0 4px #a855f7' }} /><span className="text-[10px] text-gray-500">ISS</span></div>}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Hint */}
+      {/* Flight info card */}
+      {selectedFlight && !showModal && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#111827]/95 backdrop-blur-xl border border-cyan-500/20 rounded-2xl p-4 shadow-2xl shadow-black/40 w-80 animate-slide-up pointer-events-auto">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-base">✈️</span>
+              <div>
+                <p className="text-white font-bold text-sm tracking-wider">{String(selectedFlight.callsign ?? selectedFlight.icao24 ?? '')}</p>
+                <p className="text-[9px] text-gray-500">{String(selectedFlight.originCountry ?? '')}</p>
+              </div>
+            </div>
+            <button onClick={() => setSelectedFlight(null)} className="text-gray-500 hover:text-white text-xs w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/5">✕</button>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-black/30 rounded-lg p-2 text-center">
+              <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Alt</p>
+              <p className="text-white font-mono text-xs">{Math.round(Number(selectedFlight.altitude ?? 0)).toLocaleString()}m</p>
+            </div>
+            <div className="bg-black/30 rounded-lg p-2 text-center">
+              <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Speed</p>
+              <p className="text-white font-mono text-xs">{Math.round(Number(selectedFlight.velocity ?? 0) * 3.6)}km/h</p>
+            </div>
+            <div className="bg-black/30 rounded-lg p-2 text-center">
+              <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Heading</p>
+              <p className="text-white font-mono text-xs">{Math.round(Number(selectedFlight.heading ?? 0))}°</p>
+            </div>
+          </div>
+          <p className="text-[9px] text-gray-600 mt-2 font-mono">ICAO {String(selectedFlight.icao24 ?? '')} · SQK {String(selectedFlight.squawk ?? '—')}</p>
+        </div>
+      )}
+
+      {/* Vessel info card */}
+      {selectedVessel && !showModal && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#111827]/95 backdrop-blur-xl border border-emerald-500/20 rounded-2xl p-4 shadow-2xl shadow-black/40 w-80 animate-slide-up pointer-events-auto">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🚢</span>
+              <div>
+                <p className="text-white font-bold text-sm tracking-wider">{String(selectedVessel.name ?? '')}</p>
+                <p className="text-[9px] text-gray-500">MMSI {String(selectedVessel.mmsi ?? '')}</p>
+              </div>
+            </div>
+            <button onClick={() => setSelectedVessel(null)} className="text-gray-500 hover:text-white text-xs w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/5">✕</button>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-black/30 rounded-lg p-2 text-center">
+              <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Speed</p>
+              <p className="text-white font-mono text-xs">{Number(selectedVessel.speed ?? 0).toFixed(1)}kn</p>
+            </div>
+            <div className="bg-black/30 rounded-lg p-2 text-center">
+              <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Course</p>
+              <p className="text-white font-mono text-xs">{Math.round(Number(selectedVessel.course ?? 0))}°</p>
+            </div>
+            <div className="bg-black/30 rounded-lg p-2 text-center">
+              <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Dest</p>
+              <p className="text-white font-mono text-xs truncate">{String(selectedVessel.destination ?? '—')}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Event modal */}
+      {showModal && selectedEvent && (
+        <EventCardModal
+          event={selectedEvent as EventData}
+          onClose={() => { setShowModal(false); setSelectedEvent(null); }}
+        />
+      )}
+
+      {/* Bottom hint */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-        <p className="text-[10px] text-gray-600 tracking-wide">Click event to zoom · Drag to rotate · Scroll to zoom · Right-drag to tilt</p>
+        <p className="text-[10px] text-gray-600 tracking-wide">Click pin · Drag to rotate · Scroll to zoom · Right-drag to tilt</p>
       </div>
 
       {/* Loading */}
@@ -409,7 +714,7 @@ export default function CesiumGlobe() {
         <div className="absolute inset-0 bg-black z-20 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-            <p className="text-xs text-gray-600 tracking-wider uppercase">Loading Cesium 3D Globe…</p>
+            <p className="text-xs text-gray-600 tracking-wider uppercase">Loading 3D Globe…</p>
           </div>
         </div>
       )}
@@ -419,7 +724,9 @@ export default function CesiumGlobe() {
             <p className="text-red-400 text-sm font-semibold mb-2">Globe failed to load</p>
             <p className="text-gray-600 text-xs mb-4">Check browser console for details</p>
             <button onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-500">Retry</button>
+              className="px-4 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-500 pointer-events-auto">
+              Retry
+            </button>
           </div>
         </div>
       )}

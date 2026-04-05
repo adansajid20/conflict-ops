@@ -1,4 +1,16 @@
 {
+  "projectId": "prj_WbOePdNeM6zUnKUAvAPLCHwt8j2o",
   "orgId": "team_fBI6urZw8Gctwwj4i1bmHp3C",
-  "projectId": "prj_WbOePdNeM6zUnKUAvAPLCHwt8j2o"
+  "projectName": "conflict-ops",
+  "settings": {
+    "createdAt": 1774394843548,
+    "framework": "nextjs",
+    "devCommand": null,
+    "installCommand": "cd ../.. && npm install --include=dev",
+    "buildCommand": "cd ../.. && npm install --include=dev && npx turbo build --filter=@conflict-ops/web...",
+    "outputDirectory": null,
+    "rootDirectory": "apps/web",
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
 }

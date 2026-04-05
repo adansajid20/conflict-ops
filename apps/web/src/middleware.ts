@@ -29,6 +29,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/v1/overview(.*)',
   '/api/v1/feed(.*)',
   '/api/v1/map/(.*)',
+  '/api/flights(.*)',
   '/api/v1/live/(.*)',
   '/api/v1/alerts/(.*)',
   '/api/v1/situations(.*)',

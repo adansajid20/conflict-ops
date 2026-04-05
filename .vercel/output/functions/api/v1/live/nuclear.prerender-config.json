@@ -1,0 +1,29 @@
+{
+  "type": "Prerender",
+  "expiration": false,
+  "group": 2,
+  "bypassToken": "8437f06c169a43c977a3b5669cc301be",
+  "experimentalBypassFor": [
+    {
+      "type": "header",
+      "key": "Next-Action"
+    },
+    {
+      "type": "header",
+      "key": "content-type",
+      "value": "multipart/form-data;.*"
+    }
+  ],
+  "fallback": {
+    "type": "FileFsRef",
+    "mode": 33188,
+    "contentType": "application/json",
+    "fsPath": "nuclear.prerender-fallback.body"
+  },
+  "initialHeaders": {
+    "content-type": "application/json",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/api/layout,_N_T_/api/v1/layout,_N_T_/api/v1/live/layout,_N_T_/api/v1/live/nuclear/layout,_N_T_/api/v1/live/nuclear/route,_N_T_/api/v1/live/nuclear",
+    "vary": "RSC, Next-Router-State-Tree, Next-Router-Prefetch"
+  },
+  "allowQuery": []
+}

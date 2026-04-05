@@ -1,0 +1,744 @@
+{
+  "version": 3,
+  "routes": [
+    {
+      "src": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$",
+      "headers": {
+        "Location": "/$1"
+      },
+      "status": 308,
+      "continue": true
+    },
+    {
+      "src": "/_next/__private/trace",
+      "dest": "/404",
+      "status": 404,
+      "continue": true
+    },
+    {
+      "src": "/_next/data/(.*)",
+      "missing": [
+        {
+          "type": "header",
+          "key": "x-nextjs-data"
+        }
+      ],
+      "transforms": [
+        {
+          "type": "request.headers",
+          "op": "append",
+          "target": {
+            "key": "x-nextjs-data"
+          },
+          "args": "1"
+        }
+      ],
+      "continue": true
+    },
+    {
+      "src": "^(?:/((?!_next/static|_next/image|favicon.ico).*))(?:/)?$",
+      "headers": {
+        "Cache-Control": "no-store, must-revalidate",
+        "X-Content-Type-Options": "nosniff"
+      },
+      "continue": true
+    },
+    {
+      "src": "^/_next/static(?:/(.*))(?:/)?$",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      },
+      "continue": true
+    },
+    {
+      "src": "^/cesium(?:/(.*))(?:/)?$",
+      "headers": {
+        "Cache-Control": "public, max-age=604800, immutable"
+      },
+      "continue": true
+    },
+    {
+      "src": "/404/?",
+      "status": 404,
+      "continue": true,
+      "missing": [
+        {
+          "type": "header",
+          "key": "x-prerender-revalidate"
+        }
+      ]
+    },
+    {
+      "src": "/500",
+      "status": 500,
+      "continue": true
+    },
+    {
+      "src": "^/api(?:/(.*))$",
+      "headers": {
+        "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+        "X-Frame-Options": "SAMEORIGIN",
+        "X-Content-Type-Options": "nosniff"
+      },
+      "continue": true
+    },
+    {
+      "src": "^(?:/((?!_next/static|_next/image|favicon\\.ico).*))$",
+      "headers": {
+        "Cache-Control": "no-store, must-revalidate"
+      },
+      "continue": true
+    },
+    {
+      "src": "^/_next/static(?:/(.*))$",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      },
+      "continue": true
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/(.*).json",
+      "dest": "/$1",
+      "override": true,
+      "continue": true,
+      "has": [
+        {
+          "type": "header",
+          "key": "x-nextjs-data"
+        }
+      ]
+    },
+    {
+      "src": "^/index(?:/)?",
+      "has": [
+        {
+          "type": "header",
+          "key": "x-nextjs-data"
+        }
+      ],
+      "dest": "/",
+      "override": true,
+      "continue": true
+    },
+    {
+      "continue": true,
+      "src": "^(?:\\/(_next\\/data\\/[^/]{1,}))?(?:\\/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*))(.json)?[\\/#\\?]?$",
+      "missing": [
+        {
+          "type": "header",
+          "key": "x-prerender-revalidate",
+          "value": "8437f06c169a43c977a3b5669cc301be"
+        }
+      ],
+      "middlewarePath": "src/middleware",
+      "middlewareRawSrc": [
+        "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)"
+      ],
+      "override": true
+    },
+    {
+      "continue": true,
+      "src": "^(?:\\/(_next\\/data\\/[^/]{1,}))?(?:\\/(api|trpc))(.*)(.json)?[\\/#\\?]?$",
+      "missing": [
+        {
+          "type": "header",
+          "key": "x-prerender-revalidate",
+          "value": "8437f06c169a43c977a3b5669cc301be"
+        }
+      ],
+      "middlewarePath": "src/middleware",
+      "middlewareRawSrc": [
+        "/(api|trpc)(.*)"
+      ],
+      "override": true
+    },
+    {
+      "src": "^/$",
+      "has": [
+        {
+          "type": "header",
+          "key": "x-nextjs-data"
+        }
+      ],
+      "dest": "/_next/data/gn4UjS5vRRUGseLe0agA4/index.json",
+      "continue": true,
+      "override": true
+    },
+    {
+      "src": "^/((?!_next/)(?:.*[^/]|.*))/?$",
+      "has": [
+        {
+          "type": "header",
+          "key": "x-nextjs-data"
+        }
+      ],
+      "dest": "/_next/data/gn4UjS5vRRUGseLe0agA4/$1.json",
+      "continue": true,
+      "override": true
+    },
+    {
+      "src": "^/?",
+      "has": [
+        {
+          "type": "header",
+          "key": "rsc",
+          "value": "1"
+        }
+      ],
+      "dest": "/index.rsc",
+      "headers": {
+        "vary": "RSC, Next-Router-State-Tree, Next-Router-Prefetch"
+      },
+      "continue": true,
+      "override": true
+    },
+    {
+      "src": "^/((?!.+\\.rsc).+?)(?:/)?$",
+      "has": [
+        {
+          "type": "header",
+          "key": "rsc",
+          "value": "1"
+        }
+      ],
+      "dest": "/$1.rsc",
+      "headers": {
+        "vary": "RSC, Next-Router-State-Tree, Next-Router-Prefetch"
+      },
+      "continue": true,
+      "override": true
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/(.*).json",
+      "dest": "/$1",
+      "continue": true,
+      "has": [
+        {
+          "type": "header",
+          "key": "x-nextjs-data"
+        }
+      ]
+    },
+    {
+      "src": "^/index(?:/)?",
+      "has": [
+        {
+          "type": "header",
+          "key": "x-nextjs-data"
+        }
+      ],
+      "dest": "/",
+      "continue": true
+    },
+    {
+      "src": "/index(\\.action|\\.rsc)",
+      "dest": "/",
+      "continue": true
+    },
+    {
+      "src": "/\\.prefetch\\.rsc$",
+      "dest": "/__index.prefetch.rsc",
+      "check": true
+    },
+    {
+      "src": "/(.+)/\\.prefetch\\.rsc$",
+      "dest": "/$1.prefetch.rsc",
+      "check": true
+    },
+    {
+      "src": "/\\.rsc$",
+      "dest": "/index.rsc",
+      "check": true
+    },
+    {
+      "src": "/(.+)/\\.rsc$",
+      "dest": "/$1.rsc",
+      "check": true
+    },
+    {
+      "handle": "resource"
+    },
+    {
+      "src": "/.*",
+      "status": 404
+    },
+    {
+      "handle": "miss"
+    },
+    {
+      "src": "/_next/static/.+",
+      "status": 404,
+      "check": true,
+      "dest": "/_next/static/not-found.txt",
+      "headers": {
+        "content-type": "text/plain; charset=utf-8"
+      }
+    },
+    {
+      "handle": "rewrite"
+    },
+    {
+      "src": "^/$",
+      "has": [
+        {
+          "type": "header",
+          "key": "x-nextjs-data"
+        }
+      ],
+      "dest": "/_next/data/gn4UjS5vRRUGseLe0agA4/index.json",
+      "continue": true
+    },
+    {
+      "src": "^/((?!_next/)(?:.*[^/]|.*))/?$",
+      "has": [
+        {
+          "type": "header",
+          "key": "x-nextjs-data"
+        }
+      ],
+      "dest": "/_next/data/gn4UjS5vRRUGseLe0agA4/$1.json",
+      "continue": true
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/actors/(?<nxtPid>[^/]+?)(?:/)?.json$",
+      "dest": "/actors/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/api/public/v1/reports/(?<nxtPtoken>[^/]+?)(?:/)?.json$",
+      "dest": "/api/public/v1/reports/[token]?nxtPtoken=$nxtPtoken"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/api/v1/actors/(?<nxtPid>[^/]+?)(?:/)?.json$",
+      "dest": "/api/v1/actors/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/api/v1/alerts/(?<nxtPid>[^/]+?)(?:/)?.json$",
+      "dest": "/api/v1/alerts/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/api/v1/events/(?<nxtPid>[^/]+?)(?:/)?.json$",
+      "dest": "/api/v1/events/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/api/v1/events/(?<nxtPid>[^/]+?)/related(?:/)?.json$",
+      "dest": "/api/v1/events/[id]/related?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/api/v1/notifications/(?<nxtPid>[^/]+?)(?:/)?.json$",
+      "dest": "/api/v1/notifications/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/api/v1/pir/(?<nxtPid>[^/]+?)(?:/)?.json$",
+      "dest": "/api/v1/pir/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/api/v1/reports/(?<nxtPid>[^/]+?)(?:/)?.json$",
+      "dest": "/api/v1/reports/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/api/v1/reports/(?<nxtPid>[^/]+?)/ai\\-summary(?:/)?.json$",
+      "dest": "/api/v1/reports/[id]/ai-summary?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/api/v1/reports/(?<nxtPid>[^/]+?)/share(?:/)?.json$",
+      "dest": "/api/v1/reports/[id]/share?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/api/v1/situations/(?<nxtPslug>[^/]+?)(?:/)?.json$",
+      "dest": "/api/v1/situations/[slug]?nxtPslug=$nxtPslug"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/sign\\-in(?:/(?<nxtPsignin>.+?))?(?:/)?.json$",
+      "dest": "/sign-in/[[...sign-in]]?nxtPsign-in=$nxtPsignin"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/sign\\-up(?:/(?<nxtPsignup>.+?))?(?:/)?.json$",
+      "dest": "/sign-up/[[...sign-up]]?nxtPsign-up=$nxtPsignup"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/situations/(?<nxtPslug>[^/]+?)(?:/)?.json$",
+      "dest": "/situations/[slug]?nxtPslug=$nxtPslug"
+    },
+    {
+      "src": "^/actors/(?<nxtPid>[^/]+?)(?:\\.rsc)(?:/)?$",
+      "dest": "/actors/[id].rsc?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/actors/(?<nxtPid>[^/]+?)(?:/)?$",
+      "dest": "/actors/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/public/v1/reports/(?<nxtPtoken>[^/]+?)(?:\\.rsc)(?:/)?$",
+      "dest": "/api/public/v1/reports/[token].rsc?nxtPtoken=$nxtPtoken"
+    },
+    {
+      "src": "^/api/public/v1/reports/(?<nxtPtoken>[^/]+?)(?:/)?$",
+      "dest": "/api/public/v1/reports/[token]?nxtPtoken=$nxtPtoken"
+    },
+    {
+      "src": "^/api/v1/actors/(?<nxtPid>[^/]+?)(?:\\.rsc)(?:/)?$",
+      "dest": "/api/v1/actors/[id].rsc?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/actors/(?<nxtPid>[^/]+?)(?:/)?$",
+      "dest": "/api/v1/actors/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/alerts/(?<nxtPid>[^/]+?)(?:\\.rsc)(?:/)?$",
+      "dest": "/api/v1/alerts/[id].rsc?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/alerts/(?<nxtPid>[^/]+?)(?:/)?$",
+      "dest": "/api/v1/alerts/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/events/(?<nxtPid>[^/]+?)(?:\\.rsc)(?:/)?$",
+      "dest": "/api/v1/events/[id].rsc?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/events/(?<nxtPid>[^/]+?)(?:/)?$",
+      "dest": "/api/v1/events/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/events/(?<nxtPid>[^/]+?)/related(?:\\.rsc)(?:/)?$",
+      "dest": "/api/v1/events/[id]/related.rsc?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/events/(?<nxtPid>[^/]+?)/related(?:/)?$",
+      "dest": "/api/v1/events/[id]/related?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/notifications/(?<nxtPid>[^/]+?)(?:\\.rsc)(?:/)?$",
+      "dest": "/api/v1/notifications/[id].rsc?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/notifications/(?<nxtPid>[^/]+?)(?:/)?$",
+      "dest": "/api/v1/notifications/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/pir/(?<nxtPid>[^/]+?)(?:\\.rsc)(?:/)?$",
+      "dest": "/api/v1/pir/[id].rsc?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/pir/(?<nxtPid>[^/]+?)(?:/)?$",
+      "dest": "/api/v1/pir/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/reports/(?<nxtPid>[^/]+?)(?:\\.rsc)(?:/)?$",
+      "dest": "/api/v1/reports/[id].rsc?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/reports/(?<nxtPid>[^/]+?)(?:/)?$",
+      "dest": "/api/v1/reports/[id]?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/reports/(?<nxtPid>[^/]+?)/ai\\-summary(?:\\.rsc)(?:/)?$",
+      "dest": "/api/v1/reports/[id]/ai-summary.rsc?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/reports/(?<nxtPid>[^/]+?)/ai\\-summary(?:/)?$",
+      "dest": "/api/v1/reports/[id]/ai-summary?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/reports/(?<nxtPid>[^/]+?)/share(?:\\.rsc)(?:/)?$",
+      "dest": "/api/v1/reports/[id]/share.rsc?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/reports/(?<nxtPid>[^/]+?)/share(?:/)?$",
+      "dest": "/api/v1/reports/[id]/share?nxtPid=$nxtPid"
+    },
+    {
+      "src": "^/api/v1/situations/(?<nxtPslug>[^/]+?)(?:\\.rsc)(?:/)?$",
+      "dest": "/api/v1/situations/[slug].rsc?nxtPslug=$nxtPslug"
+    },
+    {
+      "src": "^/api/v1/situations/(?<nxtPslug>[^/]+?)(?:/)?$",
+      "dest": "/api/v1/situations/[slug]?nxtPslug=$nxtPslug"
+    },
+    {
+      "src": "^/sign\\-in(?:/(?<nxtPsignin>.+?))?(?:\\.rsc)(?:/)?$",
+      "dest": "/sign-in/[[...sign-in]].rsc?nxtPsign-in=$nxtPsignin"
+    },
+    {
+      "src": "^/sign\\-in(?:/(?<nxtPsignin>.+?))?(?:/)?$",
+      "dest": "/sign-in/[[...sign-in]]?nxtPsign-in=$nxtPsignin"
+    },
+    {
+      "src": "^/sign\\-up(?:/(?<nxtPsignup>.+?))?(?:\\.rsc)(?:/)?$",
+      "dest": "/sign-up/[[...sign-up]].rsc?nxtPsign-up=$nxtPsignup"
+    },
+    {
+      "src": "^/sign\\-up(?:/(?<nxtPsignup>.+?))?(?:/)?$",
+      "dest": "/sign-up/[[...sign-up]]?nxtPsign-up=$nxtPsignup"
+    },
+    {
+      "src": "^/situations/(?<nxtPslug>[^/]+?)(?:\\.rsc)(?:/)?$",
+      "dest": "/situations/[slug].rsc?nxtPslug=$nxtPslug"
+    },
+    {
+      "src": "^/situations/(?<nxtPslug>[^/]+?)(?:/)?$",
+      "dest": "/situations/[slug]?nxtPslug=$nxtPslug"
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/(.*).json",
+      "headers": {
+        "x-nextjs-matched-path": "/$1"
+      },
+      "continue": true,
+      "override": true
+    },
+    {
+      "src": "^/_next/data/gn4UjS5vRRUGseLe0agA4/(.*).json",
+      "dest": "__next_data_catchall"
+    },
+    {
+      "handle": "hit"
+    },
+    {
+      "src": "/_next/static/(?:[^/]+/pages|pages|chunks|runtime|css|image|media|gn4UjS5vRRUGseLe0agA4)/.+",
+      "headers": {
+        "cache-control": "public,max-age=31536000,immutable"
+      },
+      "continue": true,
+      "important": true
+    },
+    {
+      "src": "/index(?:/)?",
+      "headers": {
+        "x-matched-path": "/"
+      },
+      "continue": true,
+      "important": true
+    },
+    {
+      "src": "/((?!index$).*?)(?:/)?",
+      "headers": {
+        "x-matched-path": "/$1"
+      },
+      "continue": true,
+      "important": true
+    },
+    {
+      "handle": "error"
+    },
+    {
+      "src": "/.*",
+      "dest": "/_not-found",
+      "status": 404,
+      "headers": {
+        "x-next-error-status": "404"
+      }
+    },
+    {
+      "src": "/.*",
+      "dest": "/500",
+      "status": 500,
+      "headers": {
+        "x-next-error-status": "500"
+      }
+    }
+  ],
+  "images": {
+    "domains": [],
+    "sizes": [
+      640,
+      750,
+      828,
+      1080,
+      1200,
+      1920,
+      2048,
+      3840,
+      16,
+      32,
+      48,
+      64,
+      96,
+      128,
+      256,
+      384
+    ],
+    "remotePatterns": [
+      {
+        "protocol": "https",
+        "hostname": "^(?:(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)\\.supabase\\.co\\/?)$",
+        "pathname": "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$"
+      },
+      {
+        "protocol": "https",
+        "hostname": "^(?:(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)\\.cesium\\.com\\/?)$",
+        "pathname": "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$"
+      },
+      {
+        "protocol": "https",
+        "hostname": "^(?:(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)\\.bing\\.com\\/?)$",
+        "pathname": "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$"
+      },
+      {
+        "protocol": "https",
+        "hostname": "^(?:(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)\\.virtualearth\\.net\\/?)$",
+        "pathname": "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$"
+      }
+    ],
+    "minimumCacheTTL": 60,
+    "formats": [
+      "image/webp"
+    ],
+    "dangerouslyAllowSVG": false,
+    "contentSecurityPolicy": "script-src 'none'; frame-src 'none'; sandbox;",
+    "contentDispositionType": "inline"
+  },
+  "overrides": {
+    "500.html": {
+      "path": "500",
+      "contentType": "text/html; charset=utf-8"
+    },
+    "_app.rsc.json": {
+      "path": "_app.rsc",
+      "contentType": "application/json"
+    },
+    "_error.rsc.json": {
+      "path": "_error.rsc",
+      "contentType": "application/json"
+    },
+    "_document.rsc.json": {
+      "path": "_document.rsc",
+      "contentType": "application/json"
+    },
+    "__next_data_catchall.json": {
+      "path": "__next_data_catchall",
+      "contentType": "application/json"
+    },
+    "_next/static/not-found.txt": {
+      "contentType": "text/plain"
+    }
+  },
+  "framework": {
+    "version": "14.2.0"
+  },
+  "crons": [
+    {
+      "path": "/api/cron/ingest",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/rss",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/collect-news",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/collect-flights",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/collect-vessels",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/collect-seismic",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/collect-fires",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/collect-outages",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/enrich-events",
+      "schedule": "*/3 * * * *"
+    },
+    {
+      "path": "/api/cron/generate-embeddings",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cluster-events",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/correlate",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/detect-patterns",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/calculate-risk-scores",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/generate-predictions",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/evaluate-predictions",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/evaluate-alerts",
+      "schedule": "*/3 * * * *"
+    },
+    {
+      "path": "/api/cron/send-alerts",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/flash-report",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/calculate-flywheel",
+      "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/cron/generate-daily-brief",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/generate-weekly-summary",
+      "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/cron/source-credibility",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/collect-commodity-prices",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/detect-market-correlations",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-sanctions",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/update-country-profiles",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/check-personnel-safety",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/check-supply-chain",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

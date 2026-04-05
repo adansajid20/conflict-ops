@@ -503,3 +503,40 @@ body {
 .cesium-viewer, .cesium-viewer-cesiumWidgetContainer,
 .cesium-widget, .cesium-widget canvas { width: 100% !important; height: 100% !important; }
 .cesium-viewer-dark { position: absolute !important; inset: 0 !important; }
+
+/* ═══════════════════════════════════════
+   ConflictRadar V3 — Cesium + Sidebar
+   ═══════════════════════════════════════ */
+
+/* Hide Cesium credit bar */
+.cesium-viewer-bottom,
+.cesium-credit-logoContainer,
+.cesium-credit-expand-link { display: none !important; }
+
+/* Viewer fills container */
+.cr-viewer,
+.cr-viewer .cesium-viewer,
+.cr-viewer .cesium-viewer-cesiumWidgetContainer,
+.cr-viewer .cesium-widget,
+.cr-viewer .cesium-widget canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Event card slide-up */
+@keyframes slide-up {
+  from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);   opacity: 1; }
+}
+.animate-slide-up { animation: slide-up 0.25s ease-out; }
+
+/* Sidebar scrollbar */
+.cr-scrollbar::-webkit-scrollbar { width: 3px; }
+.cr-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.cr-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 10px; }
+.cr-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
+
+/* Select options dark */
+select option { background: #111827; color: #d1d5db; }
