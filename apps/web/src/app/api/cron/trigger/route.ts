@@ -1,3 +1,6 @@
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 /**
  * Public ingest trigger — rate limited to once per 2 minutes via Redis.
  * Called by the client every 3 minutes to keep data fresh when users are active.
@@ -6,7 +9,6 @@
 import { NextResponse } from 'next/server'
 import { getCachedSnapshot, setCachedSnapshot } from '@/lib/cache/redis'
 
-export const dynamic = 'force-dynamic'
 
 const RATE_LIMIT_KEY = 'ingest:client_trigger:last_run'
 const RATE_LIMIT_MS = 2 * 60 * 1000 // 2 minutes

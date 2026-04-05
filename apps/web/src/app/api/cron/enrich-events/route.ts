@@ -114,8 +114,10 @@ Severity guide: critical=active combat/WMD/mass casualties, high=military mobili
           await supabase.from('actors').update({ event_count: (existing.event_count ?? 0) + 1, last_seen: new Date().toISOString() }).eq('id', actorId)
         } else {
           const { data: newActor } = await supabase.from('actors').insert({
-            name: actor.name, display_name: actor.name, type: actor.type ?? 'organization',
-            country: event.region,
+            name: actor.name, display_name: actor.name,
+            type: actor.type ?? 'organization',
+            actor_type: actor.type ?? 'organization',
+            region: event.region,
           }).select('id').single()
           actorId = newActor?.id ?? ''
         }

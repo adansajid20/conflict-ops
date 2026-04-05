@@ -36,6 +36,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/v1/region-risk(.*)',
   '/api/v1/actors(.*)',
   '/api/v1/actors/relationships(.*)',
+  '/api/v1/actors/graph(.*)',
   '/api/v1/intelligence-reports(.*)',
   '/api/v1/predictions(.*)',
   '/api/v1/trends(.*)',

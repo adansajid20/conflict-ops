@@ -9,16 +9,16 @@ export const metadata: Metadata = {
 }
 
 const COMPARISON = [
-  ['Real-time event feed',   '✓', '✓', '✓', '✓'],
-  ['AI Co-pilot',            '–', '✓', '✓', '✓'],
-  ['Custom alert rules',     '3', '25', '∞', '∞'],
-  ['REST API',               '–', '✓', '✓', '✓'],
-  ['Webhooks',               '–', '–', '✓', '✓'],
-  ['Slack / PagerDuty',      '–', '–', '✓', '✓'],
-  ['Actor network',          '–', '✓', '✓', '✓'],
-  ['Prediction engine',      '–', '✓', '✓', '✓'],
-  ['White-label',            '–', '–', '–', '✓'],
-  ['SLA + dedicated support','–', '–', '–', '✓'],
+  ['Real-time event feed',    '✓', '✓', '✓', '✓'],
+  ['AI Co-pilot',             '–', '–', '✓', '✓'],
+  ['Custom alert rules',      '3', '10', '50', '∞'],
+  ['REST API',                '–', '–', '✓', '✓'],
+  ['Webhooks',                '–', '–', '✓', '✓'],
+  ['Actor network',           '–', 'View', '✓', '✓'],
+  ['Similarity search',       '–', '–', '✓', '✓'],
+  ['Workbench boards',        '–', '–', '–', '✓'],
+  ['Prediction engine',       '–', 'View', '✓', '✓'],
+  ['Feed history',            '24h', '7d', '30d', '∞'],
 ]
 
 export default function PricingPage() {
@@ -49,7 +49,7 @@ export default function PricingPage() {
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 <th className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>Feature</th>
-                {['Individual','Pro','Business','Enterprise'].map(h => <th key={h} className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>{h}</th>)}
+                {['Free','Scout','Analyst','Operator'].map(h => <th key={h} className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>{h}</th>)}
               </tr>
             </thead>
             <tbody>

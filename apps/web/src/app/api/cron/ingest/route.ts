@@ -1,9 +1,11 @@
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/cron/ingest?token=<INTERNAL_SECRET>
  * Public cron trigger — for use with cron-job.org (free tier, GET only, no custom headers)
  * Runs ingest directly (no internal HTTP round-trip).
  */
-export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 export async function GET(req: Request) {

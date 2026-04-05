@@ -10,10 +10,26 @@ export async function GET(req: NextRequest) {
   const actorId = url.searchParams.get('actor_id')
   const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '80'), 200)
 
-  let query = supabase.from('actor_relationships').select('actor_id, related_actor_id, relationship_type, strength, description, verified').order('strength', { ascending: false }).limit(limit)
-  if (actorId) query = query.or(`actor_id.eq.${actorId},related_actor_id.eq.${actorId}`)
+  let query = supabase
+    .from('actor_relationships')
+    .select('id,actor_a,actor_b,actor_id,related_actor_id,relationship,relationship_type,strength,evidence_count,notes')
+    .order('strength', { ascending: false })
+    .limit(limit)
+
+  if (actorId) {
+    query = query.or(`actor_a.eq.${actorId},actor_b.eq.${actorId},actor_id.eq.${actorId},related_actor_id.eq.${actorId}`)
+  }
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ relationships: data ?? [] })
+
+  // Normalise columns
+  const relationships = (data ?? []).map(r => ({
+    ...r,
+    actor_id: r.actor_id ?? r.actor_a,
+    related_actor_id: r.related_actor_id ?? r.actor_b,
+    relationship_type: r.relationship_type ?? r.relationship,
+  }))
+
+  return NextResponse.json({ relationships })
 }

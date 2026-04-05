@@ -3,6 +3,7 @@ import { ingestRSSLive } from '@/lib/ingest/rss-live'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
+export const dynamic = 'force-dynamic'
 
 function isAuthorized(request: Request): boolean {
   const url = new URL(request.url)

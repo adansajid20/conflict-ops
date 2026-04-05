@@ -1,7 +1,9 @@
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 import { createServiceClient } from '@/lib/supabase/server'
 import { extractEntitiesBatch } from '@/lib/intelligence/entity-extraction'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 type AnalyzeEventRow = {
