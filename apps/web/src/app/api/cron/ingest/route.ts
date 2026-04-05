@@ -12,8 +12,14 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const token = url.searchParams.get('token') ?? ''
   const validSecret = process.env['INTERNAL_SECRET'] ?? ''
+  const authHeader = req.headers.get('authorization') ?? ''
+  const cronSecret = process.env['CRON_SECRET'] ?? ''
 
-  if (!token || token !== validSecret) {
+  const isAuthorized =
+    (token && validSecret && token === validSecret) ||
+    (authHeader && cronSecret && authHeader === `Bearer ${cronSecret}`)
+
+  if (!isAuthorized) {
     return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 
