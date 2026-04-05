@@ -8,7 +8,9 @@ import type { LayerState, FilterState, TrackingState, MapEvent } from './Operati
 // CESIUM BASE URL — must be set before any Cesium import
 // ═══════════════════════════════════════════════════════
 if (typeof window !== 'undefined') {
-  (window as unknown as Record<string, unknown>).CESIUM_BASE_URL = '/cesium';
+  // Use CDN — avoids needing public/cesium assets in the deploy
+  (window as unknown as Record<string, unknown>).CESIUM_BASE_URL =
+    'https://cdn.jsdelivr.net/npm/cesium@1.140.0/Build/Cesium/';
 }
 
 // ═══════════════════════════════════════════════════════
