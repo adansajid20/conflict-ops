@@ -84,7 +84,7 @@ export default function MapSidebar({
   const activeLayers = [showEvents, showFlights, showVessels, showISS].filter(Boolean).length;
 
   return (
-    <div className="absolute top-0 right-0 z-10 w-[300px] h-full flex flex-col
+    <div className="w-[300px] flex-shrink-0 h-full flex flex-col
       bg-[#0a0e17]/92 backdrop-blur-2xl border-l border-gray-800/50">
 
       {/* ═══ HEADER ═══ */}

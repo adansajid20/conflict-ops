@@ -128,7 +128,7 @@ export default function CesiumGlobe() {
 
   // Layers
   const [showEvents, setShowEvents] = useState(true);
-  const [showFlights, setShowFlights] = useState(false);
+  const [showFlights, setShowFlights] = useState(true);
   const [showVessels, setShowVessels] = useState(false);
   const [showISS, setShowISS] = useState(true);
 
@@ -221,35 +221,10 @@ export default function CesiumGlobe() {
 
         const evtId = String(p.id ?? Math.random().toString(36).slice(2));
 
-        // Outer glow ring — all events get subtle glow, critical gets double ring
-        v.entities.add({
-          id: `evt-glow-${evtId}`,
-          position: Ce.Cartesian3.fromDegrees(lon, lat, 0),
-          point: {
-            pixelSize: size * 2.8,
-            color: glowColor,
-            outlineWidth: 0,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          },
-        } as never);
-        // Critical: extra outer pulse ring
-        if (sevStr === 'critical') {
-          v.entities.add({
-            id: `evt-pulse-${evtId}`,
-            position: Ce.Cartesian3.fromDegrees(lon, lat, 0),
-            point: {
-              pixelSize: size * 4.5,
-              color: Ce.Color.fromCssColorString('rgba(255,23,68,0.12)'),
-              outlineWidth: 0,
-              disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            },
-          } as never);
-        }
-
-        // Main pin
+        // Single stable pin — colored outline acts as glow, no separate entities
         v.entities.add({
           id: `evt-${evtId}`,
-          position: Ce.Cartesian3.fromDegrees(lon, lat, 0),
+          position: Ce.Cartesian3.fromDegrees(lon, lat),
           name: String(p.title ?? 'Event'),
           properties: {
             _type: 'event',
@@ -266,9 +241,9 @@ export default function CesiumGlobe() {
           point: {
             pixelSize: size,
             color,
-            outlineColor: Ce.Color.WHITE.withAlpha(0.6),
-            outlineWidth: outline,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            outlineColor: Ce.Color.fromCssColorString(SEV_GLOW[sevStr] ?? 'rgba(68,138,255,0.2)'),
+            outlineWidth: sevStr === 'critical' ? 6 : sevStr === 'high' ? 4 : 3,
+            heightReference: Ce.HeightReference.CLAMP_TO_GROUND,
           },
         } as never);
       }
@@ -309,8 +284,6 @@ export default function CesiumGlobe() {
             color: Ce.Color.fromCssColorString('#00e5ff'),
             outlineColor: Ce.Color.fromCssColorString('rgba(0,229,255,0.3)'),
             outlineWidth: 1,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            // No scaleByDistance — fixed pins stay put
           },
         } as never);
       }
@@ -395,8 +368,6 @@ export default function CesiumGlobe() {
               color: Ce.Color.fromCssColorString('#34d399'),
               outlineColor: Ce.Color.fromCssColorString('rgba(52,211,153,0.3)'),
               outlineWidth: 1,
-              disableDepthTestDistance: Number.POSITIVE_INFINITY,
-              // No scaleByDistance — fixed pins stay put
             },
           } as never);
         }
@@ -432,7 +403,6 @@ export default function CesiumGlobe() {
             color: Ce.Color.fromCssColorString('#a855f7'),
             outlineColor: Ce.Color.fromCssColorString('#c084fc'),
             outlineWidth: 4,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
           },
         } as never);
       }
@@ -640,6 +610,18 @@ export default function CesiumGlobe() {
         else camera.zoomOut(zoomAmount);
       }, { passive: false });
 
+      // ── RESIZE OBSERVER — tell Cesium when flex layout changes canvas size ──
+      if (containerRef.current) {
+        const ro = new ResizeObserver(() => {
+          if (viewer && !(viewer as unknown as { isDestroyed: () => boolean }).isDestroyed()) {
+            (viewer as unknown as { resize: () => void }).resize?.();
+          }
+        });
+        ro.observe(containerRef.current);
+        // Store for cleanup
+        (viewer as unknown as { _resizeObserver?: ResizeObserver })._resizeObserver = ro;
+      }
+
       viewerRef.current = viewer;
       setIsLoading(false);
       setCesiumReady(true);
@@ -665,7 +647,12 @@ export default function CesiumGlobe() {
       if (flightIntervalRef.current) clearInterval(flightIntervalRef.current);
       wsRef.current?.close();
       const v = viewerRef.current;
-      if (v && !v.isDestroyed()) v.destroy();
+      if (v) {
+        // Disconnect resize observer
+        const ro = (v as unknown as { _resizeObserver?: ResizeObserver })._resizeObserver;
+        if (ro) ro.disconnect();
+        if (!v.isDestroyed()) v.destroy();
+      }
       viewerRef.current = null;
     };
   }, []);
@@ -674,7 +661,7 @@ export default function CesiumGlobe() {
   // RENDER
   // ═══════════════════════════════════════
   return (
-    <div className="relative w-full h-full overflow-hidden bg-black">
+    <div className="w-full h-full overflow-hidden bg-black flex">
 
       {/* Cesium CSS */}
       <link rel="stylesheet" href={`${CESIUM_CDN}/Widgets/widgets.css`} />
@@ -690,35 +677,160 @@ export default function CesiumGlobe() {
         onError={() => { setIsLoading(false); setLoadError(true); }}
       />
 
-      {/* Globe canvas */}
-      <div ref={containerRef} className="absolute inset-0 z-[1] cr-viewer" />
+      {/* ══ GLOBE AREA — fills remaining space beside sidebar ══ */}
+      <div className="flex-1 relative min-w-0">
 
-      {/* HEADER */}
-      <div className="absolute top-4 left-4 z-10 pointer-events-none">
-        <div className="flex items-center gap-2 mb-0.5">
-          <h1 className="text-sm font-bold tracking-[0.2em] text-white/90 uppercase">Operational Map</h1>
-          <span className="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full font-medium">β</span>
+        {/* Cesium canvas — fills its flex parent naturally */}
+        <div ref={containerRef} className="absolute inset-0 z-[1] cr-viewer" />
+
+        {/* HEADER */}
+        <div className="absolute top-4 left-4 z-10 pointer-events-none">
+          <div className="flex items-center gap-2 mb-0.5">
+            <h1 className="text-sm font-bold tracking-[0.2em] text-white/90 uppercase">Operational Map</h1>
+            <span className="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full font-medium">β</span>
+          </div>
+          <p className="text-[10px] text-gray-500 tracking-wide">Real-time conflict intelligence overlay</p>
+          <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
+            <span><span className="text-white font-semibold">{eventCount.toLocaleString()}</span> events</span>
+            {showFlights && <span><span className="text-cyan-400 font-semibold">{flightCount.toLocaleString()}</span> flights</span>}
+            {showVessels && <span><span className="text-emerald-400 font-semibold">{vesselCount.toLocaleString()}</span> vessels</span>}
+          </div>
         </div>
-        <p className="text-[10px] text-gray-500 tracking-wide">Real-time conflict intelligence overlay</p>
-        <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
-          <span><span className="text-white font-semibold">{eventCount.toLocaleString()}</span> events</span>
-          {showFlights && <span><span className="text-cyan-400 font-semibold">{flightCount.toLocaleString()}</span> flights</span>}
-          {showVessels && <span><span className="text-emerald-400 font-semibold">{vesselCount.toLocaleString()}</span> vessels</span>}
+
+        {/* Globe / 2D toggle */}
+        <div className="absolute top-4 right-3 z-10 flex bg-[#111827]/70 backdrop-blur-sm rounded-lg p-0.5 border border-white/5 pointer-events-auto">
+          {(['globe', 'map'] as const).map(m => (
+            <button key={m} onClick={() => setMapMode(m)}
+              className={`px-3 py-1.5 text-[10px] font-medium tracking-wider uppercase rounded-md transition
+                ${mapMode === m ? 'bg-blue-500/20 text-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>
+              {m === 'globe' ? '🌐 Globe' : '🗺️ 2D'}
+            </button>
+          ))}
         </div>
-      </div>
 
-      {/* Globe / 2D toggle */}
-      <div className="absolute top-4 right-[310px] z-10 flex bg-[#111827]/70 backdrop-blur-sm rounded-lg p-0.5 border border-white/5 pointer-events-auto">
-        {(['globe', 'map'] as const).map(m => (
-          <button key={m} onClick={() => setMapMode(m)}
-            className={`px-3 py-1.5 text-[10px] font-medium tracking-wider uppercase rounded-md transition
-              ${mapMode === m ? 'bg-blue-500/20 text-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>
-            {m === 'globe' ? '🌐 Globe' : '🗺️ 2D'}
-          </button>
-        ))}
-      </div>
+        {/* Legend */}
+        <div className="absolute bottom-16 left-4 z-10 pointer-events-none">
+          <div className="bg-[#0d1117]/80 backdrop-blur-xl border border-gray-700/30 rounded-xl p-3">
+            <p className="text-[9px] font-bold tracking-[0.15em] text-gray-400 uppercase mb-2">Legend</p>
+            <div className="flex flex-col gap-1.5">
+              {[
+                { c: '#ff1744', l: 'Critical', sz: 12 }, { c: '#ff6d00', l: 'High', sz: 9 },
+                { c: '#ffc400', l: 'Medium', sz: 7 }, { c: '#448aff', l: 'Low', sz: 6 },
+              ].map(i => (
+                <div key={i.l} className="flex items-center gap-2">
+                  <div className="rounded-full flex-shrink-0"
+                    style={{ width: i.sz, height: i.sz, backgroundColor: i.c, boxShadow: `0 0 4px ${i.c}` }} />
+                  <span className="text-[10px] text-gray-400">{i.l}</span>
+                </div>
+              ))}
+              <div className="mt-1 pt-1 border-t border-gray-700/30 flex flex-col gap-1.5">
+                {showFlights && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-cyan-400" style={{ boxShadow: '0 0 4px #00e5ff' }} /><span className="text-[10px] text-gray-500">Flights</span></div>}
+                {showVessels && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 4px #34d399' }} /><span className="text-[10px] text-gray-500">Vessels</span></div>}
+                {showISS && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-purple-500" style={{ boxShadow: '0 0 4px #a855f7' }} /><span className="text-[10px] text-gray-500">ISS</span></div>}
+              </div>
+            </div>
+          </div>
+        </div>
 
-      {/* Sidebar */}
+        {/* Flight info card */}
+        {selectedFlight && !showModal && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#111827]/95 backdrop-blur-xl border border-cyan-500/20 rounded-2xl p-4 shadow-2xl shadow-black/40 w-80 animate-slide-up pointer-events-auto">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">✈️</span>
+                <div>
+                  <p className="text-white font-bold text-sm tracking-wider">{String(selectedFlight.callsign ?? selectedFlight.icao24 ?? '')}</p>
+                  <p className="text-[9px] text-gray-500">{String(selectedFlight.originCountry ?? '')}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedFlight(null)} className="text-gray-500 hover:text-white text-xs w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/5">✕</button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-black/30 rounded-lg p-2 text-center">
+                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Alt</p>
+                <p className="text-white font-mono text-xs">{Math.round(Number(selectedFlight.altitude ?? 0)).toLocaleString()}m</p>
+              </div>
+              <div className="bg-black/30 rounded-lg p-2 text-center">
+                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Speed</p>
+                <p className="text-white font-mono text-xs">{Math.round(Number(selectedFlight.velocity ?? 0) * 3.6)}km/h</p>
+              </div>
+              <div className="bg-black/30 rounded-lg p-2 text-center">
+                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Heading</p>
+                <p className="text-white font-mono text-xs">{Math.round(Number(selectedFlight.heading ?? 0))}°</p>
+              </div>
+            </div>
+            <p className="text-[9px] text-gray-600 mt-2 font-mono">ICAO {String(selectedFlight.icao24 ?? '')} · SQK {String(selectedFlight.squawk ?? '—')}</p>
+          </div>
+        )}
+
+        {/* Vessel info card */}
+        {selectedVessel && !showModal && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#111827]/95 backdrop-blur-xl border border-emerald-500/20 rounded-2xl p-4 shadow-2xl shadow-black/40 w-80 animate-slide-up pointer-events-auto">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🚢</span>
+                <div>
+                  <p className="text-white font-bold text-sm tracking-wider">{String(selectedVessel.name ?? '')}</p>
+                  <p className="text-[9px] text-gray-500">MMSI {String(selectedVessel.mmsi ?? '')}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedVessel(null)} className="text-gray-500 hover:text-white text-xs w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/5">✕</button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-black/30 rounded-lg p-2 text-center">
+                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Speed</p>
+                <p className="text-white font-mono text-xs">{Number(selectedVessel.speed ?? 0).toFixed(1)}kn</p>
+              </div>
+              <div className="bg-black/30 rounded-lg p-2 text-center">
+                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Course</p>
+                <p className="text-white font-mono text-xs">{Math.round(Number(selectedVessel.course ?? 0))}°</p>
+              </div>
+              <div className="bg-black/30 rounded-lg p-2 text-center">
+                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Dest</p>
+                <p className="text-white font-mono text-xs truncate">{String(selectedVessel.destination ?? '—')}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Event modal */}
+        {showModal && selectedEvent && (
+          <EventCardModal
+            event={selectedEvent as EventData}
+            onClose={() => { setShowModal(false); setSelectedEvent(null); }}
+          />
+        )}
+
+        {/* Bottom hint */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+          <p className="text-[10px] text-gray-600 tracking-wide">Click pin · Drag to rotate · Scroll to zoom · Right-drag to tilt</p>
+        </div>
+
+        {/* Loading */}
+        {isLoading && !loadError && (
+          <div className="absolute inset-0 bg-black z-20 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+              <p className="text-xs text-gray-600 tracking-wider uppercase">Loading 3D Globe…</p>
+            </div>
+          </div>
+        )}
+        {loadError && (
+          <div className="absolute inset-0 bg-black z-20 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-red-400 text-sm font-semibold mb-2">Globe failed to load</p>
+              <p className="text-gray-600 text-xs mb-4">Check browser console for details</p>
+              <button onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-500 pointer-events-auto">
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+
+      </div>{/* end globe area */}
+
+      {/* ══ SIDEBAR — flex child, no absolute positioning ══ */}
       <MapSidebar
         eventCount={eventCount} flightCount={flightCount} vesselCount={vesselCount}
         showEvents={showEvents} onToggleEvents={() => setShowEvents(p => !p)}
@@ -732,126 +844,6 @@ export default function CesiumGlobe() {
         viewMode={mapMode} onViewModeChange={setMapMode}
         selectedEvent={selectedEvent} selectedFlight={selectedFlight} selectedVessel={selectedVessel}
       />
-
-      {/* Legend */}
-      <div className="absolute bottom-16 left-4 z-10 pointer-events-none">
-        <div className="bg-[#0d1117]/80 backdrop-blur-xl border border-gray-700/30 rounded-xl p-3">
-          <p className="text-[9px] font-bold tracking-[0.15em] text-gray-400 uppercase mb-2">Legend</p>
-          <div className="flex flex-col gap-1.5">
-            {[
-              { c: '#ff1744', l: 'Critical', sz: 12 }, { c: '#ff6d00', l: 'High', sz: 9 },
-              { c: '#ffc400', l: 'Medium', sz: 7 }, { c: '#448aff', l: 'Low', sz: 6 },
-            ].map(i => (
-              <div key={i.l} className="flex items-center gap-2">
-                <div className="rounded-full flex-shrink-0"
-                  style={{ width: i.sz, height: i.sz, backgroundColor: i.c, boxShadow: `0 0 4px ${i.c}` }} />
-                <span className="text-[10px] text-gray-400">{i.l}</span>
-              </div>
-            ))}
-            <div className="mt-1 pt-1 border-t border-gray-700/30 flex flex-col gap-1.5">
-              {showFlights && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-cyan-400" style={{ boxShadow: '0 0 4px #00e5ff' }} /><span className="text-[10px] text-gray-500">Flights</span></div>}
-              {showVessels && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 4px #34d399' }} /><span className="text-[10px] text-gray-500">Vessels</span></div>}
-              {showISS && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-purple-500" style={{ boxShadow: '0 0 4px #a855f7' }} /><span className="text-[10px] text-gray-500">ISS</span></div>}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Flight info card */}
-      {selectedFlight && !showModal && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#111827]/95 backdrop-blur-xl border border-cyan-500/20 rounded-2xl p-4 shadow-2xl shadow-black/40 w-80 animate-slide-up pointer-events-auto">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-base">✈️</span>
-              <div>
-                <p className="text-white font-bold text-sm tracking-wider">{String(selectedFlight.callsign ?? selectedFlight.icao24 ?? '')}</p>
-                <p className="text-[9px] text-gray-500">{String(selectedFlight.originCountry ?? '')}</p>
-              </div>
-            </div>
-            <button onClick={() => setSelectedFlight(null)} className="text-gray-500 hover:text-white text-xs w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/5">✕</button>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="bg-black/30 rounded-lg p-2 text-center">
-              <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Alt</p>
-              <p className="text-white font-mono text-xs">{Math.round(Number(selectedFlight.altitude ?? 0)).toLocaleString()}m</p>
-            </div>
-            <div className="bg-black/30 rounded-lg p-2 text-center">
-              <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Speed</p>
-              <p className="text-white font-mono text-xs">{Math.round(Number(selectedFlight.velocity ?? 0) * 3.6)}km/h</p>
-            </div>
-            <div className="bg-black/30 rounded-lg p-2 text-center">
-              <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Heading</p>
-              <p className="text-white font-mono text-xs">{Math.round(Number(selectedFlight.heading ?? 0))}°</p>
-            </div>
-          </div>
-          <p className="text-[9px] text-gray-600 mt-2 font-mono">ICAO {String(selectedFlight.icao24 ?? '')} · SQK {String(selectedFlight.squawk ?? '—')}</p>
-        </div>
-      )}
-
-      {/* Vessel info card */}
-      {selectedVessel && !showModal && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#111827]/95 backdrop-blur-xl border border-emerald-500/20 rounded-2xl p-4 shadow-2xl shadow-black/40 w-80 animate-slide-up pointer-events-auto">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-base">🚢</span>
-              <div>
-                <p className="text-white font-bold text-sm tracking-wider">{String(selectedVessel.name ?? '')}</p>
-                <p className="text-[9px] text-gray-500">MMSI {String(selectedVessel.mmsi ?? '')}</p>
-              </div>
-            </div>
-            <button onClick={() => setSelectedVessel(null)} className="text-gray-500 hover:text-white text-xs w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/5">✕</button>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="bg-black/30 rounded-lg p-2 text-center">
-              <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Speed</p>
-              <p className="text-white font-mono text-xs">{Number(selectedVessel.speed ?? 0).toFixed(1)}kn</p>
-            </div>
-            <div className="bg-black/30 rounded-lg p-2 text-center">
-              <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Course</p>
-              <p className="text-white font-mono text-xs">{Math.round(Number(selectedVessel.course ?? 0))}°</p>
-            </div>
-            <div className="bg-black/30 rounded-lg p-2 text-center">
-              <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Dest</p>
-              <p className="text-white font-mono text-xs truncate">{String(selectedVessel.destination ?? '—')}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Event modal */}
-      {showModal && selectedEvent && (
-        <EventCardModal
-          event={selectedEvent as EventData}
-          onClose={() => { setShowModal(false); setSelectedEvent(null); }}
-        />
-      )}
-
-      {/* Bottom hint */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-        <p className="text-[10px] text-gray-600 tracking-wide">Click pin · Drag to rotate · Scroll to zoom · Right-drag to tilt</p>
-      </div>
-
-      {/* Loading */}
-      {isLoading && !loadError && (
-        <div className="absolute inset-0 bg-black z-20 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-            <p className="text-xs text-gray-600 tracking-wider uppercase">Loading 3D Globe…</p>
-          </div>
-        </div>
-      )}
-      {loadError && (
-        <div className="absolute inset-0 bg-black z-20 flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-red-400 text-sm font-semibold mb-2">Globe failed to load</p>
-            <p className="text-gray-600 text-xs mb-4">Check browser console for details</p>
-            <button onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-500 pointer-events-auto">
-              Retry
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
