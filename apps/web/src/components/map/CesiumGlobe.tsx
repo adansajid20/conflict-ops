@@ -966,12 +966,12 @@ export default function CesiumGlobe() {
                 <p className="text-white text-[10px] leading-tight">{String(selectedAcled.actor2 || '—')}</p>
               </div>
             </div>
-            {selectedAcled.civilianTargeting && (
+            {String(selectedAcled.civilianTargeting ?? '') !== '' && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1 mb-3">
                 <p className="text-red-400 text-[10px] font-medium uppercase tracking-wider">⚠ Civilian targeting</p>
               </div>
             )}
-            {selectedAcled.notes && (
+            {String(selectedAcled.notes ?? '') !== '' && (
               <p className="text-[10px] text-gray-400 leading-relaxed line-clamp-3">{String(selectedAcled.notes)}</p>
             )}
             <p className="text-[8px] text-gray-600 mt-2 uppercase tracking-wider">Source: ACLED</p>

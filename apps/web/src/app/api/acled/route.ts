@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
   const window = searchParams.get('window') ?? '30d'
   const days = window === '7d' ? 7 : window === '24h' ? 1 : window === '90d' ? 90 : 30
   const since = new Date(Date.now() - days * 86_400_000)
-  const sinceStr = since.toISOString().split('T')[0]
+  const sinceStr = since.toISOString().split('T')[0] ?? ''
   params.set('event_date', sinceStr)
   params.set('event_date_where', '>=')
 
