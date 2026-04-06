@@ -9,20 +9,9 @@ interface KpiStripProps {
     breaking2h: number
     activeConflictZones: number
     mostActiveRegion: string | null
+    activeAlertsCount: number
   }
   lastUpdatedAt: string | null
-}
-
-function getLiveMeta(lastUpdatedAt: string | null) {
-  if (!lastUpdatedAt) {
-    return { label: 'Active', detail: 'Monitoring active', color: 'bg-green-400' }
-  }
-
-  const ageMin = Math.max(0, Math.floor((Date.now() - new Date(lastUpdatedAt).getTime()) / 60000))
-
-  if (ageMin < 15) return { label: 'Live', detail: 'Updated just now', color: 'bg-green-400' }
-  if (ageMin < 60) return { label: 'Live', detail: `Updated ${ageMin}m ago`, color: 'bg-green-400' }
-  return { label: 'Active', detail: `Updated ${Math.floor(ageMin / 60)}h ago`, color: 'bg-green-400' }
 }
 
 function Dot({ colorClass, pulse = false }: { colorClass: string; pulse?: boolean }) {
@@ -60,35 +49,36 @@ function StatCard({
   )
 }
 
-export function KpiStrip({ kpis, lastUpdatedAt }: KpiStripProps) {
-  const liveMeta = getLiveMeta(lastUpdatedAt)
+export function KpiStrip({ kpis }: KpiStripProps) {
   const activeConflictColorClass =
     kpis.activeConflictZones > 5 ? 'text-red-400' : kpis.activeConflictZones > 2 ? 'text-orange-400' : undefined
 
+  const alertColorClass =
+    kpis.activeAlertsCount > 10 ? 'text-red-400' : kpis.activeAlertsCount > 0 ? 'text-amber-400' : 'text-white/30'
+
   return (
-    <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
       <StatCard
-        href="/feed?window=24h"
+        href="/situations"
         label="Active Conflicts"
         value={kpis.activeConflictZones}
         accentClass={activeConflictColorClass}
       />
       <StatCard
-        href="/feed?window=24h"
+        href="/feed?severity=4&window=2h"
         label="Breaking"
         value={kpis.breaking2h}
         accentClass={kpis.breaking2h > 0 ? 'text-red-400' : undefined}
         meta={kpis.breaking2h > 0 ? <Dot colorClass="bg-red-400" pulse /> : undefined}
       />
       <StatCard href="/feed?window=24h" label="Events Today" value={kpis.eventsWindow} />
-      <StatCard href="/feed?window=24h" label="Hot Regions" value={kpis.hotRegionCount} accentClass="text-orange-400" />
-      <StatCard href="/feed?window=24h" label="Most Active" value={kpis.mostActiveRegion ?? '—'} accentClass="text-sky-400" />
+      <StatCard href="/analysis/countries" label="Hot Regions" value={kpis.hotRegionCount} accentClass="text-orange-400" />
       <StatCard
-        href="/feed?window=24h"
-        label="Live"
-        value={liveMeta.label}
-        accentClass="text-green-400"
-        meta={<Dot colorClass="bg-green-400" pulse={liveMeta.label === 'Live'} />}
+        href="/alerts"
+        label="Unread Alerts"
+        value={kpis.activeAlertsCount}
+        accentClass={alertColorClass}
+        meta={kpis.activeAlertsCount > 0 ? <Dot colorClass="bg-amber-400" pulse /> : undefined}
       />
     </div>
   )
