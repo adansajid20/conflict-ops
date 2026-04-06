@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType, CSSProperties } from 'react'
-import { AlertTriangle, Bell, Copy, Download, ExternalLink, Pin, Search, X } from 'lucide-react'
+import { AlertTriangle, Bell, Copy, Download, ExternalLink, Pin, RefreshCw, Search, SortDesc, X, Clock } from 'lucide-react'
 import { getFreshnessStatus } from '@/lib/utils/freshness'
 import { getOutletDisplay } from '@/lib/utils/outlet'
 import { getRegionDisplay } from '@/lib/event-presentation'
@@ -30,6 +30,7 @@ type FeedResponse = { data?: FeedEvent[] }
 type TimeWindow = '1h' | '6h' | '24h' | '7d' | '30d'
 type SeverityFilter = 'all' | 'critical' | 'high' | 'medium' | 'low'
 type CategoryFilter = 'all' | 'conflict' | 'airstrikes' | 'political' | 'humanitarian' | 'disasters' | 'cyber' | 'nuclear'
+type SortMode = 'newest' | 'severity'
 type DetailTab = 'brief' | 'raw' | 'related'
 
 const TIME_WINDOWS: TimeWindow[] = ['1h', '6h', '24h', '7d', '30d']
@@ -54,6 +55,9 @@ const ExternalLinkIcon = ExternalLink as unknown as ComponentType<{ className?: 
 const PinIcon = Pin as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
 const SearchIcon = Search as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
 const XIcon = X as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
+const RefreshIcon = RefreshCw as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
+const SortIcon = SortDesc as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
+const ClockIcon = Clock as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ')
@@ -74,19 +78,14 @@ function getSeverityMeta(severity?: number | null) {
   return { label: 'LOW', chip: 'text-green-300 bg-green-500/15 border-green-500/40', border: 'border-l-green-500', dot: 'bg-green-500' }
 }
 
-function getSeverityFilterValue(filter: SeverityFilter) {
-  if (filter === 'critical') return 4
-  if (filter === 'high') return 3
-  if (filter === 'medium') return 2
-  if (filter === 'low') return 1
-  return 0
-}
-
 function matchesSeverity(event: FeedEvent, filter: SeverityFilter) {
   if (filter === 'all') return true
-  const threshold = getSeverityFilterValue(filter)
-  // Show events at or above the selected severity level
-  return (event.severity ?? 1) >= threshold
+  const sev = event.severity ?? 1
+  if (filter === 'critical') return sev === 4
+  if (filter === 'high') return sev === 3
+  if (filter === 'medium') return sev === 2
+  if (filter === 'low') return sev === 1
+  return true
 }
 
 function matchesCategory(event: FeedEvent, category: CategoryFilter) {
@@ -116,22 +115,29 @@ function formatRegion(region?: string | null) {
   return getRegionDisplay(region ?? null) ?? (region ? region.replace(/_/g, ' ') : 'Global')
 }
 
+function escCsv(value: string): string {
+  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`
+  return value
+}
+
 function exportCsv(events: FeedEvent[]) {
-  const header = ['id', 'title', 'severity', 'region', 'occurred_at', 'source', 'source_id']
+  const header = ['id', 'title', 'severity', 'event_type', 'region', 'occurred_at', 'source', 'source_url', 'summary']
   const rows = events.map((event) => [
-    event.id,
-    JSON.stringify(event.title ?? ''),
+    escCsv(event.id),
+    escCsv(event.title ?? ''),
     String(event.severity ?? 1),
-    JSON.stringify(event.region ?? ''),
+    escCsv(event.event_type ?? 'general'),
+    escCsv(event.region ?? ''),
     event.occurred_at ?? '',
-    JSON.stringify(event.source ?? ''),
-    JSON.stringify(event.source_id ?? ''),
+    escCsv(event.source ?? ''),
+    escCsv(event.source_id ?? ''),
+    escCsv(event.summary_short ?? event.snippet ?? event.description ?? ''),
   ])
   const blob = new Blob([[header.join(','), ...rows.map((row) => row.join(','))].join('\n')], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `intel-feed-${Date.now()}.csv`
+  link.download = `intel-feed-${new Date().toISOString().slice(0, 10)}.csv`
   link.click()
   URL.revokeObjectURL(url)
 }
@@ -315,38 +321,69 @@ function EventDetailPanel({ events, selectedIndex, onClose, onNavigate }: { even
 export function EventFeed() {
   const [events, setEvents] = useState<FeedEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('24h')
   const [category, setCategory] = useState<CategoryFilter>('all')
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all')
+  const [sortMode, setSortMode] = useState<SortMode>('newest')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [lastFetched, setLastFetched] = useState<Date | null>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
 
-  const fetchEvents = useCallback(async () => {
-    setLoading(true)
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 200)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const fetchEvents = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
+    else setLoading(true)
     try {
       const response = await fetch(`/api/v1/events?window=${timeWindow}&limit=200`, { cache: 'no-store' })
       const json = await response.json() as FeedResponse
       setEvents(json.data ?? [])
+      setLastFetched(new Date())
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }, [timeWindow])
 
   useEffect(() => { void fetchEvents() }, [fetchEvents])
 
-  const filteredEvents = useMemo(() => events.filter((event) => {
-    const query = search.trim().toLowerCase()
-    const matchesQuery = !query || `${event.title} ${event.description ?? ''} ${event.region ?? ''}`.toLowerCase().includes(query)
-    return matchesQuery && matchesCategory(event, category) && matchesSeverity(event, severityFilter)
-  }), [events, search, category, severityFilter])
+  const filteredEvents = useMemo(() => {
+    const query = debouncedSearch.trim().toLowerCase()
+    let result = events.filter((event) => {
+      const matchesQuery = !query || `${event.title} ${event.description ?? ''} ${event.region ?? ''} ${event.event_type ?? ''}`.toLowerCase().includes(query)
+      return matchesQuery && matchesCategory(event, category) && matchesSeverity(event, severityFilter)
+    })
+
+    if (sortMode === 'severity') {
+      result = [...result].sort((a, b) => (b.severity ?? 1) - (a.severity ?? 1))
+    }
+
+    return result
+  }, [events, debouncedSearch, category, severityFilter, sortMode])
+
+  // Severity counts based on currently category+search filtered events (not raw)
+  const activeFilteredBase = useMemo(() => {
+    const query = debouncedSearch.trim().toLowerCase()
+    return events.filter((event) => {
+      const matchesQuery = !query || `${event.title} ${event.description ?? ''} ${event.region ?? ''} ${event.event_type ?? ''}`.toLowerCase().includes(query)
+      return matchesQuery && matchesCategory(event, category)
+    })
+  }, [events, debouncedSearch, category])
 
   const severityCounts = useMemo(() => ({
-    all: events.length,
-    critical: events.filter((event) => event.severity === 4).length,
-    high: events.filter((event) => event.severity === 3).length,
-    medium: events.filter((event) => event.severity === 2).length,
-    low: events.filter((event) => (event.severity ?? 1) === 1).length,
-  }), [events])
+    all: activeFilteredBase.length,
+    critical: activeFilteredBase.filter((event) => event.severity === 4).length,
+    high: activeFilteredBase.filter((event) => event.severity === 3).length,
+    medium: activeFilteredBase.filter((event) => event.severity === 2).length,
+    low: activeFilteredBase.filter((event) => (event.severity ?? 1) === 1).length,
+  }), [activeFilteredBase])
 
   const selectedIndex = useMemo(() => filteredEvents.findIndex((event) => event.id === selectedId), [filteredEvents, selectedId])
 
@@ -354,34 +391,145 @@ export function EventFeed() {
     if (selectedId && selectedIndex === -1) setSelectedId(null)
   }, [selectedId, selectedIndex])
 
+  const lastFetchedLabel = lastFetched
+    ? `Updated ${lastFetched.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+    : null
+
   return (
     <div className="h-full overflow-hidden rounded-xl border border-white/[0.05] bg-[#070B11]">
       <div className="border-b border-white/[0.05] px-4 py-3">
+        {/* Row 1: Search + actions */}
         <div className="mb-3 flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
             <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/20" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search intel feed" className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] py-2 pl-9 pr-3 text-[12px] text-white/70 outline-none placeholder:text-white/20 focus:border-white/[0.12]" />
+            <input
+              ref={searchRef}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search events by title, region, or type…"
+              className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] py-2 pl-9 pr-8 text-[12px] text-white/70 outline-none placeholder:text-white/20 focus:border-white/[0.12]"
+            />
+            {search && (
+              <button
+                onClick={() => { setSearch(''); searchRef.current?.focus() }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-white/20 hover:text-white/50"
+                aria-label="Clear search"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-          <button onClick={() => exportCsv(filteredEvents)} className="inline-flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[12px] text-white/70 hover:bg-white/[0.06] transition-colors duration-150"><DownloadIcon className="h-4 w-4" />Export</button>
+
+          {/* Sort toggle */}
+          <button
+            onClick={() => setSortMode((m) => m === 'newest' ? 'severity' : 'newest')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12px] font-medium transition-colors duration-150',
+              sortMode === 'severity'
+                ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
+                : 'border-white/[0.06] bg-white/[0.03] text-white/50 hover:bg-white/[0.06]'
+            )}
+            title={`Sort by ${sortMode === 'newest' ? 'severity' : 'newest first'}`}
+          >
+            <SortIcon className="h-3.5 w-3.5" />
+            {sortMode === 'newest' ? 'Newest' : 'Severity'}
+          </button>
+
+          {/* Refresh */}
+          <button
+            onClick={() => void fetchEvents(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[12px] text-white/50 hover:bg-white/[0.06] transition-colors duration-150 disabled:opacity-40"
+            title="Refresh feed"
+          >
+            <RefreshIcon className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
+          </button>
+
+          {/* Export */}
+          <button
+            onClick={() => exportCsv(filteredEvents)}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[12px] text-white/50 hover:bg-white/[0.06] transition-colors duration-150"
+          >
+            <DownloadIcon className="h-3.5 w-3.5" />
+            Export
+          </button>
         </div>
 
-        <div className="mb-3 flex flex-wrap gap-2">
-          {TIME_WINDOWS.map((value) => <button key={value} onClick={() => setTimeWindow(value)} className={cn('rounded-lg border px-3 py-1.5 text-xs font-medium', timeWindow === value ? 'bg-blue-500 text-white border-blue-500' : 'border-white/[0.06] text-white/35 hover:text-white/55')}>{value.toUpperCase()}</button>)}
+        {/* Row 2: Time windows + meta info */}
+        <div className="mb-3 flex items-center gap-3">
+          <div className="flex flex-wrap gap-1.5">
+            {TIME_WINDOWS.map((value) => (
+              <button
+                key={value}
+                onClick={() => setTimeWindow(value)}
+                className={cn(
+                  'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors duration-150',
+                  timeWindow === value
+                    ? 'bg-blue-500 text-white border-blue-500'
+                    : 'border-white/[0.06] text-white/35 hover:text-white/55'
+                )}
+              >
+                {value.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <div className="ml-auto flex items-center gap-3 text-[11px] text-white/20">
+            {lastFetchedLabel && (
+              <span className="flex items-center gap-1.5">
+                <ClockIcon className="h-3 w-3" />
+                {lastFetchedLabel}
+              </span>
+            )}
+            <span className="tabular-nums">
+              {filteredEvents.length === events.length
+                ? `${events.length} events`
+                : `${filteredEvents.length} of ${events.length} events`}
+            </span>
+          </div>
         </div>
 
-        <div className="mb-3 flex flex-wrap gap-2">
-          {CATEGORY_OPTIONS.map((option) => <button key={option.key} onClick={() => setCategory(option.key)} className={cn('rounded-lg border px-3 py-1.5 text-xs font-medium', category === option.key ? 'bg-blue-500 text-white border-blue-500' : 'border-white/[0.06] text-white/35 hover:text-white/55')}>{option.label}</button>)}
+        {/* Row 3: Category filters */}
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {CATEGORY_OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              onClick={() => setCategory(option.key)}
+              className={cn(
+                'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors duration-150',
+                category === option.key
+                  ? 'bg-blue-500 text-white border-blue-500'
+                  : 'border-white/[0.06] text-white/35 hover:text-white/55'
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        {/* Row 4: Severity filters with live counts */}
+        <div className="flex flex-wrap gap-1.5">
           {SEVERITY_ORDER.map((key) => {
             const label = key === 'all' ? 'All' : `${key.slice(0, 1).toUpperCase()}${key.slice(1)}`
-            return <button key={key} onClick={() => setSeverityFilter(key)} className={cn('rounded-lg border px-3 py-1.5 text-xs font-medium', severityFilter === key ? 'bg-blue-500 text-white border-blue-500' : 'border-white/[0.06] text-white/35 hover:text-white/55')}>{label} ({severityCounts[key]})</button>
+            const count = severityCounts[key]
+            return (
+              <button
+                key={key}
+                onClick={() => setSeverityFilter(key)}
+                className={cn(
+                  'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors duration-150',
+                  severityFilter === key
+                    ? 'bg-blue-500 text-white border-blue-500'
+                    : 'border-white/[0.06] text-white/35 hover:text-white/55'
+                )}
+              >
+                {label} ({count})
+              </button>
+            )
           })}
         </div>
       </div>
 
-      <div className="grid h-[calc(100%-138px)] lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid h-[calc(100%-160px)] lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-h-0 overflow-y-auto p-4">
           <BreakingBanner events={filteredEvents} />
           <div className="space-y-3">
