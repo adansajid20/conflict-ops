@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, type ComponentType, type CSSProperties } from 'react'
+import { usePathname } from 'next/navigation'
 import { Bot, Loader2, Send, X } from 'lucide-react'
 
 type OrgResponse = { success?: boolean; data?: { org?: { id?: string } } }
@@ -30,6 +31,7 @@ const SendIcon = Send as unknown as ComponentType<{ className?: string; style?: 
 const CloseIcon = X as unknown as ComponentType<{ className?: string; style?: CSSProperties }>
 
 export function IntelCopilot({ topStories: propTopStories }: { topStories?: TopStoryContext[] }) {
+  const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [orgId, setOrgId] = useState<string | null>(null)
   const [input, setInput] = useState('')
@@ -96,6 +98,9 @@ export function IntelCopilot({ topStories: propTopStories }: { topStories?: TopS
       setThinking(false)
     }
   }
+
+  // Hide on map page — the globe has its own UI and the button overlaps the sidebar
+  if (pathname === '/map') return null
 
   return (
     <div className="fixed bottom-4 right-4 z-[70] flex flex-col items-end gap-3">

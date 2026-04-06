@@ -1,5 +1,6 @@
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 15 // seconds — Vercel serverless function timeout
 
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -19,7 +20,10 @@ export async function GET(request: NextRequest) {
 
   const clientId = process.env.OPENSKY_CLIENT_ID
   const clientSecret = process.env.OPENSKY_CLIENT_SECRET
-  const headers: Record<string, string> = { Accept: 'application/json' }
+  const headers: Record<string, string> = {
+    'Accept': 'application/json',
+    'User-Agent': 'ConflictRadar/1.0',
+  }
   if (clientId && clientSecret) {
     headers['Authorization'] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`
   }
@@ -27,20 +31,24 @@ export async function GET(request: NextRequest) {
   // Retry up to 2 times
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 8_000)
+
       const res = await fetch(apiUrl, {
         headers,
-        next: { revalidate: 15 },
-        signal: AbortSignal.timeout(12_000),
+        cache: 'no-store',
+        signal: controller.signal,
       })
+      clearTimeout(timeout)
 
       if (res.status === 429) {
         console.warn(`[flights] OpenSky rate limited (attempt ${attempt + 1})`)
-        if (attempt === 0) await new Promise(r => setTimeout(r, 2000))
+        if (attempt === 0) await new Promise(r => setTimeout(r, 1500))
         continue
       }
 
       if (!res.ok) {
-        console.error(`[flights] OpenSky ${res.status}`)
+        console.error(`[flights] OpenSky ${res.status} ${res.statusText}`)
         continue
       }
 
@@ -62,11 +70,17 @@ export async function GET(request: NextRequest) {
           squawk: s[14] ? String(s[14]) : undefined,
         }))
 
-      return NextResponse.json({ time: data.time, count: flights.length, flights })
+      return NextResponse.json(
+        { time: data.time, count: flights.length, flights },
+        { headers: { 'Cache-Control': 'public, s-maxage=15, stale-while-revalidate=30' } },
+      )
     } catch (err) {
       console.error(`[flights] attempt ${attempt + 1} error:`, err)
     }
   }
 
-  return NextResponse.json({ flights: [], count: 0, error: 'OpenSky unavailable' })
+  return NextResponse.json(
+    { flights: [], count: 0, error: 'OpenSky unavailable' },
+    { status: 502 },
+  )
 }
