@@ -66,21 +66,23 @@ function OverviewSkeleton() {
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="min-h-[96px] rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }} />
+          <div key={i} className="min-h-[96px] rounded-xl border border-white/[0.05] bg-white/[0.02] p-4">
+            <div className="h-full bg-white/[0.04] rounded animate-pulse" />
+          </div>
         ))}
       </div>
       <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
-        <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+        <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-4">
           <div className="space-y-3">
-            {[...Array(8)].map((_, i) => <div key={i} className="h-16 rounded bg-white/5" />)}
+            {[...Array(8)].map((_, i) => <div key={i} className="h-16 rounded bg-white/[0.04] animate-pulse" />)}
           </div>
         </div>
         <div className="space-y-4">
-          <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-            <div className="h-64 rounded bg-white/5" />
+          <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-4">
+            <div className="h-64 rounded bg-white/[0.04] animate-pulse" />
           </div>
-          <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-            <div className="h-40 rounded bg-white/5" />
+          <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-4">
+            <div className="h-40 rounded bg-white/[0.04] animate-pulse" />
           </div>
         </div>
       </div>
@@ -98,11 +100,11 @@ type Window = typeof WINDOWS[number]['key']
 
 function TopStoriesList({ events, onSelect }: { events: OverviewEvent[]; onSelect: (event: OverviewEvent) => void }) {
   if (events.length === 0) {
-    return <div className="px-5 py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No significant events in the selected timeframe.</div>
+    return <div className="px-5 py-10 text-center text-sm text-white/30">No significant events in the selected timeframe.</div>
   }
 
   return (
-    <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+    <div className="divide-y divide-white/[0.04]">
       {events.slice(0, 20).map((event) => {
         const tier = getSignificanceTier(event.significance_score ?? null, event.severity)
         const showBadge = !['Monitoring', 'Low', 'Routine'].includes(event.significance_tier ?? tier.label)
@@ -115,33 +117,33 @@ function TopStoriesList({ events, onSelect }: { events: OverviewEvent[]; onSelec
           <button
             key={event.id}
             onClick={() => onSelect(event)}
-            className="block w-full px-5 py-4 text-left transition-colors duration-150 hover:bg-white/5"
+            className="block w-full px-5 py-4 text-left transition-colors duration-150 hover:bg-white/[0.03]"
           >
-            <div className="mb-2 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-              {showBadge && <span className={`rounded-full px-2 py-0.5 font-semibold ${tier.bgColor} ${tier.color}`}>{event.significance_tier ?? tier.label}</span>}
+            <div className="mb-2 flex items-center gap-2 text-[11px] text-white/25">
+              {showBadge && <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${tier.bgColor} ${tier.color}`}>{event.significance_tier ?? tier.label}</span>}
               <span>{sourceName}</span>
               <span>·</span>
               <span>{regionName}</span>
               <span className="ml-auto tabular-nums">{timeText}</span>
             </div>
-            <p className="line-clamp-2 text-sm font-semibold leading-6" style={{ color: 'var(--text-primary)' }}>
+            <p className="line-clamp-2 text-[14px] font-medium leading-6 text-white/85">
               {decodeHtmlEntities(event.title ?? 'Untitled event')}
             </p>
             {isDescriptionMeaningful({ ...event, description }) && (
-              <p className="mt-1 text-xs line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+              <p className="mt-1 text-[12px] line-clamp-2 text-white/30">
                 {description}
               </p>
             )}
           </button>
         )
       })}
-      <div className="px-5 py-4 text-sm">
-        <Link href="/feed" className="font-medium" style={{ color: 'var(--primary)' }}>
+      <div className="px-5 py-4">
+        <Link href="/feed" className="text-[13px] font-medium text-blue-400/70 hover:text-blue-400">
           Advanced filters &amp; search →
         </Link>
       </div>
-      <div className="px-5 pb-4 text-sm">
-        <Link href="/feed" className="font-medium" style={{ color: 'var(--primary)' }}>
+      <div className="px-5 pb-4">
+        <Link href="/feed" className="text-[13px] font-medium text-blue-400/70 hover:text-blue-400">
           View all events in Intel Feed →
         </Link>
       </div>
@@ -175,25 +177,25 @@ function QuickActions({ data, hasOrg }: { data: OverviewData; hasOrg: boolean })
   }, [data])
 
   return (
-    <div className="rounded-xl border p-4 space-y-1.5" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-      <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Quick Actions</div>
-      <Link href="/feed?window=24h" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--text-secondary)' }}>
-        <IconRefresh size={14} /> View Intel Feed (24h)
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] overflow-hidden p-4 space-y-1.5">
+      <div className="mb-3 text-[10px] font-medium uppercase tracking-[0.15em] text-white/20">Quick Actions</div>
+      <Link href="/feed?window=24h" className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60">
+        <IconRefresh size={14} className="text-white/25" /> View Intel Feed (24h)
       </Link>
-      <Link href="/tracking" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--text-secondary)' }}>
-        <IconMap size={14} /> Open Live Map
+      <Link href="/tracking" className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60">
+        <IconMap size={14} className="text-white/25" /> Open Live Map
       </Link>
       {hasOrg ? (
-        <Link href="/alerts/new" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--text-secondary)' }}>
-          <IconBell size={14} /> Set Up Alert
+        <Link href="/alerts/new" className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60">
+          <IconBell size={14} className="text-white/25" /> Set Up Alert
         </Link>
       ) : (
-        <Link href="/alerts/new" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--text-secondary)' }}>
-          <IconBell size={14} /> Set Up Alert
+        <Link href="/alerts/new" className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60">
+          <IconBell size={14} className="text-white/25" /> Set Up Alert
         </Link>
       )}
-      <button onClick={downloadReport} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white/5" style={{ color: 'var(--text-secondary)' }}>
-        <IconDownload size={14} /> Download Report
+      <button onClick={downloadReport} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60">
+        <IconDownload size={14} className="text-white/25" /> Download Report
       </button>
     </div>
   )
@@ -209,25 +211,25 @@ function RiskScoreWidget({ scores }: { scores: RegionRisk[] }) {
   if (!scores.length) return null
   const top = [...scores].sort((a, b) => b.risk_score - a.risk_score).slice(0, 6)
   return (
-    <section className="overflow-hidden rounded-lg border" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-      <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--border)' }}>
-        <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Regional Risk Scores</h2>
-        <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>0–10</span>
+    <section className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.015]">
+      <div className="flex items-center justify-between border-b border-white/[0.04] px-4 py-3">
+        <h2 className="text-[13px] font-semibold text-white/80">Regional Risk Scores</h2>
+        <span className="text-[10px] uppercase tracking-[0.15em] text-white/20">0–10</span>
       </div>
-      <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+      <div className="divide-y divide-white/[0.04]">
         {top.map(r => (
           <div key={r.region} className="flex items-center gap-3 px-4 py-2.5">
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+              <div className="text-[13px] text-white/60">
                 {r.region.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
               </div>
-              <div className="mt-1 h-1.5 w-full rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+              <div className="mt-1 h-1 w-full rounded-full overflow-hidden bg-white/[0.04]">
                 <div className="h-full rounded-full transition-all" style={{ width: `${(r.risk_score / 10) * 100}%`, background: RISK_COLOR(r.risk_score) }} />
               </div>
             </div>
             <div className="shrink-0 flex items-center gap-1.5">
               <span className="text-[10px]" style={{ color: RISK_COLOR(r.risk_score) }}>{TREND_ICON(r.trend)}</span>
-              <span className="text-sm font-bold tabular-nums" style={{ color: RISK_COLOR(r.risk_score), fontFamily: 'JetBrains Mono, monospace' }}>
+              <span className="text-[14px] font-bold tabular-nums" style={{ color: RISK_COLOR(r.risk_score) }}>
                 {r.risk_score.toFixed(1)}
               </span>
             </div>
@@ -242,20 +244,20 @@ function ActiveSituationsWidget({ situations }: { situations: SituationSummary[]
   if (!situations.length) return null
   const top = situations.slice(0, 5)
   return (
-    <section className="overflow-hidden rounded-lg border" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-      <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--border)' }}>
-        <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Active Situations</h2>
-        <Link href="/situations" className="text-[11px] hover:opacity-70" style={{ color: 'var(--text-muted)' }}>View all →</Link>
+    <section className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.015]">
+      <div className="flex items-center justify-between border-b border-white/[0.04] px-4 py-3">
+        <h2 className="text-[13px] font-semibold text-white/80">Active Situations</h2>
+        <Link href="/situations" className="text-[10px] uppercase tracking-[0.15em] text-white/20 hover:text-white/40">View all →</Link>
       </div>
-      <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+      <div className="divide-y divide-white/[0.04]">
         {top.map(s => (
           <Link key={s.id} href={`/situations/${s.slug}`}
-            className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/5 block">
+            className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.03] block">
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{s.name}</div>
-              <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.event_count.toLocaleString()} events · {s.status}</div>
+              <div className="text-[13px] font-medium truncate text-white/70">{s.name}</div>
+              <div className="text-[10px] mt-0.5 text-white/25">{s.event_count.toLocaleString()} events · {s.status}</div>
             </div>
-            <div className="shrink-0 text-sm font-bold tabular-nums" style={{ color: RISK_COLOR(s.risk_score), fontFamily: 'JetBrains Mono, monospace' }}>
+            <div className="shrink-0 text-[14px] font-bold tabular-nums" style={{ color: RISK_COLOR(s.risk_score) }}>
               {s.risk_score.toFixed(1)}
             </div>
           </Link>
@@ -378,7 +380,7 @@ export function OverviewClient() {
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-[22px] font-semibold" style={{ color: 'var(--text-primary)' }}>Situation Overview</h1>
+            <h1 className="text-xl font-semibold text-white">Situation Overview</h1>
             {data && isAdmin && (
               <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: `${freshnessBadge.color}18`, color: freshnessBadge.color, border: `1px solid ${freshnessBadge.color}30` }}>
                 {freshnessBadge.label}
@@ -386,20 +388,20 @@ export function OverviewClient() {
             )}
           </div>
           {data && (
-            <div className="mt-1 flex items-center gap-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <div className="mt-1 flex items-center gap-2 text-[12px] text-white/30">
               {isAdmin && <><span>Last update: {safeRelativeTime(data.lastUpdatedAt)}</span><span>·</span></>}
               <span>{headerDate}</span>
             </div>
           )}
         </div>
 
-        <div className="flex rounded-lg p-0.5" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+        <div className="flex rounded-lg p-0.5 bg-white/[0.04] border border-white/[0.06]">
           {WINDOWS.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => { setWin(key); setSelectedEvent(null); setLastSeenAt(new Date()); setShowBanner(false) }}
-              className="px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-150"
-              style={win === key ? { background: 'var(--primary)', color: '#fff' } : { color: 'var(--text-secondary)' }}
+              className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150"
+              style={win === key ? { background: '#3b82f6', color: '#fff' } : { color: 'text-white/40 hover:text-white/60' }}
             >
               {label}
             </button>
@@ -408,11 +410,11 @@ export function OverviewClient() {
       </header>
 
       {error && !data && (
-        <div className="rounded-xl border px-5 py-10 text-center mb-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-          <IconActivity size={32} className="mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
-          <p className="mb-1 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Unable to load data</p>
-          <p className="mb-4 text-xs" style={{ color: 'var(--text-muted)' }}>Try refresh, or check back shortly.</p>
-          <button onClick={() => void fetchOverview(win)} className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium" style={{ background: 'var(--primary)', color: '#fff' }}>
+        <div className="rounded-xl border border-white/[0.05] px-5 py-10 text-center mb-4 bg-white/[0.015]">
+          <IconActivity size={32} className="mx-auto mb-3 text-white/30" />
+          <p className="mb-1 text-sm font-medium text-white">Unable to load data</p>
+          <p className="mb-4 text-xs text-white/30">Try refresh, or check back shortly.</p>
+          <button onClick={() => void fetchOverview(win)} className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium bg-blue-500 text-white">
             <IconRefresh size={13} /> Retry
           </button>
         </div>
@@ -423,12 +425,11 @@ export function OverviewClient() {
       {data && (
         <>
           {showBanner && newEventCount > 0 && (
-            <div className="mb-4 flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: '#1d4ed8', background: '#0f172a' }}>
-              <span className="text-sm" style={{ color: '#bfdbfe' }}>↑ {newEventCount} new events since your last view</span>
+            <div className="mb-4 flex items-center gap-3 rounded-xl border border-blue-500/15 px-4 py-3 bg-blue-500/[0.06]">
+              <span className="text-sm text-blue-400">↑ {newEventCount} new events since your last view</span>
               <button
                 onClick={() => { setLastSeenAt(new Date()); setShowBanner(false); setNewEventCount(0) }}
-                className="rounded-lg px-3 py-1.5 text-sm font-medium"
-                style={{ background: '#1d4ed8', color: '#fff' }}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium bg-blue-500 text-white"
               >
                 Show now
               </button>
@@ -436,10 +437,10 @@ export function OverviewClient() {
           )}
 
           {(data.freshnessStatus === 'Stale' || data.freshnessStatus === 'Offline') && (
-            <div className="mb-4 flex items-center gap-2 rounded-xl border px-4 py-3" style={{ borderColor: '#f59e0b30', background: '#f59e0b08' }}>
-              <IconClock size={14} style={{ color: '#f59e0b' }} />
-              <span className="text-sm" style={{ color: '#f59e0b' }}>Updates are delayed. Core tracking continues. Try refresh.</span>
-              <button onClick={() => window.location.reload()} className="ml-auto text-xs underline" style={{ color: '#f59e0b' }}>Refresh</button>
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-500/15 px-4 py-3 bg-amber-500/[0.04]">
+              <IconClock size={14} className="text-amber-500" />
+              <span className="text-sm text-amber-500">Updates are delayed. Core tracking continues. Try refresh.</span>
+              <button onClick={() => window.location.reload()} className="ml-auto text-xs underline text-amber-500">Refresh</button>
             </div>
           )}
 
@@ -448,28 +449,27 @@ export function OverviewClient() {
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
-            <section className="overflow-hidden rounded-lg border" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-              <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}>
-                <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Top Stories</h2>
+            <section className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.015]">
+              <div className="flex items-center justify-between border-b border-white/[0.04] px-5 py-4">
+                <h2 className="text-[13px] font-semibold text-white/80">Top Stories</h2>
               </div>
 
               {breakingEvents.length > 0 && (
-                <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)', background: 'rgba(239,68,68,0.04)' }}>
-                  <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-red-500">BREAKING</div>
+                <div className="border-b border-white/[0.04] px-5 py-4 bg-red-500/[0.03]">
+                  <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-red-400">BREAKING</div>
                   <div className="space-y-2.5">
                     {breakingEvents.map((event) => (
                       <button
                         key={`breaking-${event.id}`}
                         onClick={() => setSelectedEvent(event)}
-                        className="flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors hover:bg-white/5"
-                        style={{ borderColor: 'rgba(239,68,68,0.18)', borderLeft: '4px solid #ef4444' }}
+                        className="flex w-full items-start gap-3 rounded-lg border border-red-500/15 border-l-[3px] border-l-red-500 px-3 py-2.5 text-left transition-colors hover:bg-white/[0.03]"
                       >
-                        <span className="text-xs font-semibold uppercase tracking-wide animate-pulse text-red-500">●LIVE</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] animate-pulse text-red-400">●LIVE</span>
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold leading-6" style={{ color: 'var(--text-primary)' }}>
+                          <div className="text-[14px] font-medium leading-6 text-white/85">
                             {decodeHtmlEntities(event.title ?? 'Untitled event')}
                           </div>
-                          <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                          <div className="mt-1 text-[11px] text-white/25">
                             {[getRegionDisplay(event.region), formatRelativeOccurredTime(event.occurred_at)].filter(Boolean).join(' · ')}
                           </div>
                         </div>
@@ -483,13 +483,13 @@ export function OverviewClient() {
             </section>
 
             <div className="space-y-4">
-              <section className="overflow-hidden rounded-lg border" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-                <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}>
-                  <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Hot Regions</h2>
+              <section className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.015]">
+                <div className="border-b border-white/[0.04] px-5 py-4">
+                  <h2 className="text-[13px] font-semibold text-white/80">Hot Regions</h2>
                 </div>
                 <div className="p-3">
                   {data.hotRegions.length === 0 ? (
-                    <p className="px-2 py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Insufficient data to rank regions.</p>
+                    <p className="px-2 py-6 text-center text-sm text-white/30">Insufficient data to rank regions.</p>
                   ) : (
                     <HotRegionsTable regions={data.hotRegions} />
                   )}

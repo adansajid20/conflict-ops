@@ -79,37 +79,36 @@ function NavLink({ item, pathname, alertCount = 0 }: { item: NavItem; pathname: 
     return (
       <button
         type="button"
-        className="nav-item w-full opacity-50 cursor-not-allowed"
+        className="w-full opacity-50 cursor-not-allowed flex items-center gap-3 px-3 py-2 text-[13px] text-white/50 rounded-lg"
         title="Coming soon — on the roadmap"
         onClick={(event) => event.preventDefault()}
       >
-        <Icon className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
-        <span>{item.label}</span>
-        <span className="text-[9px] tracking-wider bg-white/5 text-white/30 rounded px-1 ml-auto">SOON</span>
+        <Icon className="h-4 w-4 flex-shrink-0" />
+        <span className="truncate">{item.label}</span>
+        <span className="text-[9px] tracking-wider bg-white/5 text-white/30 rounded px-1 ml-auto flex-shrink-0">SOON</span>
       </button>
     )
   }
 
   return (
-    <Link href={item.href} className={`nav-item transition-colors duration-150 ${active ? 'active' : ''}`} style={{ position: 'relative' }}>
+    <Link
+      href={item.href}
+      className={`flex items-center gap-3 px-3 py-2 text-[13px] rounded-lg transition-all duration-150 relative ${
+        active
+          ? 'bg-white/[0.06] text-white/90'
+          : 'text-white/50 hover:bg-white/[0.04]'
+      }`}
+    >
       <span
         aria-hidden
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 2,
-          background: 'var(--primary)',
-          borderRadius: '0 2px 2px 0',
-          opacity: active ? 1 : 0,
-          transition: 'opacity 150ms ease',
-        }}
+        className={`absolute left-0 top-0 bottom-0 w-[2px] bg-blue-400 rounded-r transition-opacity duration-150 ${
+          active ? 'opacity-100' : 'opacity-0'
+        }`}
       />
-      <Icon className="h-4 w-4" style={{ color: active ? 'var(--primary-text)' : 'var(--text-muted)' }} />
-      <span>{item.label}</span>
+      <Icon className={`h-4 w-4 flex-shrink-0 ${active ? 'text-blue-400' : 'text-white/30'}`} />
+      <span className="truncate flex-1">{item.label}</span>
       {item.href === '/alerts' && alertCount > 0 && (
-        <span className="ml-auto rounded-full px-2 py-0.5 text-[11px] mono" style={{ background: 'var(--sev-critical-dim)', color: 'var(--sev-critical)' }}>
+        <span className="ml-auto flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium bg-red-500/15 text-red-400">
           {alertCount}
         </span>
       )}
@@ -135,19 +134,19 @@ function SidebarStatus({ lastIngestAt, liveFeeds, totalFeeds }: { lastIngestAt: 
   const isWarning = ingestAgeMs > 5 * 60 * 1000
   const isStale = ingestAgeMs > 15 * 60 * 1000
   const ingestIcon = isStale ? '✕' : isWarning ? '⚠' : '⟳'
-  const ingestColor = isStale ? 'var(--sev-critical)' : isWarning ? 'var(--sev-medium)' : 'var(--text-muted)'
+  const ingestColor = isStale ? 'var(--sev-critical)' : isWarning ? 'var(--sev-medium)' : 'text-white/30'
   const ingestLabel = isStale ? 'STALE' : `INGEST ${safeTimeAgo(lastIngestAt)}`
 
   return (
-    <div className="space-y-2 text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+    <div className="space-y-2 text-[10px] text-white/40">
       <div className="flex items-center gap-1.5 whitespace-nowrap">
         <span style={{ color: liveFeeds > 0 ? 'var(--sev-low)' : 'var(--sev-medium)' }}>🟢</span>
         <span>Live</span>
         <span>·</span>
         <span className="mono">{liveFeeds}/{totalFeeds}</span>
         <span>|</span>
-        <span className="mono" style={{ color: ingestColor }}>{ingestIcon}</span>
-        <span className="mono" style={{ color: ingestColor }}>{ingestLabel}</span>
+        <span className={`mono ${typeof ingestColor === 'string' && ingestColor.includes('var') ? '' : ingestColor}`} style={typeof ingestColor === 'string' && ingestColor.includes('var') ? { color: ingestColor } : {}}>{ingestIcon}</span>
+        <span className={`mono ${typeof ingestColor === 'string' && ingestColor.includes('var') ? '' : ingestColor}`} style={typeof ingestColor === 'string' && ingestColor.includes('var') ? { color: ingestColor } : {}}>{ingestLabel}</span>
       </div>
       <div className="flex items-center gap-2 whitespace-nowrap">
         <span>UTC <span className="mono">{utcTime}</span></span>
@@ -156,8 +155,7 @@ function SidebarStatus({ lastIngestAt, liveFeeds, totalFeeds }: { lastIngestAt: 
           type="button"
           onClick={openCommandPalette}
           title="Open command palette"
-          className="rounded-full border px-2 py-0.5 mono"
-          style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.55)' }}
+          className="rounded-full border px-2 py-0.5 mono text-white/40 border-white/[0.08] hover:border-white/[0.12] transition-colors duration-150"
         >
           ⌘K
         </button>
@@ -214,82 +212,107 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const lastIngestAt = health?.ingest?.last_success_at ?? health?.lastIngestAt ?? null
 
   return (
-    <div className="flex h-screen flex-col" style={{ background: 'var(--bg-base)', ['--primary' as string]: branding?.primary_color ?? 'var(--primary)', ['--accent' as string]: branding?.accent_color ?? 'var(--accent)' } as React.CSSProperties}>
+    <div className="flex h-screen flex-col bg-[#070B11]" style={{ ['--primary' as string]: branding?.primary_color ?? 'var(--primary)', ['--accent' as string]: branding?.accent_color ?? 'var(--accent)' } as React.CSSProperties}>
       <CommandPalette />
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-[240px] shrink-0 flex-col border-r" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-          <div className="border-b px-4 py-5" style={{ borderColor: 'var(--border)' }}>
-            <Link href="/overview" className="flex items-start gap-3" style={{ textDecoration: 'none' }}>
-              <div className="rounded-lg border p-2" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
-                {(() => { const ShieldIcon = Shield as React.ElementType; return <ShieldIcon className="h-4 w-4" style={{ color: 'var(--primary-text)' }} /> })()}
-              </div>
+        <aside className="flex w-[256px] shrink-0 flex-col border-r border-white/[0.06] bg-[#0B0F18]">
+          {/* Logo Section */}
+          <div className="border-b border-white/[0.06] px-4 py-5">
+            <Link href="/overview" className="flex items-center gap-2 no-underline hover:opacity-90 transition-opacity">
+              <Shield className="h-5 w-5 text-blue-400 flex-shrink-0" />
               <div>
-                <div className="text-sm font-semibold tracking-[0.04em]" style={{ color: 'var(--text-primary)' }}>{branding?.app_name ?? 'CONFLICTRADAR'}</div>
-                <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Intelligence Platform</div>
+                <div className="text-sm font-semibold text-white">{branding?.app_name ?? 'ConflictRadar'}</div>
               </div>
             </Link>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-2 py-4">
-            <div className="mb-1 px-3 pb-2 text-xs tracking-widest opacity-50" style={{ color: 'var(--text-muted)' }}>
-              INTELLIGENCE
+          {/* Nav Sections */}
+          <div className="flex-1 overflow-y-auto px-2 py-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+            {/* Primary Nav */}
+            <div className="mb-6">
+              <div className="mb-2 px-3 text-[10px] uppercase tracking-[0.15em] text-white/20">
+                Intelligence
+              </div>
+              <div className="space-y-1">
+                {PRIMARY_NAV.map((item) => (
+                  <NavLink key={item.href} item={item} pathname={pathname} alertCount={alertCount} />
+                ))}
+              </div>
             </div>
-            <div className="mb-5 space-y-1">
-              {PRIMARY_NAV.map((item) => (
-                <NavLink key={item.href} item={item} pathname={pathname} alertCount={alertCount} />
-              ))}
-              {isAdminMode && (
-                <>
-                  <div className="px-3 pt-3 pb-1 text-[10px] font-medium uppercase tracking-[0.08em]" style={{ color: 'rgba(139,92,246,0.7)' }}>
-                    Admin
-                  </div>
+
+            {/* Admin Nav */}
+            {isAdminMode && (
+              <div className="mb-6">
+                <div className="mb-2 px-3 text-[10px] uppercase tracking-[0.15em] text-white/20">
+                  Admin
+                </div>
+                <div className="space-y-1">
                   {ADMIN_NAV.map((item) => (
                     <NavLink key={item.href} item={item} pathname={pathname} />
                   ))}
-                </>
-              )}
+                </div>
+              </div>
+            )}
+
+            {/* Analysis Nav */}
+            <div className="mb-6">
+              <div className="mb-2 px-3 text-[10px] uppercase tracking-[0.15em] text-white/20">
+                Analysis
+              </div>
+              <div className="space-y-1">
+                {ANALYSIS_NAV.map((item) => (
+                  <NavLink key={item.href} item={item} pathname={pathname} />
+                ))}
+              </div>
             </div>
 
-            <div className="mb-1 px-3 pb-2 text-xs tracking-widest opacity-50" style={{ color: 'var(--text-muted)' }}>
-              ANALYSIS
-            </div>
-            <div className="mb-5 space-y-1">
-              {ANALYSIS_NAV.map((item) => (
-                <NavLink key={item.href} item={item} pathname={pathname} />
-              ))}
-            </div>
-
-            <div className="mb-1 px-3 pb-2 text-xs tracking-widest opacity-50" style={{ color: 'var(--text-muted)' }}>
-              TOOLS
-            </div>
-            <div className="space-y-1">
-              {TOOLS_NAV.map((item) => (
-                <NavLink key={item.href} item={item} pathname={pathname} />
-              ))}
+            {/* Tools Nav */}
+            <div>
+              <div className="mb-2 px-3 text-[10px] uppercase tracking-[0.15em] text-white/20">
+                Tools
+              </div>
+              <div className="space-y-1">
+                {TOOLS_NAV.map((item) => (
+                  <NavLink key={item.href} item={item} pathname={pathname} />
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}>
-            <div className="mb-2 space-y-1">
+          {/* Bottom Section */}
+          <div className="border-t border-white/[0.06] px-4 py-3 space-y-3">
+            {/* Settings Nav */}
+            <div className="space-y-1">
               <NavLink item={{ href: '/settings', label: 'Settings', icon: Settings }} pathname={pathname} />
               <NavLink item={{ href: '/settings/alerts', label: 'Alert Settings', icon: Bell }} pathname={pathname} />
             </div>
-            <div className="mb-3 flex items-center gap-3 rounded-lg border p-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: 'var(--bg-active)', color: 'var(--primary-text)' }}>
+
+            {/* User Card */}
+            <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-400/20 text-blue-300 text-xs font-semibold flex-shrink-0">
                 {initials}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{user?.fullName ?? 'Operator'}</div>
-                <div className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>{user?.primaryEmailAddress?.emailAddress ?? 'Signed in'}</div>
+                <div className="truncate text-sm font-medium text-white/90">{user?.fullName ?? 'Operator'}</div>
+                <div className="truncate text-xs text-white/40">{user?.primaryEmailAddress?.emailAddress ?? 'Signed in'}</div>
               </div>
             </div>
+
+            {/* Admin Status */}
             {isAdminMode && <SidebarStatus lastIngestAt={lastIngestAt} liveFeeds={liveFeeds} totalFeeds={totalFeeds} />}
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        {/* Main Content */}
+        <div className="flex min-w-0 flex-1 flex-col bg-[#070B11]">
           <FreshnessBanner />
-          <div className="flex justify-end border-b px-4 py-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}><NotificationBell /></div>
+
+          {/* Top Bar */}
+          <div className="flex justify-end border-b border-white/[0.04] px-4 py-3 bg-transparent">
+            <NotificationBell />
+          </div>
+
+          {/* Page Content */}
           <main className="min-h-0 flex-1 overflow-auto">{children}</main>
         </div>
       </div>
