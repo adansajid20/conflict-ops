@@ -141,10 +141,10 @@ function BreakingBanner({ events }: { events: FeedEvent[] }) {
   const breaking = useMemo(() => events.filter((event) => (event.severity ?? 1) === 4 && event.occurred_at && (Date.now() - new Date(event.occurred_at).getTime()) <= 15 * 60 * 1000).slice(0, 3), [events])
   if (dismissed || breaking.length === 0) return null
   return (
-    <div className="sticky top-0 z-20 mb-3 flex items-center gap-3 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-3 text-sm text-red-100">
+    <div className="sticky top-0 z-20 mb-3 flex items-center gap-3 rounded-xl border border-red-500/15 bg-red-500/[0.04] px-4 py-3 text-sm text-red-100">
       <AlertTriangleIcon className="h-4 w-4 shrink-0" />
       <div className="min-w-0 flex-1 truncate">
-        <span className="mr-2 font-semibold tracking-wide">BREAKING</span>
+        <span className="mr-2 text-[10px] tracking-[0.2em] font-medium text-red-400">BREAKING</span>
         {breaking.map((event) => toTitleCase(event.title)).join(' • ')}
       </div>
       <button onClick={() => setDismissed(true)} className="rounded p-1 hover:bg-white/10" aria-label="Dismiss breaking banner">
@@ -165,14 +165,14 @@ function FeedSidebar({ events, onSelect }: { events: FeedEvent[]; onSelect: (eve
 
   return (
     <aside className="space-y-4">
-      <section className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">Hot Regions</div>
+      <section className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4">
+        <div className="mb-3 text-[10px] uppercase tracking-[0.15em] font-medium text-white/20">Hot Regions</div>
         <div className="space-y-2">
           {hotRegions.map(([region, count]) => (
             <div key={region}>
-              <div className="mb-1 flex items-center justify-between text-xs text-zinc-300">
+              <div className="mb-1 flex items-center justify-between text-[12px] text-white/50">
                 <span>{formatRegion(region)}</span>
-                <span>{count}</span>
+                <span className="text-white/30 tabular-nums">{count}</span>
               </div>
               <div className="h-2 rounded-full bg-white/10">
                 <div className="h-2 rounded-full bg-cyan-500" style={{ width: `${Math.max(12, (count / Math.max(hotRegions[0]?.[1] ?? 1, 1)) * 100)}%` }} />
@@ -182,23 +182,23 @@ function FeedSidebar({ events, onSelect }: { events: FeedEvent[]; onSelect: (eve
         </div>
       </section>
 
-      <section className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">Breaking Events</div>
+      <section className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4">
+        <div className="mb-3 text-[10px] uppercase tracking-[0.15em] font-medium text-white/20">Breaking Events</div>
         <div className="space-y-2">
-          {breaking.length === 0 ? <div className="text-sm text-zinc-500">No breaking events in the last 30 minutes.</div> : breaking.map((event) => <button key={event.id} onClick={() => onSelect(event)} className="block w-full rounded-lg border border-white/10 px-3 py-2 text-left hover:bg-white/5"><div className="text-sm font-medium text-zinc-100">{toTitleCase(event.title)}</div><div className="mt-1 text-xs text-zinc-400">{formatRegion(event.region)} · {relativeTime(event.occurred_at)}</div></button>)}
+          {breaking.length === 0 ? <div className="text-[12px] text-white/25">No breaking events in the last 30 minutes.</div> : breaking.map((event) => <button key={event.id} onClick={() => onSelect(event)} className="block w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.06] transition-colors duration-150"><div className="text-[12px] font-medium text-white/80">{toTitleCase(event.title)}</div><div className="mt-1 text-[11px] text-white/20">{formatRegion(event.region)} · {relativeTime(event.occurred_at)}</div></button>)}
         </div>
       </section>
 
-      <section className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">Critical Events</div>
+      <section className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4">
+        <div className="mb-3 text-[10px] uppercase tracking-[0.15em] font-medium text-white/20">Critical Events</div>
         <div className="space-y-2">
-          {critical.length === 0 ? <div className="text-sm text-zinc-500">No critical events in scope.</div> : critical.map((event) => <button key={event.id} onClick={() => onSelect(event)} className="block w-full rounded-lg border border-white/10 px-3 py-2 text-left hover:bg-white/5"><div className="text-sm font-medium text-zinc-100">{toTitleCase(event.title)}</div><div className="mt-1 text-xs text-zinc-400">{getOutletDisplay(event.source, event.source_id)}</div></button>)}
+          {critical.length === 0 ? <div className="text-[12px] text-white/25">No critical events in scope.</div> : critical.map((event) => <button key={event.id} onClick={() => onSelect(event)} className="block w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.06] transition-colors duration-150"><div className="text-[12px] font-medium text-white/80">{toTitleCase(event.title)}</div><div className="mt-1 text-[11px] text-white/25">{getOutletDisplay(event.source, event.source_id)}</div></button>)}
         </div>
       </section>
 
-      <section className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">Data Sources</div>
-        <div className="space-y-2 text-sm text-zinc-300">
+      <section className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4">
+        <div className="mb-3 text-[10px] uppercase tracking-[0.15em] font-medium text-white/20">Data Sources</div>
+        <div className="space-y-2 text-[11px] text-white/25">
           <div className="flex justify-between"><span>RSS</span><span>155 active</span></div>
           <div className="flex justify-between"><span>GDELT</span><span>15m</span></div>
           <div className="flex justify-between"><span>ACLED</span><span>15m</span></div>
@@ -234,23 +234,23 @@ function EventDetailPanel({ events, selectedIndex, onClose, onNavigate }: { even
 
   return (
     <div className="fixed inset-0 z-40 bg-black/60 p-4 md:p-8" onClick={onClose}>
-      <div className="ml-auto flex h-full w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-950" onClick={(eventClick) => eventClick.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+      <div className="ml-auto flex h-full w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0C1220]" onClick={(eventClick) => eventClick.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
           <div className="flex items-center gap-2">
             <span className={cn('rounded-full border px-2.5 py-1 text-xs font-semibold', severity.chip)}>{severity.label}</span>
-            <span className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-zinc-300">{event.event_type ?? 'general'}</span>
+            <span className="rounded-full border border-white/[0.06] px-2.5 py-1 text-xs text-white/70">{event.event_type ?? 'general'}</span>
             {freshness ? <span className={cn('rounded-full border px-2.5 py-1 text-xs font-semibold', freshness.color)}>{freshness.label}</span> : null}
           </div>
           <div className="flex items-center gap-2">
-            <button disabled={selectedIndex <= 0} onClick={() => onNavigate(selectedIndex - 1)} className="rounded border border-white/10 px-2 py-1 text-xs text-zinc-300 disabled:opacity-30">Prev</button>
-            <button disabled={selectedIndex >= events.length - 1} onClick={() => onNavigate(selectedIndex + 1)} className="rounded border border-white/10 px-2 py-1 text-xs text-zinc-300 disabled:opacity-30">Next</button>
-            <button onClick={onClose} className="rounded border border-white/10 p-2 text-zinc-300"><XIcon className="h-4 w-4" /></button>
+            <button disabled={selectedIndex <= 0} onClick={() => onNavigate(selectedIndex - 1)} className="rounded border border-white/[0.06] px-2 py-1 text-xs text-white/70 disabled:opacity-30">Prev</button>
+            <button disabled={selectedIndex >= events.length - 1} onClick={() => onNavigate(selectedIndex + 1)} className="rounded border border-white/[0.06] px-2 py-1 text-xs text-white/70 disabled:opacity-30">Next</button>
+            <button onClick={onClose} className="rounded border border-white/[0.06] p-2 text-white/30 hover:text-white/60"><XIcon className="h-4 w-4" /></button>
           </div>
         </div>
 
-        <div className="border-b border-white/10 px-5 py-4">
+        <div className="border-b border-white/[0.06] px-5 py-4">
           <h2 className="text-xl font-semibold text-white">{toTitleCase(event.title)}</h2>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-zinc-400">
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-white/20">
             <span>{getOutletDisplay(event.source, event.source_id)}</span>
             <span>•</span>
             <span>{formatRegion(event.region)}</span>
@@ -259,24 +259,24 @@ function EventDetailPanel({ events, selectedIndex, onClose, onNavigate }: { even
           </div>
         </div>
 
-        <div className="flex gap-2 border-b border-white/10 px-5 py-3 text-sm">
-          <button onClick={() => setTab('brief')} className={cn('rounded-full px-3 py-1.5', tab === 'brief' ? 'bg-white text-black' : 'text-zinc-400')}>Intel Brief</button>
-          <button onClick={() => setTab('raw')} className={cn('rounded-full px-3 py-1.5', tab === 'raw' ? 'bg-white text-black' : 'text-zinc-400')}>Raw Data</button>
-          <button onClick={() => setTab('related')} className={cn('rounded-full px-3 py-1.5', tab === 'related' ? 'bg-white text-black' : 'text-zinc-400')}>Related</button>
+        <div className="flex gap-2 border-b border-white/[0.06] px-5 py-3 text-[12px]">
+          <button onClick={() => setTab('brief')} className={cn('rounded-lg px-3 py-1.5 font-medium', tab === 'brief' ? 'bg-blue-500 text-white' : 'text-white/35 hover:text-white/55')}>Intel Brief</button>
+          <button onClick={() => setTab('raw')} className={cn('rounded-lg px-3 py-1.5 font-medium', tab === 'raw' ? 'bg-blue-500 text-white' : 'text-white/35 hover:text-white/55')}>Raw Data</button>
+          <button onClick={() => setTab('related')} className={cn('rounded-lg px-3 py-1.5 font-medium', tab === 'related' ? 'bg-blue-500 text-white' : 'text-white/35 hover:text-white/55')}>Related</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {tab === 'brief' ? (
-            <div className="space-y-4 text-sm leading-7 text-zinc-200">
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <div className="space-y-4 text-[12px] leading-7 text-white/70">
+              <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4">
                 {(event.summary_short ?? event.summary_full ?? event.description ?? event.snippet ?? 'No brief available.').trim()}
               </div>
-              {event.description && event.description !== event.summary_short ? <div className="text-zinc-400">{event.description}</div> : null}
+              {event.description && event.description !== event.summary_short ? <div className="text-white/25">{event.description}</div> : null}
             </div>
           ) : null}
 
           {tab === 'raw' ? (
-            <div className="overflow-hidden rounded-xl border border-white/10">
+            <div className="overflow-hidden rounded-xl border border-white/[0.05]">
               {[
                 ['id', event.id],
                 ['severity', String(event.severity ?? 1)],
@@ -286,9 +286,9 @@ function EventDetailPanel({ events, selectedIndex, onClose, onNavigate }: { even
                 ['source', event.source ?? ''],
                 ['source_id', event.source_id ?? ''],
               ].map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[140px_1fr] border-b border-white/10 px-4 py-3 text-sm last:border-b-0">
-                  <div className="font-mono text-zinc-500">{label}</div>
-                  <div className="break-all text-zinc-200">{value}</div>
+                <div key={label} className="grid grid-cols-[140px_1fr] border-b border-white/[0.05] bg-white/[0.015] px-4 py-3 text-[12px] last:border-b-0">
+                  <div className="font-mono text-white/20">{label}</div>
+                  <div className="break-all text-white/70">{value}</div>
                 </div>
               ))}
             </div>
@@ -296,17 +296,17 @@ function EventDetailPanel({ events, selectedIndex, onClose, onNavigate }: { even
 
           {tab === 'related' ? (
             <div className="space-y-2">
-              {related && related.length > 0 ? related.map((item) => <div key={item.id} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3"><div className="text-sm font-medium text-zinc-100">{item.title}</div><div className="mt-1 text-xs text-zinc-400">{formatRegion(item.region)} · {relativeTime(item.occurred_at)}</div></div>) : <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-zinc-500">No related events</div>}
+              {related && related.length > 0 ? related.map((item) => <div key={item.id} className="rounded-xl border border-white/[0.05] bg-white/[0.015] px-4 py-3"><div className="text-[12px] font-medium text-white/80">{item.title}</div><div className="mt-1 text-[11px] text-white/20">{formatRegion(item.region)} · {relativeTime(item.occurred_at)}</div></div>) : <div className="rounded-xl border border-dashed border-white/[0.05] px-4 py-8 text-center text-[12px] text-white/25">No related events</div>}
             </div>
           ) : null}
         </div>
 
-        <div className="grid grid-cols-3 gap-2 border-t border-white/10 px-5 py-4">
-          <button onClick={() => navigator.clipboard.writeText(`https://conflictradar.co/feed?eventId=${event.id}`)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-zinc-200"><CopyIcon className="h-4 w-4" />Copy Link</button>
-          <button className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-zinc-200"><PinIcon className="h-4 w-4" />Pin</button>
-          <button className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-zinc-200"><BellIcon className="h-4 w-4" />Alert</button>
+        <div className="grid grid-cols-3 gap-2 border-t border-white/[0.06] px-5 py-4">
+          <button onClick={() => navigator.clipboard.writeText(`https://conflictradar.co/feed?eventId=${event.id}`)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[12px] text-white/70 hover:bg-white/[0.06] transition-colors duration-150"><CopyIcon className="h-4 w-4" />Copy Link</button>
+          <button className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[12px] text-white/70 hover:bg-white/[0.06] transition-colors duration-150"><PinIcon className="h-4 w-4" />Pin</button>
+          <button className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[12px] text-white/70 hover:bg-white/[0.06] transition-colors duration-150"><BellIcon className="h-4 w-4" />Alert</button>
         </div>
-        {sourceLink ? <a href={sourceLink} target="_blank" rel="noreferrer" className="border-t border-white/10 px-5 py-3 text-sm text-cyan-400"><span className="inline-flex items-center gap-2">Open source <ExternalLinkIcon className="h-4 w-4" /></span></a> : null}
+        {sourceLink ? <a href={sourceLink} target="_blank" rel="noreferrer" className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-cyan-400"><span className="inline-flex items-center gap-2">Open source <ExternalLinkIcon className="h-4 w-4" /></span></a> : null}
       </div>
     </div>
   )
@@ -355,25 +355,28 @@ export function EventFeed() {
   }, [selectedId, selectedIndex])
 
   return (
-    <div className="h-full overflow-hidden rounded-xl border border-white/10 bg-zinc-950/70">
-      <div className="border-b border-white/10 px-4 py-3">
+    <div className="h-full overflow-hidden rounded-xl border border-white/[0.05] bg-[#070B11]">
+      <div className="border-b border-white/[0.05] px-4 py-3">
         <div className="mb-3 flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
-            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search intel feed" className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-9 pr-3 text-sm text-white outline-none placeholder:text-zinc-500" />
+            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/20" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search intel feed" className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] py-2 pl-9 pr-3 text-[12px] text-white/70 outline-none placeholder:text-white/20 focus:border-white/[0.12]" />
           </div>
-          <button onClick={() => exportCsv(filteredEvents)} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-zinc-200"><DownloadIcon className="h-4 w-4" />Export</button>
+          <button onClick={() => exportCsv(filteredEvents)} className="inline-flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[12px] text-white/70 hover:bg-white/[0.06] transition-colors duration-150"><DownloadIcon className="h-4 w-4" />Export</button>
         </div>
 
         <div className="mb-3 flex flex-wrap gap-2">
-          {TIME_WINDOWS.map((value) => <button key={value} onClick={() => setTimeWindow(value)} className={cn('rounded-full border px-3 py-1.5 text-xs', timeWindow === value ? 'border-cyan-400 bg-cyan-400 text-black' : 'border-white/10 text-zinc-400')}>{value.toUpperCase()}</button>)}
-          {CATEGORY_OPTIONS.map((option) => <button key={option.key} onClick={() => setCategory(option.key)} className={cn('rounded-full border px-3 py-1.5 text-xs', category === option.key ? 'border-white bg-white text-black' : 'border-white/10 text-zinc-400')}>{option.label}</button>)}
+          {TIME_WINDOWS.map((value) => <button key={value} onClick={() => setTimeWindow(value)} className={cn('rounded-lg border px-3 py-1.5 text-xs font-medium', timeWindow === value ? 'bg-blue-500 text-white border-blue-500' : 'border-white/[0.06] text-white/35 hover:text-white/55')}>{value.toUpperCase()}</button>)}
+        </div>
+
+        <div className="mb-3 flex flex-wrap gap-2">
+          {CATEGORY_OPTIONS.map((option) => <button key={option.key} onClick={() => setCategory(option.key)} className={cn('rounded-lg border px-3 py-1.5 text-xs font-medium', category === option.key ? 'bg-blue-500 text-white border-blue-500' : 'border-white/[0.06] text-white/35 hover:text-white/55')}>{option.label}</button>)}
         </div>
 
         <div className="flex flex-wrap gap-2">
           {SEVERITY_ORDER.map((key) => {
             const label = key === 'all' ? 'All' : `${key.slice(0, 1).toUpperCase()}${key.slice(1)}`
-            return <button key={key} onClick={() => setSeverityFilter(key)} className={cn('rounded-full border px-3 py-1.5 text-xs', severityFilter === key ? 'border-red-400 bg-red-400/90 text-black' : 'border-white/10 text-zinc-400')}>{label} ({severityCounts[key]})</button>
+            return <button key={key} onClick={() => setSeverityFilter(key)} className={cn('rounded-lg border px-3 py-1.5 text-xs font-medium', severityFilter === key ? 'bg-blue-500 text-white border-blue-500' : 'border-white/[0.06] text-white/35 hover:text-white/55')}>{label} ({severityCounts[key]})</button>
           })}
         </div>
       </div>
@@ -382,27 +385,27 @@ export function EventFeed() {
         <div className="min-h-0 overflow-y-auto p-4">
           <BreakingBanner events={filteredEvents} />
           <div className="space-y-3">
-            {loading ? <div className="rounded-xl border border-white/10 px-4 py-12 text-center text-sm text-zinc-500">Loading intel feed…</div> : null}
-            {!loading && filteredEvents.length === 0 ? <div className="rounded-xl border border-white/10 px-4 py-12 text-center text-sm text-zinc-500">No events match current filters.</div> : null}
+            {loading ? <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] px-4 py-12 text-center text-[12px] text-white/25">Loading intel feed…</div> : null}
+            {!loading && filteredEvents.length === 0 ? <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] px-4 py-12 text-center text-[12px] text-white/25">No events match current filters.</div> : null}
             {!loading && filteredEvents.map((event) => {
               const severity = getSeverityMeta(event.severity)
               const freshness = event.occurred_at ? getFreshnessStatus(event.occurred_at) : null
               return (
-                <button key={event.id} onClick={() => setSelectedId(event.id)} className={cn('block w-full rounded-xl border border-white/10 border-l-4 bg-white/5 p-4 text-left hover:bg-white/10', severity.border)}>
+                <button key={event.id} onClick={() => setSelectedId(event.id)} className={cn('block w-full rounded-xl border border-white/[0.05] border-l-4 bg-white/[0.015] p-4 text-left hover:bg-white/[0.03] transition-colors duration-150', severity.border)}>
                   <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
                     <span className={cn('rounded-full border px-2 py-1 font-semibold', severity.chip)}>{severity.label}</span>
                     {freshness ? <span className={cn('rounded-full border px-2 py-1 font-semibold', freshness.color)}>{freshness.label}</span> : null}
-                    <span className="text-zinc-500">{formatRegion(event.region)}</span>
-                    <span className="ml-auto text-zinc-500">{getOutletDisplay(event.source, event.source_id)} · {relativeTime(event.occurred_at)}</span>
+                    <span className="text-white/20">{formatRegion(event.region)}</span>
+                    <span className="ml-auto text-white/20">{getOutletDisplay(event.source, event.source_id)} · {relativeTime(event.occurred_at)}</span>
                   </div>
-                  <div className="text-base font-semibold text-white">{toTitleCase(event.title)}</div>
-                  <div className="mt-2 line-clamp-2 text-sm text-zinc-400">{event.summary_short ?? event.summary_full ?? event.snippet ?? event.description ?? 'No summary available.'}</div>
+                  <div className="text-[14px] font-medium text-white/80">{toTitleCase(event.title)}</div>
+                  <div className="mt-2 line-clamp-2 text-[12px] text-white/25">{event.summary_short ?? event.summary_full ?? event.snippet ?? event.description ?? 'No summary available.'}</div>
                 </button>
               )
             })}
           </div>
         </div>
-        <div className="min-h-0 overflow-y-auto border-l border-white/10 p-4">
+        <div className="min-h-0 overflow-y-auto border-l border-white/[0.05] p-4">
           <FeedSidebar events={filteredEvents} onSelect={(event) => setSelectedId(event.id)} />
         </div>
       </div>

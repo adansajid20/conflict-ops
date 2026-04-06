@@ -6,11 +6,11 @@ import { EventFeed } from '@/components/feed/EventFeed'
 export default function FeedPage() {
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-        <h1 className="text-sm font-bold uppercase tracking-widest" style={{ color: 'var(--text-primary)' }}>
+      <div className="flex items-center justify-between border-b border-white/[0.05] bg-white/[0.015] px-4 py-3">
+        <h1 className="text-xl font-semibold text-white">
           Intelligence Feed
         </h1>
-        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        <div className="text-[13px] text-white/30">
           Live severity-aware intel stream
         </div>
       </div>

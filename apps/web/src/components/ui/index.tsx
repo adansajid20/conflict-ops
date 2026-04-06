@@ -19,13 +19,12 @@ export function Panel({
 }) {
   return (
     <div
-      className={`rounded-lg border ${className}`}
-      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)', boxShadow: 'var(--shadow-sm)', ...style }}
+      className={`rounded-xl border border-white/[0.05] bg-white/[0.015] ${className}`}
+      style={style}
     >
       {(header || headerRight) && (
-        <div className="flex items-center justify-between px-4 py-3 border-b"
-          style={{ borderColor: 'var(--border)' }}>
-          {header && <div className="text-xs font-bold tracking-widest uppercase font-mono" style={{ color: 'var(--text-muted)' }}>{header}</div>}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.04]">
+          {header && <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/25">{header}</div>}
           {headerRight && <div>{headerRight}</div>}
         </div>
       )}
@@ -37,14 +36,14 @@ export function Panel({
 // ---------- Badge ----------
 type BadgeVariant = 'critical' | 'high' | 'medium' | 'low' | 'info' | 'success' | 'primary'
 
-const BADGE_STYLES: Record<BadgeVariant, React.CSSProperties> = {
-  critical: { background: 'rgba(255,68,68,0.15)', color: '#FF4444', border: '1px solid rgba(255,68,68,0.25)' },
-  high:     { background: 'rgba(255,136,0,0.15)', color: '#FF8800', border: '1px solid rgba(255,136,0,0.25)' },
-  medium:   { background: 'rgba(245,158,11,0.12)', color: '#FFCC00', border: '1px solid rgba(245,158,11,0.2)' },
-  low:      { background: 'rgba(59,130,246,0.12)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' },
-  info:     { background: 'rgba(125,133,144,0.1)', color: '#7D8590', border: '1px solid rgba(125,133,144,0.15)' },
-  success:  { background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' },
-  primary:  { background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid rgba(0,255,136,0.2)' },
+const BADGE_STYLES: Record<BadgeVariant, string> = {
+  critical: 'bg-red-500/10 text-red-400 border border-red-500/15',
+  high:     'bg-orange-500/10 text-orange-400 border border-orange-500/15',
+  medium:   'bg-amber-500/10 text-amber-400 border border-amber-500/15',
+  low:      'bg-blue-500/10 text-blue-400 border border-blue-500/15',
+  info:     'bg-slate-500/10 text-slate-400 border border-slate-500/15',
+  success:  'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15',
+  primary:  'bg-green-500/10 text-green-400 border border-green-500/15',
 }
 
 export function Badge({ variant = 'info', children, size = 'sm' }: {
@@ -52,15 +51,10 @@ export function Badge({ variant = 'info', children, size = 'sm' }: {
   children: React.ReactNode
   size?: 'xs' | 'sm'
 }) {
+  const sizeClasses = size === 'xs' ? 'text-[9px] px-1.5 py-0.5' : 'text-[10px] px-2 py-0.5'
+
   return (
-    <span
-      className="inline-block font-mono font-bold rounded tracking-wide"
-      style={{
-        ...BADGE_STYLES[variant],
-        fontSize: size === 'xs' ? 10 : 11,
-        padding: size === 'xs' ? '1px 6px' : '2px 8px',
-      }}
-    >
+    <span className={`inline-block font-bold rounded-md ${sizeClasses} ${BADGE_STYLES[variant]}`}>
       {children}
     </span>
   )
@@ -68,7 +62,7 @@ export function Badge({ variant = 'info', children, size = 'sm' }: {
 
 // ---------- Skeleton ----------
 export function Skeleton({ className = '', style = {} }: { className?: string; style?: React.CSSProperties }) {
-  return <div className={`skeleton rounded ${className}`} style={style} />
+  return <div className={`bg-white/[0.04] animate-pulse rounded-lg ${className}`} style={style} />
 }
 
 export function SkeletonLine({ width = '100%' }: { width?: string | number }) {
@@ -77,7 +71,7 @@ export function SkeletonLine({ width = '100%' }: { width?: string | number }) {
 
 export function SkeletonCard({ lines = 3 }: { lines?: number }) {
   return (
-    <div className="p-4 rounded-lg border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+    <div className="p-4 rounded-xl border border-white/[0.05] bg-white/[0.015]">
       {Array.from({ length: lines }).map((_, i) => (
         <SkeletonLine key={i} width={i === 0 ? '50%' : i === lines - 1 ? '30%' : '80%'} />
       ))}
@@ -97,19 +91,18 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
-      <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.4 }}>{icon}</div>
-      <p className="font-bold font-mono text-sm tracking-widest uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+      <div className="text-[48px] mb-4 text-white/15">{icon}</div>
+      <p className="text-[15px] font-medium text-white/60 mb-2">
         {title}
       </p>
       {description && (
-        <p className="text-xs max-w-xs leading-relaxed mb-6" style={{ color: 'var(--text-disabled)' }}>
+        <p className="text-[13px] text-white/30 max-w-xs leading-relaxed mb-6">
           {description}
         </p>
       )}
       {action && actionLabel && (
         <button onClick={action}
-          className="px-6 py-2 rounded text-xs font-bold font-mono tracking-wider"
-          style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
+          className="px-6 py-2 rounded-lg text-[12px] font-bold text-white bg-blue-500 hover:bg-blue-400 transition-colors">
           {actionLabel}
         </button>
       )}
@@ -127,13 +120,12 @@ export function ErrorState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
-      <div style={{ fontSize: 40, marginBottom: 12, color: '#FF4444' }}>⚠</div>
-      <p className="font-bold font-mono text-sm mb-1" style={{ color: '#FF4444' }}>{message}</p>
-      {detail && <p className="text-xs mb-4 max-w-sm" style={{ color: 'var(--text-muted)' }}>{detail}</p>}
+      <div className="text-[40px] mb-3 text-red-400">⚠</div>
+      <p className="text-[15px] font-medium text-red-400 mb-1">{message}</p>
+      {detail && <p className="text-[13px] text-white/30 mb-4 max-w-sm">{detail}</p>}
       {onRetry && (
         <button onClick={onRetry}
-          className="mt-2 px-6 py-2 rounded text-xs font-bold font-mono border"
-          style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+          className="mt-2 px-6 py-2 rounded-lg text-[12px] font-bold bg-white/[0.06] hover:bg-white/[0.1] text-white/60 border border-white/[0.06] transition-colors">
           RETRY
         </button>
       )}
@@ -152,14 +144,13 @@ export function StatCard({
   icon?: string
 }) {
   return (
-    <div className="rounded-lg border p-4 flex flex-col gap-1"
-      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4 flex flex-col gap-1 hover:bg-white/[0.03] hover:-translate-y-0.5 transition-all duration-200">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-mono tracking-widest" style={{ color: 'var(--text-muted)' }}>{label}</span>
+        <span className="text-[10px] uppercase tracking-[0.15em] text-white/20">{label}</span>
         {icon && <span style={{ color, opacity: 0.7 }}>{icon}</span>}
       </div>
-      <div className="text-3xl font-bold font-mono count-up" style={{ color }}>{value}</div>
-      {sub && <div className="text-xs font-mono" style={{ color: 'var(--text-disabled)' }}>{sub}</div>}
+      <div className="text-xl font-bold text-white" style={{ color: color !== 'var(--primary)' ? color : undefined }}>{value}</div>
+      {sub && <div className="text-[11px] text-white/25">{sub}</div>}
     </div>
   )
 }
@@ -176,27 +167,26 @@ export function Btn({
   size?: 'sm' | 'md' | 'lg'
   className?: string
 }) {
-  const styles: Record<string, React.CSSProperties> = {
-    primary:   { backgroundColor: 'var(--primary)', color: '#000', border: 'none' },
-    secondary: { backgroundColor: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)' },
-    danger:    { backgroundColor: 'rgba(255,68,68,0.1)', color: '#FF4444', border: '1px solid rgba(255,68,68,0.3)' },
-    ghost:     { backgroundColor: 'transparent', color: 'var(--text-muted)', border: 'none' },
+  const variantClasses: Record<string, string> = {
+    primary:   'bg-blue-500 hover:bg-blue-400 text-white',
+    secondary: 'bg-white/[0.05] hover:bg-white/[0.08] text-white/60 border border-white/[0.06]',
+    danger:    'bg-red-500/10 hover:bg-red-500/15 text-red-400',
+    ghost:     'hover:bg-white/[0.04] text-white/40',
   }
-  const pads: Record<string, string> = { sm: '5px 12px', md: '7px 16px', lg: '10px 24px' }
-  const fs: Record<string, number> = { sm: 11, md: 12, lg: 13 }
+
+  const sizeClasses: Record<string, string> = {
+    sm: 'text-[12px] px-3 py-1.5',
+    md: 'text-[13px] px-4 py-2',
+    lg: 'text-[14px] px-5 py-2.5',
+  }
+
+  const disabledClasses = (disabled || loading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
 
   return (
     <button
       onClick={onClick}
       disabled={disabled || loading}
-      className={`rounded font-mono font-bold tracking-wider transition-opacity ${className}`}
-      style={{
-        ...styles[variant],
-        padding: pads[size],
-        fontSize: fs[size],
-        opacity: (disabled || loading) ? 0.5 : 1,
-        cursor: (disabled || loading) ? 'not-allowed' : 'pointer',
-      }}
+      className={`rounded-lg font-bold transition-all ${variantClasses[variant]} ${sizeClasses[size]} ${disabledClasses} ${className}`}
     >
       {loading ? 'LOADING...' : children}
     </button>
@@ -210,8 +200,7 @@ export function IngestStaleBanner({ lastIngestAt }: { lastIngestAt: string | nul
   if (ageMs < 2 * 3600 * 1000) return null
   const h = Math.floor(ageMs / 3600000)
   return (
-    <div className="px-4 py-2 text-xs font-mono flex items-center gap-2 rounded-lg mb-4"
-      style={{ backgroundColor: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--alert-amber)' }}>
+    <div className="px-4 py-2 text-[13px] flex items-center gap-2 rounded-xl mb-4 bg-amber-500/[0.04] border border-amber-500/15 text-amber-400">
       ⌛ Data may be stale — last ingest {h}h ago
     </div>
   )
