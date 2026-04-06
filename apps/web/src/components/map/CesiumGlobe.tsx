@@ -36,10 +36,16 @@ interface EventData {
 
 // ─── Severity config ──────────────────────────────────────────────────────────
 const SEV_COLORS: Record<string, string> = {
-  critical: '#ff2d2d', high: '#ff8c00', medium: '#ffd700', low: '#3b9dff',
+  critical: '#ff1744', high: '#ff6d00', medium: '#ffab00', low: '#448aff',
+};
+const SEV_GLOW: Record<string, string> = {
+  critical: 'rgba(255,23,68,0.5)', high: 'rgba(255,109,0,0.35)', medium: 'rgba(255,171,0,0.25)', low: 'rgba(68,138,255,0.2)',
 };
 const SEV_SIZE: Record<string, number> = {
-  critical: 18, high: 14, medium: 11, low: 9,
+  critical: 14, high: 11, medium: 9, low: 7,
+};
+const SEV_OUTLINE: Record<string, number> = {
+  critical: 3, high: 2, medium: 1.5, low: 1,
 };
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -182,23 +188,58 @@ export default function CesiumGlobe() {
         meta?: { total: number };
       };
 
-      setEventCount(geojson.meta?.total ?? geojson.features?.length ?? 0);
+      const features = geojson.features ?? [];
+      setEventCount(geojson.meta?.total ?? features.length ?? 0);
 
       // Remove old event entities
       removeEntitiesByPrefix('evt-');
 
-      for (const feature of (geojson.features ?? [])) {
+      // ── Client-side micro-jitter to separate overlapping pins ──
+      // Group by rounded coordinates (0.3° grid) and offset duplicates
+      const gridMap = new Map<string, number>();
+      function spreadPin(lon: number, lat: number): [number, number] {
+        const key = `${Math.round(lon * 3)}:${Math.round(lat * 3)}`;
+        const count = gridMap.get(key) ?? 0;
+        gridMap.set(key, count + 1);
+        if (count === 0) return [lon, lat];
+        // Spiral offset — each subsequent pin in same cell moves outward
+        const angle = (count * 137.5) * (Math.PI / 180); // golden angle
+        const radius = 0.15 + count * 0.08; // degrees
+        return [lon + Math.cos(angle) * radius, lat + Math.sin(angle) * radius];
+      }
+
+      for (const feature of features) {
         const p = feature.properties;
         const sevStr = ((p.severity as string) ?? 'low').toLowerCase();
-        const color = Ce.Color.fromCssColorString(SEV_COLORS[sevStr] ?? '#3b9dff');
+        const color = Ce.Color.fromCssColorString(SEV_COLORS[sevStr] ?? '#448aff');
+        const glowColor = Ce.Color.fromCssColorString(SEV_GLOW[sevStr] ?? 'rgba(68,138,255,0.2)');
         const size = SEV_SIZE[sevStr] ?? 7;
-        const [lon, lat] = feature.geometry.coordinates;
+        const outline = SEV_OUTLINE[sevStr] ?? 1;
+        const rawLon = feature.geometry.coordinates[0];
+        const rawLat = feature.geometry.coordinates[1];
+        const [lon, lat] = spreadPin(rawLon, rawLat);
 
+        const evtId = String(p.id ?? Math.random().toString(36).slice(2));
+
+        // Outer glow ring for critical & high severity
+        if (sevStr === 'critical' || sevStr === 'high') {
+          v.entities.add({
+            id: `evt-glow-${evtId}`,
+            position: Ce.Cartesian3.fromDegrees(lon, lat, 0),
+            point: {
+              pixelSize: size * 2.5,
+              color: glowColor,
+              outlineWidth: 0,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            },
+          } as never);
+        }
+
+        // Main pin
         v.entities.add({
-          id: `evt-${String(p.id ?? Math.random().toString(36).slice(2))}`,
+          id: `evt-${evtId}`,
           position: Ce.Cartesian3.fromDegrees(lon, lat, 0),
           name: String(p.title ?? 'Event'),
-          // Store all props for click handler
           properties: {
             _type: 'event',
             severity: sevStr,
@@ -214,10 +255,9 @@ export default function CesiumGlobe() {
           point: {
             pixelSize: size,
             color,
-            outlineColor: Ce.Color.WHITE.withAlpha(0.8),
-            outlineWidth: sevStr === 'critical' ? 4 : 2.5,
+            outlineColor: Ce.Color.WHITE.withAlpha(0.6),
+            outlineWidth: outline,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            // No scaleByDistance — causes pins to visually drift as camera moves
           },
         } as never);
       }
@@ -455,45 +495,50 @@ export default function CesiumGlobe() {
       // DARK INTELLIGENCE GLOBE THEME
       // ═══════════════════════════════════════
 
-      // ── 1. Darken the satellite imagery base layer ──
+      // ── 1. Darken the satellite imagery — visible but subdued ──
       const baseLayer = viewer.imageryLayers.get(0);
       if (baseLayer) {
-        baseLayer.brightness = 0.35;   // darken from 1.0 → cities glow on dark terrain
-        baseLayer.contrast = 1.4;      // city lights & snow pop against dark areas
-        baseLayer.saturation = 0.1;    // nearly grayscale — cold intelligence look
-        baseLayer.gamma = 0.8;         // slight midtone lift for city glow
+        baseLayer.brightness = 0.45;   // dark but terrain still visible on night side
+        baseLayer.contrast = 1.3;      // definition without blowout
+        baseLayer.saturation = 0.15;   // near-grayscale intel aesthetic
+        baseLayer.gamma = 0.9;         // lift shadows slightly so night side isn't pure black
       }
-      // Labels overlay stays at normal brightness so text is readable
+      // Labels overlay — crisp white text on dark globe
       const labelLayer = viewer.imageryLayers.get(1);
       if (labelLayer) {
-        labelLayer.brightness = 1.2;   // slightly brighter labels on dark globe
-        labelLayer.contrast = 1.3;
+        labelLayer.brightness = 1.4;   // bright readable labels
+        labelLayer.contrast = 1.5;     // sharp against dark terrain
+        labelLayer.saturation = 0.0;   // pure white labels, no color tint
       }
 
-      // ── 2. Day/night terminator + dark atmosphere ──
-      viewer.scene.globe.enableLighting = true;
+      // ── 2. Disable day/night lighting so the whole globe is always visible ──
+      // The dark base imagery already gives the intel look without needing a
+      // day/night terminator that makes half the globe invisible
+      viewer.scene.globe.enableLighting = false;
+
+      // ── 3. Atmosphere — subtle blue glow on the limb ──
       if (viewer.scene.skyAtmosphere) {
-        viewer.scene.skyAtmosphere.brightnessShift = -0.4;
-        viewer.scene.skyAtmosphere.saturationShift = -0.3;
-        viewer.scene.skyAtmosphere.hueShift = 0.0;
+        viewer.scene.skyAtmosphere.brightnessShift = -0.25;
+        viewer.scene.skyAtmosphere.saturationShift = -0.1;
+        viewer.scene.skyAtmosphere.hueShift = -0.02;  // slight cool blue shift
       }
-      viewer.scene.globe.atmosphereBrightnessShift = -0.2;
-      viewer.scene.globe.atmosphereSaturationShift = -0.2;
+      viewer.scene.globe.atmosphereBrightnessShift = -0.15;
+      viewer.scene.globe.atmosphereSaturationShift = -0.1;
 
-      // ── 3. Stars + deep space background ──
+      // ── 4. Stars + deep space background ──
       if (viewer.scene.skyBox) viewer.scene.skyBox.show = true;
-      viewer.scene.backgroundColor = Ce.Color.fromCssColorString('#000005');
+      viewer.scene.backgroundColor = Ce.Color.fromCssColorString('#020408');
 
-      // ── 4. Subtle atmosphere glow on globe edge ──
+      // ── 5. Subtle atmosphere glow on globe edge ──
       viewer.scene.globe.showGroundAtmosphere = true;
 
       // ── 5. Hide Cesium default bottom bar ──
       if (viewer.bottomContainer) viewer.bottomContainer.style.display = 'none';
 
-      // Initial view
+      // Initial view — center on Middle East / Africa / Europe hotspot corridor
       viewer.camera.setView({
-        destination: Ce.Cartesian3.fromDegrees(35, 20, 20_000_000),
-        orientation: { heading: 0, pitch: Ce.Math.toRadians(-90), roll: 0 },
+        destination: Ce.Cartesian3.fromDegrees(38, 25, 18_000_000),
+        orientation: { heading: Ce.Math.toRadians(-5), pitch: Ce.Math.toRadians(-85), roll: 0 },
       });
 
       // ── CLICK HANDLER ─────────────────────────────────────────────
@@ -681,8 +726,8 @@ export default function CesiumGlobe() {
           <p className="text-[9px] font-bold tracking-[0.15em] text-gray-400 uppercase mb-2">Legend</p>
           <div className="flex flex-col gap-1.5">
             {[
-              { c: '#ff2d2d', l: 'Critical', sz: 12 }, { c: '#ff8c00', l: 'High', sz: 9 },
-              { c: '#ffd700', l: 'Medium', sz: 7 }, { c: '#3b9dff', l: 'Low', sz: 6 },
+              { c: '#ff1744', l: 'Critical', sz: 12 }, { c: '#ff6d00', l: 'High', sz: 9 },
+              { c: '#ffab00', l: 'Medium', sz: 7 }, { c: '#448aff', l: 'Low', sz: 6 },
             ].map(i => (
               <div key={i.l} className="flex items-center gap-2">
                 <div className="rounded-full flex-shrink-0"
