@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import 'maplibre-gl/dist/maplibre-gl.css';
+/* MapLibre CSS removed — using CesiumJS now */
 
 :root {
   --bg-base: #070B11;

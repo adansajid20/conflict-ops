@@ -42,6 +42,13 @@ const SEV_SIZE: Record<string, number> = {
 };
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
+type CesiumImageryLayer = {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  gamma: number;
+  alpha: number;
+};
 type CesiumViewer = {
   entities: {
     values: Array<{ id: string }>;
@@ -59,13 +66,34 @@ type CesiumViewer = {
   scene: {
     canvas: HTMLCanvasElement;
     pick: (pos: unknown) => unknown;
-    globe: { enableLighting: boolean };
-    skyAtmosphere: { brightnessShift: number; saturationShift: number } | undefined;
+    globe: {
+      enableLighting: boolean;
+      showGroundAtmosphere: boolean;
+      atmosphereBrightnessShift: number;
+      atmosphereSaturationShift: number;
+    };
+    skyAtmosphere: {
+      brightnessShift: number;
+      saturationShift: number;
+      hueShift: number;
+    } | undefined;
+    skyBox: { show: boolean } | undefined;
+    backgroundColor: unknown;
     morphTo2D: (d: number) => void;
     morphTo3D: (d: number) => void;
+    postRender: {
+      addEventListener: (fn: () => void) => void;
+      removeEventListener: (fn: () => void) => void;
+    };
   };
-  imageryLayers: { removeAll: () => void; addImageryProvider: (p: unknown) => void };
+  imageryLayers: {
+    removeAll: () => void;
+    addImageryProvider: (p: unknown) => unknown;
+    get: (index: number) => CesiumImageryLayer | undefined;
+    length: number;
+  };
   terrainProvider: unknown;
+  bottomContainer: HTMLElement;
   destroy: () => void;
   isDestroyed: () => boolean;
 };
@@ -76,7 +104,6 @@ type CesiumViewer = {
 export default function CesiumGlobe() {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<CesiumViewer | null>(null);
-  const rotationRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const issIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const flightIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -233,7 +260,9 @@ export default function CesiumGlobe() {
           },
         } as never);
       }
-    } catch { /* silent */ }
+    } catch (err) {
+      console.error('[CESIUM] fetchFlights error:', err);
+    }
   }, []);
 
   useEffect(() => {
@@ -421,12 +450,44 @@ export default function CesiumGlobe() {
       // Terrain
       void Ce.createWorldTerrainAsync().then((t: unknown) => { viewer.terrainProvider = t; }).catch(() => null);
 
-      // Globe settings — NO dark side
-      viewer.scene.globe.enableLighting = false;
-      if (viewer.scene.skyAtmosphere) {
-        viewer.scene.skyAtmosphere.brightnessShift = -0.1;
-        viewer.scene.skyAtmosphere.saturationShift = -0.1;
+      // ═══════════════════════════════════════
+      // DARK INTELLIGENCE GLOBE THEME
+      // ═══════════════════════════════════════
+
+      // ── 1. Darken the satellite imagery base layer ──
+      const baseLayer = viewer.imageryLayers.get(0);
+      if (baseLayer) {
+        baseLayer.brightness = 0.35;   // darken from 1.0 → cities glow on dark terrain
+        baseLayer.contrast = 1.4;      // city lights & snow pop against dark areas
+        baseLayer.saturation = 0.1;    // nearly grayscale — cold intelligence look
+        baseLayer.gamma = 0.8;         // slight midtone lift for city glow
       }
+      // Labels overlay stays at normal brightness so text is readable
+      const labelLayer = viewer.imageryLayers.get(1);
+      if (labelLayer) {
+        labelLayer.brightness = 1.2;   // slightly brighter labels on dark globe
+        labelLayer.contrast = 1.3;
+      }
+
+      // ── 2. Day/night terminator + dark atmosphere ──
+      viewer.scene.globe.enableLighting = true;
+      if (viewer.scene.skyAtmosphere) {
+        viewer.scene.skyAtmosphere.brightnessShift = -0.4;
+        viewer.scene.skyAtmosphere.saturationShift = -0.3;
+        viewer.scene.skyAtmosphere.hueShift = 0.0;
+      }
+      viewer.scene.globe.atmosphereBrightnessShift = -0.2;
+      viewer.scene.globe.atmosphereSaturationShift = -0.2;
+
+      // ── 3. Stars + deep space background ──
+      if (viewer.scene.skyBox) viewer.scene.skyBox.show = true;
+      viewer.scene.backgroundColor = Ce.Color.fromCssColorString('#000005');
+
+      // ── 4. Subtle atmosphere glow on globe edge ──
+      viewer.scene.globe.showGroundAtmosphere = true;
+
+      // ── 5. Hide Cesium default bottom bar ──
+      if (viewer.bottomContainer) viewer.bottomContainer.style.display = 'none';
 
       // Initial view
       viewer.camera.setView({
@@ -471,10 +532,6 @@ export default function CesiumGlobe() {
 
         const type = String(getP('_type') ?? '');
 
-        // Pause rotation for 20s after any click (flyTo animation + view time)
-        const pauseFn = (viewer as unknown as Record<string, unknown>)._pauseRotation as ((ms: number) => void) | undefined;
-        pauseFn?.(20_000);
-
         if (type === 'event') {
           const ev: Record<string, unknown> = {
             id: entity.id,
@@ -512,50 +569,17 @@ export default function CesiumGlobe() {
         }
       }, Ce.ScreenSpaceEventType.LEFT_CLICK);
 
-      // Hover cursor
+      // Hover cursor (throttled to ~15fps to reduce expensive pick() calls)
+      let lastHoverTime = 0;
       handler.setInputAction((movement: { endPosition: { x: number; y: number } }) => {
+        const now = Date.now();
+        if (now - lastHoverTime < 66) return; // ~15fps
+        lastHoverTime = now;
         const picked = viewer.scene.pick(movement.endPosition as never);
         viewer.scene.canvas.style.cursor = (picked as { id?: unknown } | undefined)?.id ? 'pointer' : 'default';
       }, Ce.ScreenSpaceEventType.MOUSE_MOVE);
 
-      // ── CINEMATIC ROTATION (postRender — Cesium-native, no setInterval conflict) ──
-      let pauseUntilMs = 0;
-      let lastFrameTime = 0;
-      const pauseRotation = (ms: number) => { pauseUntilMs = Math.max(pauseUntilMs, Date.now() + ms); };
-
-      // Expose so click handler can extend pause
-      (viewer as unknown as Record<string, unknown>)._pauseRotation = pauseRotation;
-
-      const onPostRender = () => {
-        const now = Date.now();
-        if (now < pauseUntilMs) return;
-        // Throttle to ~20fps to save CPU
-        if (now - lastFrameTime < 50) return;
-        lastFrameTime = now;
-        // Only rotate when zoomed far out (> 10,000 km)
-        const h = viewer.camera.positionCartographic?.height ?? 0;
-        if (h < 10_000_000) return;
-        try { viewer.camera.rotate(Ce.Cartesian3.UNIT_Z, -0.00008); } catch { /* ignore during morph */ }
-      };
-
-      (viewer as unknown as { scene: { postRender: { addEventListener: (fn: () => void) => void; removeEventListener: (fn: () => void) => void } } })
-        .scene.postRender.addEventListener(onPostRender);
-
-      // Store cleanup ref (no setInterval needed)
-      rotationRef.current = setInterval(() => {/* postRender handles rotation */}, 9999999);
-      const _origCleanup = onPostRender; // captured for useEffect cleanup below
-      (viewer as unknown as Record<string, unknown>)._rotationCleanup = () => {
-        try {
-          (viewer as unknown as { scene: { postRender: { removeEventListener: (fn: () => void) => void } } })
-            .scene.postRender.removeEventListener(_origCleanup);
-        } catch { /* ignore */ }
-      };
-
-      viewer.scene.canvas.addEventListener('mousedown', () => pauseRotation(300));
-      viewer.scene.canvas.addEventListener('mouseup',   () => pauseRotation(8000));
-      viewer.scene.canvas.addEventListener('wheel',     () => pauseRotation(5000));
-      viewer.scene.canvas.addEventListener('touchstart',() => pauseRotation(300));
-      viewer.scene.canvas.addEventListener('touchend',  () => pauseRotation(8000));
+      // Auto-rotation removed — globe stays still until user interacts
 
       viewerRef.current = viewer;
       setIsLoading(false);
@@ -578,17 +602,11 @@ export default function CesiumGlobe() {
   // Cleanup
   useEffect(() => {
     return () => {
-      if (rotationRef.current) clearInterval(rotationRef.current);
       if (issIntervalRef.current) clearInterval(issIntervalRef.current);
       if (flightIntervalRef.current) clearInterval(flightIntervalRef.current);
       wsRef.current?.close();
       const v = viewerRef.current;
-      if (v) {
-        // Remove postRender rotation listener before destroying
-        const cleanup = (v as unknown as Record<string, unknown>)._rotationCleanup as (() => void) | undefined;
-        cleanup?.();
-        if (!v.isDestroyed()) v.destroy();
-      }
+      if (v && !v.isDestroyed()) v.destroy();
       viewerRef.current = null;
     };
   }, []);

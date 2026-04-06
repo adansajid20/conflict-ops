@@ -135,7 +135,7 @@ function geocode(id: string, region: string | null, title: string | null): [numb
     if (city.length < 3) continue
     const re = new RegExp(`\\b${city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)
     if (re.test(t)) {
-      const [jl, jn] = jitter(h, 0.6)
+      const [jl, jn] = jitter(h, 0.15)
       return [lat + jl, lon + jn]
     }
   }
@@ -146,12 +146,12 @@ function geocode(id: string, region: string | null, title: string | null): [numb
     const pts = COUNTRY_SPREADS[rk] ?? COUNTRY_SPREADS[region.toLowerCase().trim()]
     if (pts?.length) {
       const pt = pts[h % pts.length]!
-      const [jl, jn] = jitter(h, 1.2)
+      const [jl, jn] = jitter(h, 0.35)
       return [pt[0] + jl, pt[1] + jn]
     }
     const city = CITY_COORDS[region.toLowerCase().trim()]
     if (city) {
-      const [jl, jn] = jitter(h, 0.5)
+      const [jl, jn] = jitter(h, 0.12)
       return [city[0] + jl, city[1] + jn]
     }
   }
@@ -162,7 +162,7 @@ function geocode(id: string, region: string | null, title: string | null): [numb
     const re = new RegExp(`\\b${country.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)
     if (re.test(t)) {
       const pt = pts[h % pts.length]!
-      const [jl, jn] = jitter(h, 1.5)
+      const [jl, jn] = jitter(h, 0.4)
       return [pt[0] + jl, pt[1] + jn]
     }
   }
