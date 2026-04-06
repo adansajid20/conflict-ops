@@ -138,12 +138,10 @@ export default function CesiumGlobe() {
     const Ce = getCe(); const v = getViewer();
     if (!Ce || !v) return;
 
-    const timeMap: Record<string, number> = { '24h': 24, '7d': 168, '30d': 720, all: 8760 };
-    const hours = timeMap[tw] ?? 168;
-    let url = `/api/v1/map/events?hours=${hours}&limit=600`;
+    // Map time window to API param (route reads `window`, not `hours`)
+    const windowParam = tw === 'all' ? '30d' : tw; // API max is 30d
+    let url = `/api/v1/map/events?window=${windowParam}`;
     if (sev !== 'all') url += `&severity=${sev}`;
-    if (cat !== 'all') url += `&category=${cat}`;
-    if (reg) url += `&region=${encodeURIComponent(reg)}`;
 
     try {
       const res = await fetch(url);

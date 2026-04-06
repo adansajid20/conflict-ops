@@ -172,10 +172,19 @@ function geocode(id: string, region: string | null, title: string | null): [numb
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
-  const window = url.searchParams.get('window') ?? '7d'
+  // Support both ?window=7d and legacy ?hours=168
+  const windowParam = url.searchParams.get('window')
+  const hoursParam = url.searchParams.get('hours')
+  const window = windowParam ?? '7d'
   const severityStr = url.searchParams.get('severity') ?? 'all'
+  const regionFilter = url.searchParams.get('region') ?? ''
 
-  const hours = windowToHours(window)
+  let hours: number
+  if (hoursParam) {
+    hours = parseInt(hoursParam, 10) || 168
+  } else {
+    hours = windowToHours(window)
+  }
   const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
 
   let query = createServiceClient()
@@ -183,11 +192,15 @@ export async function GET(request: NextRequest) {
     .select('id, title, occurred_at, severity, event_type, region, source, source_id, summary_short, significance_score, is_breaking')
     .gte('occurred_at', since)
     .order('occurred_at', { ascending: false })
-    .limit(2000)
+    .limit(3000)
 
   if (severityStr === 'critical') query = query.eq('severity', 4)
   else if (severityStr === 'high') query = query.gte('severity', 3)
   else if (severityStr === 'medium') query = query.gte('severity', 2)
+
+  if (regionFilter) {
+    query = query.or(`region.ilike.%${regionFilter}%,title.ilike.%${regionFilter}%`)
+  }
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
