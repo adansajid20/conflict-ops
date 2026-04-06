@@ -10,10 +10,12 @@ export interface MapSidebarProps {
   eventCount: number;
   flightCount: number;
   vesselCount: number;
+  acledCount: number;
   showEvents: boolean; onToggleEvents: () => void;
   showFlights: boolean; onToggleFlights: () => void;
   showVessels: boolean; onToggleVessels: () => void;
   showISS: boolean; onToggleISS: () => void;
+  showACLED: boolean; onToggleACLED: () => void;
   timeWindow: string; onTimeWindowChange: (v: string) => void;
   severity: string; onSeverityChange: (v: string) => void;
   category: string; onCategoryChange: (v: string) => void;
@@ -69,11 +71,12 @@ function Section({ title, badge, children, defaultOpen = true }: {
 // MAIN SIDEBAR
 // ═══════════════════════════════════════
 export default function MapSidebar({
-  eventCount, flightCount, vesselCount,
+  eventCount, flightCount, vesselCount, acledCount,
   showEvents, onToggleEvents,
   showFlights, onToggleFlights,
   showVessels, onToggleVessels,
   showISS, onToggleISS,
+  showACLED, onToggleACLED,
   timeWindow, onTimeWindowChange,
   severity, onSeverityChange,
   category, onCategoryChange,
@@ -81,7 +84,7 @@ export default function MapSidebar({
   selectedEvent, selectedFlight, selectedVessel,
 }: MapSidebarProps) {
 
-  const activeLayers = [showEvents, showFlights, showVessels, showISS].filter(Boolean).length;
+  const activeLayers = [showEvents, showFlights, showVessels, showISS, showACLED].filter(Boolean).length;
 
   return (
     <div className="w-[300px] flex-shrink-0 h-full flex flex-col
@@ -174,6 +177,19 @@ export default function MapSidebar({
                 </div>
               </div>
               <Toggle on={showISS} onChange={onToggleISS} color="bg-purple-500" />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-orange-500/10 flex items-center justify-center text-sm">🔥</div>
+                <div>
+                  <p className="text-[11px] text-white font-medium">ACLED Conflicts</p>
+                  <p className="text-[9px] text-gray-500">
+                    {showACLED ? <><span className="text-orange-400">{acledCount.toLocaleString()}</span> incidents</> : 'Armed Conflict Data'}
+                  </p>
+                </div>
+              </div>
+              <Toggle on={showACLED} onChange={onToggleACLED} color="bg-orange-500" />
             </div>
 
           </div>

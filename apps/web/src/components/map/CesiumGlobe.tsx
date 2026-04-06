@@ -48,6 +48,24 @@ const SEV_OUTLINE: Record<string, number> = {
   critical: 3, high: 2, medium: 1.5, low: 1,
 };
 
+// ─── ACLED event type → color mapping ────────────────────────────────────────
+const ACLED_TYPE_COLORS: Record<string, string> = {
+  'Battles': '#e53935',                  // red
+  'Violence against civilians': '#ff6f00', // dark orange
+  'Explosions/Remote violence': '#ff8f00', // amber
+  'Riots': '#ffab00',                    // gold
+  'Protests': '#7c4dff',                 // purple
+  'Strategic developments': '#00bfa5',    // teal
+};
+const ACLED_DEFAULT_COLOR = '#ff9100';
+
+interface AcledEvent {
+  id: string; date: string; eventType: string; subEventType: string;
+  actor1: string; actor2: string; country: string; admin1: string;
+  lat: number; lon: number; fatalities: number; notes: string;
+  disorderType: string; region: string; civilianTargeting: string;
+}
+
 // ─── Helper ───────────────────────────────────────────────────────────────────
 type CesiumImageryLayer = {
   brightness: number;
@@ -131,6 +149,10 @@ export default function CesiumGlobe() {
   const [showFlights, setShowFlights] = useState(true);
   const [showVessels, setShowVessels] = useState(false);
   const [showISS, setShowISS] = useState(true);
+  const [showACLED, setShowACLED] = useState(false);
+
+  // ACLED
+  const [acledCount, setAcledCount] = useState(0);
 
   // Filters
   const [timeWindow, setTimeWindow] = useState('7d');
@@ -142,6 +164,7 @@ export default function CesiumGlobe() {
   const [selectedEvent, setSelectedEvent] = useState<Record<string, unknown> | null>(null);
   const [selectedFlight, setSelectedFlight] = useState<Record<string, unknown> | null>(null);
   const [selectedVessel, setSelectedVessel] = useState<Record<string, unknown> | null>(null);
+  const [selectedAcled, setSelectedAcled] = useState<Record<string, unknown> | null>(null);
   const [showModal, setShowModal] = useState(false);
 
   // ── HELPERS ───────────────────────────────────────────────────────
@@ -260,6 +283,69 @@ export default function CesiumGlobe() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cesiumReady, showEvents, timeWindow, severity, category, region]);
+
+  // ── ACLED DATA LAYER ─────────────────────────────────────────────
+  const plotACLED = useCallback(async (tw: string) => {
+    const Ce = getCe(); const v = getViewer();
+    if (!Ce || !v) return;
+
+    const windowParam = tw === 'all' ? '90d' : tw;
+    try {
+      const res = await fetch(`/api/acled?window=${windowParam}&limit=3000`, {
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) { console.warn('[ACLED] API returned', res.status); return; }
+      const d = await res.json() as { events: AcledEvent[]; count: number; error?: string };
+      if (d.error) { console.warn('[ACLED]', d.error); return; }
+
+      const events = d.events ?? [];
+      setAcledCount(events.length);
+      removeEntitiesByPrefix('acl-');
+
+      for (const e of events) {
+        if (!e.lat || !e.lon) continue;
+        const typeColor = ACLED_TYPE_COLORS[e.eventType] ?? ACLED_DEFAULT_COLOR;
+        // Size by fatalities: min 4, max 18
+        const fatalSize = Math.min(4 + Math.sqrt(e.fatalities) * 2.5, 18);
+
+        v.entities.add({
+          id: `acl-${e.id}`,
+          position: Ce.Cartesian3.fromDegrees(e.lon, e.lat),
+          name: `${e.eventType}: ${e.subEventType}`,
+          properties: {
+            _type: 'acled',
+            eventType: e.eventType,
+            subEventType: e.subEventType,
+            actor1: e.actor1,
+            actor2: e.actor2 ?? '',
+            country: e.country,
+            admin1: e.admin1,
+            date: e.date,
+            fatalities: e.fatalities,
+            notes: e.notes,
+            civilianTargeting: e.civilianTargeting,
+          },
+          point: {
+            pixelSize: fatalSize,
+            color: Ce.Color.fromCssColorString(typeColor).withAlpha(0.85),
+            outlineColor: Ce.Color.fromCssColorString(typeColor).withAlpha(0.3),
+            outlineWidth: e.fatalities > 5 ? 4 : 2,
+            heightReference: Ce.HeightReference.CLAMP_TO_GROUND,
+          },
+        } as never);
+      }
+    } catch (err) {
+      console.error('[ACLED] plotACLED error:', err);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!cesiumReady) return;
+    if (showACLED) void plotACLED(timeWindow);
+    else { removeEntitiesByPrefix('acl-'); setAcledCount(0); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cesiumReady, showACLED, timeWindow]);
 
   // ── FLIGHTS ───────────────────────────────────────────────────────
   const fetchFlights = useCallback(async () => {
@@ -574,8 +660,23 @@ export default function CesiumGlobe() {
           setSelectedVessel(vsl);
           setSelectedEvent(null);
           setSelectedFlight(null);
+          setSelectedAcled(null);
           setShowModal(false);
           flyTo(lng, lat, 300_000, -45);
+        } else if (type === 'acled') {
+          const acl: Record<string, unknown> = {
+            eventType: getP('eventType'), subEventType: getP('subEventType'),
+            actor1: getP('actor1'), actor2: getP('actor2'),
+            country: getP('country'), admin1: getP('admin1'),
+            date: getP('date'), fatalities: getP('fatalities'),
+            notes: getP('notes'), civilianTargeting: getP('civilianTargeting'),
+          };
+          setSelectedAcled(acl);
+          setSelectedEvent(null);
+          setSelectedFlight(null);
+          setSelectedVessel(null);
+          setShowModal(false);
+          flyTo(lng, lat, 500_000, -50);
         }
       }, Ce.ScreenSpaceEventType.LEFT_CLICK);
 
@@ -727,6 +828,7 @@ export default function CesiumGlobe() {
                 {showFlights && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-cyan-400" style={{ boxShadow: '0 0 4px #00e5ff' }} /><span className="text-[10px] text-gray-500">Flights</span></div>}
                 {showVessels && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 4px #34d399' }} /><span className="text-[10px] text-gray-500">Vessels</span></div>}
                 {showISS && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-purple-500" style={{ boxShadow: '0 0 4px #a855f7' }} /><span className="text-[10px] text-gray-500">ISS</span></div>}
+                {showACLED && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500" style={{ boxShadow: '0 0 4px #ff9100' }} /><span className="text-[10px] text-gray-500">ACLED</span></div>}
               </div>
             </div>
           </div>
@@ -793,6 +895,51 @@ export default function CesiumGlobe() {
           </div>
         )}
 
+        {/* ACLED info card */}
+        {selectedAcled && !showModal && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#111827]/95 backdrop-blur-xl border border-orange-500/20 rounded-2xl p-4 shadow-2xl shadow-black/40 w-96 animate-slide-up pointer-events-auto">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🔥</span>
+                <div>
+                  <p className="text-white font-bold text-sm tracking-wider">{String(selectedAcled.eventType ?? '')}</p>
+                  <p className="text-[9px] text-gray-400">{String(selectedAcled.subEventType ?? '')} · {String(selectedAcled.date ?? '')}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedAcled(null)} className="text-gray-500 hover:text-white text-xs w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/5">✕</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="bg-black/30 rounded-lg p-2">
+                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Location</p>
+                <p className="text-white text-xs">{String(selectedAcled.admin1 ?? '')}, {String(selectedAcled.country ?? '')}</p>
+              </div>
+              <div className="bg-black/30 rounded-lg p-2">
+                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Fatalities</p>
+                <p className="text-red-400 font-mono text-sm font-bold">{Number(selectedAcled.fatalities ?? 0)}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="bg-black/30 rounded-lg p-2">
+                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Actor 1</p>
+                <p className="text-white text-[10px] leading-tight">{String(selectedAcled.actor1 ?? '—')}</p>
+              </div>
+              <div className="bg-black/30 rounded-lg p-2">
+                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Actor 2</p>
+                <p className="text-white text-[10px] leading-tight">{String(selectedAcled.actor2 || '—')}</p>
+              </div>
+            </div>
+            {selectedAcled.civilianTargeting && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1 mb-3">
+                <p className="text-red-400 text-[10px] font-medium uppercase tracking-wider">⚠ Civilian targeting</p>
+              </div>
+            )}
+            {selectedAcled.notes && (
+              <p className="text-[10px] text-gray-400 leading-relaxed line-clamp-3">{String(selectedAcled.notes)}</p>
+            )}
+            <p className="text-[8px] text-gray-600 mt-2 uppercase tracking-wider">Source: ACLED</p>
+          </div>
+        )}
+
         {/* Event modal */}
         {showModal && selectedEvent && (
           <EventCardModal
@@ -832,11 +979,12 @@ export default function CesiumGlobe() {
 
       {/* ══ SIDEBAR — flex child, no absolute positioning ══ */}
       <MapSidebar
-        eventCount={eventCount} flightCount={flightCount} vesselCount={vesselCount}
+        eventCount={eventCount} flightCount={flightCount} vesselCount={vesselCount} acledCount={acledCount}
         showEvents={showEvents} onToggleEvents={() => setShowEvents(p => !p)}
         showFlights={showFlights} onToggleFlights={() => setShowFlights(p => !p)}
         showVessels={showVessels} onToggleVessels={() => setShowVessels(p => !p)}
         showISS={showISS} onToggleISS={() => setShowISS(p => !p)}
+        showACLED={showACLED} onToggleACLED={() => setShowACLED(p => !p)}
         timeWindow={timeWindow} onTimeWindowChange={setTimeWindow}
         severity={severity} onSeverityChange={setSeverity}
         category={category} onCategoryChange={setCategory}

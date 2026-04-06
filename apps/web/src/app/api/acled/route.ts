@@ -1,0 +1,209 @@
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+export const maxDuration = 20
+
+import { NextRequest, NextResponse } from 'next/server'
+
+// ─── In-memory token cache (survives across requests within the same lambda instance) ───
+let cachedToken: { access: string; refreshToken: string; expiresAt: number } | null = null
+
+async function getAccessToken(): Promise<string | null> {
+  const email = process.env.ACLED_EMAIL
+  const password = process.env.ACLED_PASSWORD
+  if (!email || !password) {
+    console.error('[ACLED] Missing ACLED_EMAIL or ACLED_PASSWORD env vars')
+    return null
+  }
+
+  // Return cached token if still valid (with 5-minute buffer)
+  if (cachedToken && Date.now() < cachedToken.expiresAt - 300_000) {
+    return cachedToken.access
+  }
+
+  // Try refresh token first if we have one
+  if (cachedToken?.refreshToken) {
+    try {
+      const res = await fetch('https://acleddata.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          refresh_token: cachedToken.refreshToken,
+          grant_type: 'refresh_token',
+          client_id: 'acled',
+        }),
+        signal: AbortSignal.timeout(8_000),
+      })
+      if (res.ok) {
+        const data = await res.json() as { access_token: string; refresh_token: string; expires_in: number }
+        cachedToken = {
+          access: data.access_token,
+          refreshToken: data.refresh_token,
+          expiresAt: Date.now() + data.expires_in * 1000,
+        }
+        return cachedToken.access
+      }
+    } catch {
+      // Refresh failed, fall through to full auth
+    }
+  }
+
+  // Full OAuth password grant
+  try {
+    const res = await fetch('https://acleddata.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        username: email,
+        password,
+        grant_type: 'password',
+        client_id: 'acled',
+      }),
+      signal: AbortSignal.timeout(8_000),
+    })
+
+    if (!res.ok) {
+      console.error(`[ACLED] OAuth failed: ${res.status} ${res.statusText}`)
+      return null
+    }
+
+    const data = await res.json() as { access_token: string; refresh_token: string; expires_in: number }
+    cachedToken = {
+      access: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresAt: Date.now() + data.expires_in * 1000,
+    }
+    return cachedToken.access
+  } catch (err) {
+    console.error('[ACLED] OAuth error:', err)
+    return null
+  }
+}
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+interface AcledEvent {
+  event_id_cnty: string
+  event_date: string
+  year: string
+  event_type: string
+  sub_event_type: string
+  actor1: string
+  actor2: string
+  country: string
+  admin1: string
+  admin2: string
+  latitude: string
+  longitude: string
+  fatalities: string
+  notes: string
+  disorder_type: string
+  region: string
+  interaction: string
+  civilian_targeting: string
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+
+  const token = await getAccessToken()
+  if (!token) {
+    return NextResponse.json(
+      { events: [], count: 0, error: 'ACLED authentication failed — check env vars' },
+      { status: 502 },
+    )
+  }
+
+  // Build ACLED API query
+  const params = new URLSearchParams({
+    _format: 'json',
+    fields: 'event_id_cnty|event_date|year|event_type|sub_event_type|actor1|actor2|country|admin1|admin2|latitude|longitude|fatalities|notes|disorder_type|region|interaction|civilian_targeting',
+  })
+
+  // Time filter — default to last 30 days
+  const window = searchParams.get('window') ?? '30d'
+  const days = window === '7d' ? 7 : window === '24h' ? 1 : window === '90d' ? 90 : 30
+  const since = new Date(Date.now() - days * 86_400_000)
+  const sinceStr = since.toISOString().split('T')[0]
+  params.set('event_date', sinceStr)
+  params.set('event_date_where', '>=')
+
+  // Country filter
+  const country = searchParams.get('country')
+  if (country) params.set('country', country)
+
+  // Region filter (ACLED region numbers)
+  const region = searchParams.get('region')
+  if (region) params.set('region', region)
+
+  // Event type filter
+  const eventType = searchParams.get('event_type')
+  if (eventType) params.set('event_type', eventType)
+
+  // Limit — cap at 5000 to avoid huge payloads
+  const limit = Math.min(Number(searchParams.get('limit') ?? 2000), 5000)
+  params.set('limit', String(limit))
+
+  const apiUrl = `https://acleddata.com/api/acled/read?${params.toString()}`
+
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 12_000)
+
+    const res = await fetch(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+
+    if (!res.ok) {
+      console.error(`[ACLED] API returned ${res.status}: ${res.statusText}`)
+      // If 401, clear cached token so next request re-authenticates
+      if (res.status === 401) cachedToken = null
+      return NextResponse.json(
+        { events: [], count: 0, error: `ACLED API error: ${res.status}` },
+        { status: 502 },
+      )
+    }
+
+    const data = await res.json() as { data?: AcledEvent[]; count?: number; status?: number }
+    const rawEvents = data.data ?? []
+
+    // Transform to GeoJSON-like format for the globe
+    const events = rawEvents
+      .filter(e => e.latitude && e.longitude && e.latitude !== '0' && e.longitude !== '0')
+      .map(e => ({
+        id: e.event_id_cnty,
+        date: e.event_date,
+        year: e.year,
+        eventType: e.event_type,
+        subEventType: e.sub_event_type,
+        actor1: e.actor1,
+        actor2: e.actor2,
+        country: e.country,
+        admin1: e.admin1,
+        admin2: e.admin2,
+        lat: parseFloat(e.latitude),
+        lon: parseFloat(e.longitude),
+        fatalities: parseInt(e.fatalities, 10) || 0,
+        notes: e.notes,
+        disorderType: e.disorder_type,
+        region: e.region,
+        civilianTargeting: e.civilian_targeting,
+        interaction: e.interaction,
+      }))
+
+    return NextResponse.json(
+      { count: events.length, events },
+      { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' } },
+    )
+  } catch (err) {
+    console.error('[ACLED] fetch error:', err)
+    return NextResponse.json(
+      { events: [], count: 0, error: 'ACLED request failed' },
+      { status: 502 },
+    )
+  }
+}
