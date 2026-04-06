@@ -118,19 +118,46 @@ export async function GET(request: NextRequest) {
     fields: 'event_id_cnty|event_date|year|event_type|sub_event_type|actor1|actor2|country|admin1|admin2|latitude|longitude|fatalities|notes|disorder_type|region|interaction|civilian_targeting',
   })
 
-  // Time filter — default to last 30 days
-  // Note: ACLED Research-level access restricts event-level data to >12 months ago
+  // Time filter
+  // ACLED Research-level access: event-level data available only >12 months old
+  // We query from (13 months ago) to (13 months ago + window) to get the most
+  // recent data the account can access. If window is 'recent', try last 30 days
+  // (works for higher access tiers).
   const window = searchParams.get('window') ?? '30d'
-  const days = window === '7d' ? 7
+  const windowDays = window === '7d' ? 7
     : window === '24h' ? 1
     : window === '90d' ? 90
     : window === '1y' ? 365
     : window === '2y' ? 730
+    : window === 'all' ? 730
     : 30
-  const since = new Date(Date.now() - days * 86_400_000)
-  const sinceStr = since.toISOString().split('T')[0] ?? ''
+
+  // Try recent data first (30 days) — if user has higher tier it will work.
+  // For Research tier: use 13-months-ago as the start date with the window span
+  const useResearchFallback = searchParams.get('research') !== 'false'
+  const RESEARCH_OFFSET_DAYS = 395 // ~13 months
+
+  let sinceDate: Date
+  let untilDate: Date | null = null
+
+  if (useResearchFallback) {
+    // Start from 13 months ago, span the requested window backwards
+    untilDate = new Date(Date.now() - RESEARCH_OFFSET_DAYS * 86_400_000)
+    sinceDate = new Date(untilDate.getTime() - windowDays * 86_400_000)
+  } else {
+    sinceDate = new Date(Date.now() - windowDays * 86_400_000)
+  }
+
+  const sinceStr = sinceDate.toISOString().split('T')[0] ?? ''
   params.set('event_date', sinceStr)
   params.set('event_date_where', '>=')
+
+  if (untilDate) {
+    // ACLED uses BETWEEN for date ranges: event_date=startDate|endDate&event_date_where=BETWEEN
+    const untilStr = untilDate.toISOString().split('T')[0] ?? ''
+    params.set('event_date', `${sinceStr}|${untilStr}`)
+    params.set('event_date_where', 'BETWEEN')
+  }
 
   // Country filter
   const country = searchParams.get('country')

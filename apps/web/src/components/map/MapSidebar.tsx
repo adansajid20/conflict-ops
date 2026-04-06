@@ -285,6 +285,13 @@ export default function MapSidebar({
           <Section title="ACLED Filters" badge={acledCount} defaultOpen>
             <div className="flex flex-col gap-4">
 
+              {/* Research-tier notice */}
+              <div className="bg-orange-500/5 border border-orange-500/15 rounded-lg px-3 py-2">
+                <p className="text-[9px] text-orange-400/80 leading-relaxed">
+                  Research-tier: showing data from ~13 months ago. Time window controls span relative to that date.
+                </p>
+              </div>
+
               {/* Event Type */}
               <div>
                 <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Event Type</p>
