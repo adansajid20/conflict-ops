@@ -84,52 +84,52 @@ export function OnboardingWizard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="flex min-h-screen flex-col items-center justify-center px-4" style={{ backgroundColor: '#070B11' }}>
       {/* Progress */}
-      <div className="w-full max-w-lg mb-8">
-        <div className="flex items-center justify-between mb-2">
+      <div className="mb-8 w-full max-w-lg">
+        <div className="mb-2 flex items-center justify-between">
           {STEPS.map((s, i) => (
             <div key={s.id} className="flex items-center">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mono"
+              <div className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold mono"
                 style={{
-                  backgroundColor: i < step ? 'var(--primary)' : i === step ? 'var(--primary)20' : 'var(--bg-surface)',
-                  border: `1px solid ${i <= step ? 'var(--primary)' : 'var(--border)'}`,
-                  color: i <= step ? 'var(--primary)' : 'var(--text-muted)',
+                  backgroundColor: i < step ? '#3B82F6' : i === step ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.015)',
+                  border: `1px solid ${i <= step ? '#3B82F6' : 'rgba(255,255,255,0.05)'}`,
+                  color: i <= step ? '#3B82F6' : 'rgba(255,255,255,0.5)',
                 }}>
                 {i < step ? '✓' : s.icon}
               </div>
               {i < STEPS.length - 1 && (
-                <div className="h-px w-12 mx-1" style={{ backgroundColor: i < step ? 'var(--primary)' : 'var(--border)' }} />
+                <div className="mx-1 h-px w-12" style={{ backgroundColor: i < step ? '#3B82F6' : 'rgba(255,255,255,0.05)' }} />
               )}
             </div>
           ))}
         </div>
-        <div className="text-xs mono text-center" style={{ color: 'var(--text-muted)' }}>
+        <div className="text-center text-xs mono text-white/50">
           Step {step + 1} of {STEPS.length}
         </div>
       </div>
 
       {/* Card */}
-      <div className="w-full max-w-lg rounded border p-8" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-        <h2 className="text-xl font-bold mono tracking-wide mb-6" style={{ color: 'var(--text-primary)' }}>
+      <div className="w-full max-w-lg rounded-xl border border-white/[0.05] bg-white/[0.015] p-8">
+        <h2 className="mb-6 text-xl font-bold mono tracking-wide text-white">
           {STEPS[step]?.title ?? ''}
         </h2>
 
         {/* Step content */}
         {step === 0 && (
           <div>
-            <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
+            <p className="mb-4 text-sm text-white/50">
               You have full access to the platform. This 2-minute setup will personalize your experience and create your first mission.
             </p>
-            <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="mb-4 grid grid-cols-3 gap-3">
               {[
                 { icon: '▤', label: 'Real-time feed' },
                 { icon: '⊞', label: 'Conflict map' },
                 { icon: '⊡', label: 'AI workbench' },
               ].map(f => (
-                <div key={f.label} className="p-3 rounded border text-center" style={{ borderColor: 'var(--border)' }}>
-                  <div className="text-xl mb-1" style={{ color: 'var(--primary)' }}>{f.icon}</div>
-                  <div className="text-xs mono" style={{ color: 'var(--text-muted)' }}>{f.label}</div>
+                <div key={f.label} className="rounded-lg border border-white/[0.05] bg-white/[0.025] p-3 text-center">
+                  <div className="mb-1 text-xl text-blue-400">{f.icon}</div>
+                  <div className="text-xs mono text-white/50">{f.label}</div>
                 </div>
               ))}
             </div>
@@ -139,22 +139,21 @@ export function OnboardingWizard() {
         {step === 1 && (
           <div>
             <div className="mb-4">
-              <label className="text-xs mono block mb-1" style={{ color: 'var(--text-muted)' }}>ORGANIZATION NAME *</label>
+              <label className="mb-1 block text-xs mono text-white/50">ORGANIZATION NAME *</label>
               <input value={orgName} onChange={e => setOrgName(e.target.value)}
                 placeholder="e.g. Acme Security, Open Source Intel Unit"
-                className="w-full px-3 py-2 text-sm rounded border"
-                style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/20" />
             </div>
             <div>
-              <label className="text-xs mono block mb-2" style={{ color: 'var(--text-muted)' }}>ORG TYPE</label>
+              <label className="mb-2 block text-xs mono text-white/50">ORG TYPE</label>
               <div className="flex flex-wrap gap-2">
                 {['Corporate Security', 'NGO / Humanitarian', 'Research / Academic', 'Media', 'Government / Defense', 'Insurance / Risk', 'Personal / OSINT'].map(t => (
                   <button key={t} onClick={() => setOrgType(t)}
-                    className="px-3 py-1 text-xs mono rounded border"
+                    className="rounded-lg border px-3 py-1 text-xs mono"
                     style={{
-                      borderColor: orgType === t ? 'var(--primary)' : 'var(--border)',
-                      color: orgType === t ? 'var(--primary)' : 'var(--text-muted)',
-                      backgroundColor: orgType === t ? 'var(--primary)15' : 'transparent',
+                      borderColor: orgType === t ? '#3B82F6' : 'rgba(255,255,255,0.05)',
+                      color: orgType === t ? '#3B82F6' : 'rgba(255,255,255,0.5)',
+                      backgroundColor: orgType === t ? 'rgba(59,130,246,0.15)' : 'transparent',
                     }}>
                     {t}
                   </button>
@@ -167,22 +166,21 @@ export function OnboardingWizard() {
         {step === 2 && (
           <div>
             <div className="mb-4">
-              <label className="text-xs mono block mb-1" style={{ color: 'var(--text-muted)' }}>MISSION NAME *</label>
+              <label className="mb-1 block text-xs mono text-white/50">MISSION NAME *</label>
               <input value={missionName} onChange={e => setMissionName(e.target.value)}
                 placeholder="e.g. Ukraine Conflict Monitor, Sahel Instability Watch"
-                className="w-full px-3 py-2 text-sm rounded border"
-                style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/20" />
             </div>
             <div className="mb-4">
-              <label className="text-xs mono block mb-2" style={{ color: 'var(--text-muted)' }}>FOCUS REGIONS * (select all that apply)</label>
+              <label className="mb-2 block text-xs mono text-white/50">FOCUS REGIONS * (select all that apply)</label>
               <div className="flex flex-wrap gap-2">
                 {REGIONS.map(r => (
                   <button key={r} onClick={() => toggleRegion(r)}
-                    className="px-3 py-1 text-xs mono rounded border"
+                    className="rounded-lg border px-3 py-1 text-xs mono"
                     style={{
-                      borderColor: selectedRegions.includes(r) ? 'var(--primary)' : 'var(--border)',
-                      color: selectedRegions.includes(r) ? 'var(--primary)' : 'var(--text-muted)',
-                      backgroundColor: selectedRegions.includes(r) ? 'var(--primary)15' : 'transparent',
+                      borderColor: selectedRegions.includes(r) ? '#3B82F6' : 'rgba(255,255,255,0.05)',
+                      color: selectedRegions.includes(r) ? '#3B82F6' : 'rgba(255,255,255,0.5)',
+                      backgroundColor: selectedRegions.includes(r) ? 'rgba(59,130,246,0.15)' : 'transparent',
                     }}>
                     {r}
                   </button>
@@ -190,15 +188,15 @@ export function OnboardingWizard() {
               </div>
             </div>
             <div>
-              <label className="text-xs mono block mb-2" style={{ color: 'var(--text-muted)' }}>INTEREST TYPES</label>
+              <label className="mb-2 block text-xs mono text-white/50">INTEREST TYPES</label>
               <div className="flex flex-wrap gap-2">
                 {INTEREST_TYPES.map(i => (
                   <button key={i} onClick={() => toggleInterest(i)}
-                    className="px-3 py-1 text-xs mono rounded border"
+                    className="rounded-lg border px-3 py-1 text-xs mono"
                     style={{
-                      borderColor: selectedInterests.includes(i) ? 'var(--primary)' : 'var(--border)',
-                      color: selectedInterests.includes(i) ? 'var(--primary)' : 'var(--text-muted)',
-                      backgroundColor: selectedInterests.includes(i) ? 'var(--primary)15' : 'transparent',
+                      borderColor: selectedInterests.includes(i) ? '#3B82F6' : 'rgba(255,255,255,0.05)',
+                      color: selectedInterests.includes(i) ? '#3B82F6' : 'rgba(255,255,255,0.5)',
+                      backgroundColor: selectedInterests.includes(i) ? 'rgba(59,130,246,0.15)' : 'transparent',
                     }}>
                     {i}
                   </button>
@@ -210,30 +208,28 @@ export function OnboardingWizard() {
 
         {step === 3 && (
           <div>
-            <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
+            <p className="mb-4 text-sm text-white/50">
               Priority Intelligence Requirements (PIRs) trigger alerts when events match your criteria. You can skip this and configure later.
             </p>
             <div className="mb-4">
-              <label className="text-xs mono block mb-1" style={{ color: 'var(--text-muted)' }}>PIR NAME (optional)</label>
+              <label className="mb-1 block text-xs mono text-white/50">PIR NAME (optional)</label>
               <input value={pirName} onChange={e => setPirName(e.target.value)}
                 placeholder="e.g. Escalation in Eastern Ukraine"
-                className="w-full px-3 py-2 text-sm rounded border"
-                style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/20" />
             </div>
             <div>
-              <label className="text-xs mono block mb-1" style={{ color: 'var(--text-muted)' }}>ALERT KEYWORD</label>
+              <label className="mb-1 block text-xs mono text-white/50">ALERT KEYWORD</label>
               <input value={pirKeyword} onChange={e => setPirKeyword(e.target.value)}
                 placeholder="e.g. Kharkiv, missile strike, mobilization"
-                className="w-full px-3 py-2 text-sm rounded border"
-                style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/20" />
             </div>
           </div>
         )}
 
         {step === 4 && (
           <div className="text-center">
-            <div className="text-4xl mb-4" style={{ color: '#10B981' }}>✓</div>
-            <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
+            <div className="mb-4 text-4xl text-green-500">✓</div>
+            <p className="mb-6 text-sm text-white/50">
               Your workspace is configured. The intel feed will populate as data flows in.
               You can refine missions, add more PIRs, and configure alerts from the dashboard.
             </p>
@@ -245,9 +241,8 @@ export function OnboardingWizard() {
                 { href: '/alerts', label: 'Alerts', icon: '⚠' },
               ].map(l => (
                 <a key={l.href} href={l.href}
-                  className="p-3 rounded border text-center text-xs mono"
-                  style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
-                  <div style={{ color: 'var(--primary)' }}>{l.icon}</div>
+                  className="rounded-lg border border-white/[0.05] p-3 text-center text-xs mono text-white/50 hover:bg-white/5">
+                  <div className="text-blue-400">{l.icon}</div>
                   {l.label}
                 </a>
               ))}
@@ -256,19 +251,18 @@ export function OnboardingWizard() {
         )}
 
         {/* Nav buttons */}
-        <div className="flex justify-between mt-8">
+        <div className="mt-8 flex justify-between">
           {step > 0 && step < STEPS.length - 1 ? (
             <button onClick={() => setStep(s => s - 1)}
-              className="px-4 py-2 text-xs mono rounded border"
-              style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+              className="rounded-lg border border-white/[0.05] px-4 py-2 text-xs mono text-white/50 hover:bg-white/5">
               ← BACK
             </button>
           ) : <div />}
           <button
             onClick={() => void handleNext()}
             disabled={!canNext() || loading}
-            className="px-6 py-2 text-xs mono rounded font-bold"
-            style={{ backgroundColor: canNext() ? 'var(--primary)' : 'var(--bg-surface)', color: canNext() ? '#fff' : 'var(--text-muted)' }}>
+            className="rounded-lg px-6 py-2 text-xs mono font-bold text-white hover:bg-blue-600 disabled:opacity-50"
+            style={{ backgroundColor: canNext() ? '#3B82F6' : 'rgba(255,255,255,0.015)' }}>
             {loading ? 'SAVING...' : step === STEPS.length - 1 ? 'OPEN DASHBOARD →' : step === 3 ? 'FINISH SETUP' : 'NEXT →'}
           </button>
         </div>

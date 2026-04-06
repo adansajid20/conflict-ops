@@ -40,7 +40,7 @@ export interface MapSidebarProps {
 function Toggle({ on, onChange, color = 'bg-blue-500' }: { on: boolean; onChange: () => void; color?: string }) {
   return (
     <button onClick={onChange}
-      className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${on ? color : 'bg-gray-700'}`}>
+      className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${on ? color : 'bg-white/[0.1]'}`}>
       <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${on ? 'translate-x-4' : ''}`} />
     </button>
   );
@@ -54,18 +54,18 @@ function Section({ title, badge, children, defaultOpen = true }: {
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border-b border-gray-800/60 last:border-b-0">
+    <div className="border-b border-white/[0.05] last:border-b-0">
       <button onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold tracking-[0.15em] text-gray-400 uppercase">{title}</span>
+          <span className="text-[10px] font-bold tracking-[0.15em] text-white/25 uppercase">{title}</span>
           {badge !== undefined && (
             <span className="text-[9px] font-medium bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
               {badge}
             </span>
           )}
         </div>
-        <svg className={`w-3 h-3 text-gray-600 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        <svg className={`w-3 h-3 text-white/50 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
@@ -103,14 +103,14 @@ export default function MapSidebar({
 
   return (
     <div className="w-[300px] flex-shrink-0 h-full flex flex-col
-      bg-[#0a0e17]/92 backdrop-blur-2xl border-l border-gray-800/50">
+      bg-[#070B11] backdrop-blur-2xl border-l border-white/[0.05]">
 
       {/* ═══ HEADER ═══ */}
-      <div className="px-4 py-4 border-b border-gray-800/60">
+      <div className="px-4 py-4 border-b border-white/[0.05]">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xs font-bold tracking-[0.15em] text-white uppercase">Control Panel</h2>
-            <p className="text-[9px] text-gray-500 mt-0.5">{activeLayers} layer{activeLayers !== 1 ? 's' : ''} active</p>
+            <p className="text-[9px] text-white/50 mt-0.5">{activeLayers} layer{activeLayers !== 1 ? 's' : ''} active</p>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -120,16 +120,16 @@ export default function MapSidebar({
 
         {/* Stats bar */}
         <div className="flex gap-2 mt-3">
-          <div className="flex-1 bg-[#111827]/60 rounded-lg px-2 py-1.5 border border-gray-800/40">
-            <p className="text-[8px] text-gray-500 uppercase tracking-wider">Events</p>
+          <div className="flex-1 bg-white/[0.03] rounded-lg px-2 py-1.5 border border-white/[0.06]">
+            <p className="text-[8px] text-white/50 uppercase tracking-wider">Events</p>
             <p className="text-sm font-bold text-white font-mono">{eventCount.toLocaleString()}</p>
           </div>
-          <div className="flex-1 bg-[#111827]/60 rounded-lg px-2 py-1.5 border border-gray-800/40">
-            <p className="text-[8px] text-cyan-500/70 uppercase tracking-wider">Flights</p>
+          <div className="flex-1 bg-white/[0.03] rounded-lg px-2 py-1.5 border border-white/[0.06]">
+            <p className="text-[8px] text-cyan-400 uppercase tracking-wider">Flights</p>
             <p className="text-sm font-bold text-cyan-400 font-mono">{showFlights ? flightCount.toLocaleString() : 'OFF'}</p>
           </div>
-          <div className="flex-1 bg-[#111827]/60 rounded-lg px-2 py-1.5 border border-gray-800/40">
-            <p className="text-[8px] text-emerald-500/70 uppercase tracking-wider">Vessels</p>
+          <div className="flex-1 bg-white/[0.03] rounded-lg px-2 py-1.5 border border-white/[0.06]">
+            <p className="text-[8px] text-emerald-400 uppercase tracking-wider">Vessels</p>
             <p className="text-sm font-bold text-emerald-400 font-mono">{showVessels ? vesselCount.toLocaleString() : 'OFF'}</p>
           </div>
         </div>
@@ -149,7 +149,7 @@ export default function MapSidebar({
                 </div>
                 <div>
                   <p className="text-[11px] text-white font-medium">Conflict Events</p>
-                  <p className="text-[9px] text-gray-500">{eventCount.toLocaleString()} tracked</p>
+                  <p className="text-[9px] text-white/50">{eventCount.toLocaleString()} tracked</p>
                 </div>
               </div>
               <Toggle on={showEvents} onChange={onToggleEvents} color="bg-red-500" />
@@ -160,7 +160,7 @@ export default function MapSidebar({
                 <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center text-sm">✈️</div>
                 <div>
                   <p className="text-[11px] text-white font-medium">Live Flights</p>
-                  <p className="text-[9px] text-gray-500">
+                  <p className="text-[9px] text-white/50">
                     {showFlights ? <><span className="text-cyan-400">{flightCount.toLocaleString()}</span> airborne</> : 'OpenSky Network'}
                   </p>
                 </div>
@@ -173,7 +173,7 @@ export default function MapSidebar({
                 <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-sm">🚢</div>
                 <div>
                   <p className="text-[11px] text-white font-medium">Vessel Tracking</p>
-                  <p className="text-[9px] text-gray-500">
+                  <p className="text-[9px] text-white/50">
                     {showVessels ? <><span className="text-emerald-400">{vesselCount.toLocaleString()}</span> tracked</> : 'AIS Stream'}
                   </p>
                 </div>
@@ -186,7 +186,7 @@ export default function MapSidebar({
                 <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center text-sm">🛰️</div>
                 <div>
                   <p className="text-[11px] text-white font-medium">ISS Tracker</p>
-                  <p className="text-[9px] text-gray-500">
+                  <p className="text-[9px] text-white/50">
                     {showISS ? <><span className="text-purple-400">Live</span> · every 5s</> : 'Disabled'}
                   </p>
                 </div>
@@ -199,7 +199,7 @@ export default function MapSidebar({
                 <div className="w-7 h-7 rounded-lg bg-orange-500/10 flex items-center justify-center text-sm">🔥</div>
                 <div>
                   <p className="text-[11px] text-white font-medium">ACLED Conflicts</p>
-                  <p className="text-[9px] text-gray-500">
+                  <p className="text-[9px] text-white/50">
                     {showACLED ? <><span className="text-orange-400">{acledCount.toLocaleString()}</span> incidents</> : 'Armed Conflict Data'}
                   </p>
                 </div>
@@ -215,14 +215,14 @@ export default function MapSidebar({
           <div className="flex flex-col gap-4">
 
             <div>
-              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Time window</p>
+              <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Time window</p>
               <div className="flex gap-1.5">
                 {['24h', '7d', '30d', 'all'].map(t => (
                   <button key={t} onClick={() => onTimeWindowChange(t)}
                     className={`flex-1 py-1.5 text-[10px] font-medium uppercase tracking-wider rounded-lg border transition
                       ${timeWindow === t
                         ? 'bg-blue-500/15 border-blue-500/30 text-blue-400'
-                        : 'bg-transparent border-gray-800 text-gray-500 hover:border-gray-700 hover:text-gray-400'
+                        : 'bg-transparent border-white/[0.05] text-white/50 hover:border-white/[0.08] hover:text-white/60'
                       }`}>
                     {t}
                   </button>
@@ -231,7 +231,7 @@ export default function MapSidebar({
             </div>
 
             <div>
-              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Severity</p>
+              <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Severity</p>
               <div className="flex gap-1.5">
                 {[
                   { v: 'all', l: 'All', active: 'bg-blue-500/15 border-blue-500/30 text-blue-400' },
@@ -240,7 +240,7 @@ export default function MapSidebar({
                 ].map(s => (
                   <button key={s.v} onClick={() => onSeverityChange(s.v)}
                     className={`flex-1 py-1.5 text-[10px] font-medium uppercase tracking-wider rounded-lg border transition
-                      ${severity === s.v ? s.active : 'bg-transparent border-gray-800 text-gray-500 hover:border-gray-700 hover:text-gray-400'}`}>
+                      ${severity === s.v ? s.active : 'bg-transparent border-white/[0.05] text-white/50 hover:border-white/[0.08] hover:text-white/60'}`}>
                     {s.l}
                   </button>
                 ))}
@@ -248,11 +248,11 @@ export default function MapSidebar({
             </div>
 
             <div>
-              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Category</p>
+              <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Category</p>
               <div className="relative">
                 <select value={category} onChange={(e) => onCategoryChange(e.target.value)}
-                  className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
-                    appearance-none cursor-pointer hover:border-gray-700 focus:border-blue-500/40 focus:outline-none transition">
+                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
+                    appearance-none cursor-pointer hover:border-white/[0.08] focus:border-blue-500/40 focus:outline-none transition">
                   <option value="all">All categories</option>
                   <option value="armed_conflict">Armed Conflict</option>
                   <option value="terrorism">Terrorism</option>
@@ -262,7 +262,7 @@ export default function MapSidebar({
                   <option value="cyber">Cyber</option>
                   <option value="humanitarian">Humanitarian</option>
                 </select>
-                <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-600 pointer-events-none"
+                <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/50 pointer-events-none"
                   fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
@@ -270,11 +270,11 @@ export default function MapSidebar({
             </div>
 
             <div>
-              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Country / Region</p>
+              <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Country / Region</p>
               <input type="text" value={region} onChange={(e) => onRegionChange(e.target.value)}
                 placeholder="e.g. Ukraine, Syria, Sahel..."
-                className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
-                  placeholder:text-gray-600 hover:border-gray-700 focus:border-blue-500/40 focus:outline-none transition" />
+                className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
+                  placeholder:text-white/20 hover:border-white/[0.08] focus:border-blue-500/40 focus:outline-none transition" />
             </div>
 
           </div>
@@ -294,11 +294,11 @@ export default function MapSidebar({
 
               {/* Event Type */}
               <div>
-                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Event Type</p>
+                <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Event Type</p>
                 <div className="relative">
                   <select value={acledEventType} onChange={(e) => onAcledEventTypeChange(e.target.value)}
-                    className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
-                      appearance-none cursor-pointer hover:border-gray-700 focus:border-orange-500/40 focus:outline-none transition">
+                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
+                      appearance-none cursor-pointer hover:border-white/[0.08] focus:border-orange-500/40 focus:outline-none transition">
                     <option value="all">All event types</option>
                     <option value="Battles">Battles</option>
                     <option value="Violence against civilians">Violence against civilians</option>
@@ -307,7 +307,7 @@ export default function MapSidebar({
                     <option value="Protests">Protests</option>
                     <option value="Strategic developments">Strategic developments</option>
                   </select>
-                  <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-600 pointer-events-none"
+                  <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/50 pointer-events-none"
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
@@ -316,18 +316,18 @@ export default function MapSidebar({
 
               {/* Disorder Type */}
               <div>
-                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Disorder Type</p>
+                <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Disorder Type</p>
                 <div className="relative">
                   <select value={acledDisorderType} onChange={(e) => onAcledDisorderTypeChange(e.target.value)}
-                    className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
-                      appearance-none cursor-pointer hover:border-gray-700 focus:border-orange-500/40 focus:outline-none transition">
+                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
+                      appearance-none cursor-pointer hover:border-white/[0.08] focus:border-orange-500/40 focus:outline-none transition">
                     <option value="all">All disorder types</option>
                     <option value="Political violence">Political violence</option>
                     <option value="Political violence; Demonstrations">Political violence & Demonstrations</option>
                     <option value="Demonstrations">Demonstrations</option>
                     <option value="Strategic developments">Strategic developments</option>
                   </select>
-                  <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-600 pointer-events-none"
+                  <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/50 pointer-events-none"
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
@@ -336,11 +336,11 @@ export default function MapSidebar({
 
               {/* ACLED Region */}
               <div>
-                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">ACLED Region</p>
+                <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">ACLED Region</p>
                 <div className="relative">
                   <select value={acledRegion} onChange={(e) => onAcledRegionChange(e.target.value)}
-                    className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
-                      appearance-none cursor-pointer hover:border-gray-700 focus:border-orange-500/40 focus:outline-none transition">
+                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
+                      appearance-none cursor-pointer hover:border-white/[0.08] focus:border-orange-500/40 focus:outline-none transition">
                     <option value="all">All regions</option>
                     <option value="10">Middle East</option>
                     <option value="11">Europe</option>
@@ -359,7 +359,7 @@ export default function MapSidebar({
                     <option value="17">North America</option>
                     <option value="18">Oceania</option>
                   </select>
-                  <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-600 pointer-events-none"
+                  <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/50 pointer-events-none"
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
@@ -368,25 +368,25 @@ export default function MapSidebar({
 
               {/* Country */}
               <div>
-                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Country</p>
+                <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Country</p>
                 <input type="text" value={acledCountry} onChange={(e) => onAcledCountryChange(e.target.value)}
                   placeholder="e.g. Ukraine, Syria, Sudan..."
-                  className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
-                    placeholder:text-gray-600 hover:border-gray-700 focus:border-orange-500/40 focus:outline-none transition" />
+                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
+                    placeholder:text-white/20 hover:border-white/[0.08] focus:border-orange-500/40 focus:outline-none transition" />
               </div>
 
               {/* Actor search */}
               <div>
-                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Actor (search)</p>
+                <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Actor (search)</p>
                 <input type="text" value={acledActor} onChange={(e) => onAcledActorChange(e.target.value)}
                   placeholder="e.g. Wagner, Houthis, ISIS..."
-                  className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
-                    placeholder:text-gray-600 hover:border-gray-700 focus:border-orange-500/40 focus:outline-none transition" />
+                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
+                    placeholder:text-white/20 hover:border-white/[0.08] focus:border-orange-500/40 focus:outline-none transition" />
               </div>
 
               {/* Minimum fatalities */}
               <div>
-                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Min. Fatalities</p>
+                <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Min. Fatalities</p>
                 <div className="flex gap-1.5">
                   {[
                     { v: '0', l: 'Any' },
@@ -399,7 +399,7 @@ export default function MapSidebar({
                       className={`flex-1 py-1.5 text-[10px] font-medium uppercase tracking-wider rounded-lg border transition
                         ${acledFatalities === f.v
                           ? 'bg-red-500/15 border-red-500/30 text-red-400'
-                          : 'bg-transparent border-gray-800 text-gray-500 hover:border-gray-700 hover:text-gray-400'
+                          : 'bg-transparent border-white/[0.05] text-white/50 hover:border-white/[0.08] hover:text-white/60'
                         }`}>
                       {f.l}
                     </button>
@@ -413,7 +413,7 @@ export default function MapSidebar({
                   <span className="text-[11px]">⚠️</span>
                   <div>
                     <p className="text-[11px] text-white font-medium">Civilian targeting only</p>
-                    <p className="text-[9px] text-gray-500">Filter to events targeting civilians</p>
+                    <p className="text-[9px] text-white/50">Filter to events targeting civilians</p>
                   </div>
                 </div>
                 <Toggle on={acledCivilianOnly} onChange={onAcledCivilianOnlyChange} color="bg-red-500" />
@@ -431,18 +431,18 @@ export default function MapSidebar({
               const sevColor = ev.severity === 'critical' ? '#ff2d2d' : ev.severity === 'high' ? '#ff8c00' : '#ffd700';
               const sevBg = ev.severity === 'critical' ? 'rgba(255,45,45,0.1)' : 'rgba(255,140,0,0.1)';
               return (
-              <div className="bg-[#111827]/60 rounded-xl p-3 border border-gray-800/40">
+              <div className="bg-white/[0.015] rounded-xl p-3 border border-white/[0.05]">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
                     style={{ color: sevColor, backgroundColor: sevBg }}>
                     {ev.severity ?? 'unknown'}
                   </span>
-                  <span className="text-[9px] text-gray-500">{ev.category ?? ''}</span>
+                  <span className="text-[9px] text-white/50">{ev.category ?? ''}</span>
                 </div>
                 <p className="text-[11px] text-white font-medium leading-snug line-clamp-2">{ev.title ?? ''}</p>
-                <p className="text-[10px] text-gray-500 mt-1.5 line-clamp-3">{ev.summary ?? ev.description ?? ''}</p>
+                <p className="text-[10px] text-white/50 mt-1.5 line-clamp-3">{ev.summary ?? ev.description ?? ''}</p>
                 {ev.country_region && (
-                  <p className="text-[9px] text-gray-600 mt-2">📍 {ev.country_region}</p>
+                  <p className="text-[9px] text-white/30 mt-2">📍 {ev.country_region}</p>
                 )}
               </div>
               );
@@ -450,18 +450,18 @@ export default function MapSidebar({
             {selectedFlight && (() => {
               const f = selectedFlight as Record<string, string | number>;
               return (
-              <div className="bg-[#111827]/60 rounded-xl p-3 border border-cyan-800/20">
+              <div className="bg-white/[0.015] rounded-xl p-3 border border-cyan-400/20">
                 <p className="text-[11px] text-white font-medium">✈️ {String(f.callsign ?? f.icao24 ?? '')}</p>
-                <p className="text-[9px] text-gray-500 mt-1">{String(f.originCountry ?? '')} · {Math.round(Number(f.altitude ?? 0)).toLocaleString()}m · {Math.round(Number(f.velocity ?? 0) * 3.6)}km/h</p>
+                <p className="text-[9px] text-white/50 mt-1">{String(f.originCountry ?? '')} · {Math.round(Number(f.altitude ?? 0)).toLocaleString()}m · {Math.round(Number(f.velocity ?? 0) * 3.6)}km/h</p>
               </div>
               );
             })()}
             {selectedVessel && (() => {
               const v = selectedVessel as Record<string, string | number>;
               return (
-              <div className="bg-[#111827]/60 rounded-xl p-3 border border-emerald-800/20">
+              <div className="bg-white/[0.015] rounded-xl p-3 border border-emerald-400/20">
                 <p className="text-[11px] text-white font-medium">🚢 {String(v.name ?? '')}</p>
-                <p className="text-[9px] text-gray-500 mt-1">{Number(v.speed ?? 0).toFixed(1)}kn → {String(v.destination ?? 'Unknown')}</p>
+                <p className="text-[9px] text-white/50 mt-1">{Number(v.speed ?? 0).toFixed(1)}kn → {String(v.destination ?? 'Unknown')}</p>
               </div>
               );
             })()}
@@ -485,11 +485,11 @@ export default function MapSidebar({
       </div>
 
       {/* ═══ FOOTER ═══ */}
-      <div className="px-4 py-2.5 border-t border-gray-800/60 flex items-center justify-between">
-        <p className="text-[8px] text-gray-600 uppercase tracking-wider">ConflictRadar v3.0</p>
+      <div className="px-4 py-2.5 border-t border-white/[0.05] flex items-center justify-between">
+        <p className="text-[8px] text-white/30 uppercase tracking-wider">ConflictRadar v3.0</p>
         <div className="flex items-center gap-1">
           <div className="w-1 h-1 rounded-full bg-emerald-500" />
-          <p className="text-[8px] text-gray-600">Systems operational</p>
+          <p className="text-[8px] text-white/30">Systems operational</p>
         </div>
       </div>
     </div>

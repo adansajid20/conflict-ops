@@ -86,8 +86,8 @@ function parseCoords(location: unknown): { lat: number; lng: number } | null {
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <div className="text-[10px] mono font-bold tracking-[0.12em]" style={{ color: 'var(--text-muted)' }}>{label}</div>
-      <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+      <div className="text-[10px] mono font-bold tracking-[0.12em] text-white/50">{label}</div>
+      <div className="flex-1 h-px bg-white/[0.05]" />
     </div>
   )
 }
@@ -139,16 +139,13 @@ function DescriptionBlock({ description }: { description: string }) {
   return (
     <div>
       <SectionHeader label="DESCRIPTION" />
-      <p className="text-sm" style={{ color: 'var(--text-primary)', lineHeight: 1.65 }}>
+      <p className="text-sm text-white" style={{ lineHeight: 1.65 }}>
         {displayed}
       </p>
       {tooLong && (
         <button
           onClick={() => setExpanded(v => !v)}
-          className="text-xs mt-2 transition-colors rounded outline-none focus-visible:ring-1 focus-visible:ring-gray-500"
-          style={{ color: 'var(--text-muted)' }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)' }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)' }}
+          className="text-xs mt-2 transition-colors rounded outline-none focus-visible:ring-1 focus-visible:ring-white/20 text-white/50 hover:text-white/70"
         >
           {expanded ? 'Show less ↑' : 'Show more ↓'}
         </button>
@@ -291,8 +288,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40"
-        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+        className="fixed inset-0 z-40 bg-black/50"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -303,65 +299,63 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
         tabIndex={-1}
         role="dialog"
         aria-label="Intel Case File"
-        className={isMobile
-          ? "fixed inset-x-0 bottom-0 z-50 flex flex-col outline-none rounded-t-xl transition-transform duration-300"
-          : "fixed right-0 top-0 bottom-0 z-50 flex flex-col outline-none"
-        }
+        className={`${
+          isMobile
+            ? "fixed inset-x-0 bottom-0 z-50 flex flex-col outline-none rounded-t-xl transition-transform duration-300 bg-white/[0.015] border-t border-white/[0.05]"
+            : "fixed right-0 top-0 bottom-0 z-50 flex flex-col outline-none bg-white/[0.015] border-l border-white/[0.05]"
+        }`}
         style={isMobile ? {
           maxHeight: '85vh',
-          backgroundColor: 'var(--bg-surface)',
-          borderTop: '1px solid var(--border)',
           boxShadow: '0 -12px 40px rgba(0,0,0,0.5)',
           overflowY: 'auto',
         } : {
           width: 'min(560px, 95vw)',
-          backgroundColor: 'var(--bg-surface)',
-          borderLeft: '1px solid var(--border)',
           boxShadow: '-12px 0 40px rgba(0,0,0,0.5)',
         }}
       >
         {/* Mobile drag handle */}
         {isMobile && (
           <div className="flex justify-center pt-3 pb-2 shrink-0">
-            <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
+            <div className="w-10 h-1 rounded-full bg-white/[0.05]" />
           </div>
         )}
         {/* Header */}
-        <div className="flex items-start gap-3 p-4 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex items-start gap-3 p-4 border-b border-white/[0.05] shrink-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <SeverityBadge severity={item.severity} />
               {item.event_type && (
-                <span className="text-[10px] mono font-medium px-2 py-0.5 rounded"
-                  style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                <span className="text-[10px] mono font-medium px-2 py-0.5 rounded bg-white/[0.06] text-white/50 border border-white/[0.08]">
                   {(EVENT_TYPE_LABELS[item.event_type] ?? item.event_type.replace(/_/g, ' ')).toUpperCase()}
                 </span>
               )}
             </div>
-            <h2 className="text-sm font-bold leading-snug" style={{ color: 'var(--text-primary)', lineHeight: 1.4 }}>
+            <h2 className="text-sm font-bold leading-snug text-white" style={{ lineHeight: 1.4 }}>
               {item.title}
             </h2>
           </div>
           <div className="flex flex-col items-center gap-1 shrink-0">
             <button onClick={onClose}
-              className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
-              style={{ color: 'var(--text-muted)' }}
+              className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-white/50"
               title="Close (Esc)">✕</button>
 
             {items.length > 1 && (
               <>
                 <button onClick={navigatePrev} disabled={currentIndex <= 0}
-                  className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors disabled:opacity-30"
-                  style={{ color: 'var(--text-muted)' }} title="Previous (↑)">▲</button>
+                  className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors disabled:opacity-30 text-white/50"
+                  title="Previous (↑)">▲</button>
                 <button onClick={navigateNext} disabled={currentIndex >= items.length - 1}
-                  className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors disabled:opacity-30"
-                  style={{ color: 'var(--text-muted)' }} title="Next (↓)">▼</button>
+                  className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors disabled:opacity-30 text-white/50"
+                  title="Next (↓)">▼</button>
               </>
             )}
           </div>
         </div>
 
-        <div className="border-b px-4 py-2 flex gap-2" style={{ borderColor: 'var(--border)' }}><button onClick={() => setActiveTab('details')} className="rounded px-3 py-1 text-xs mono" style={{ background: activeTab === 'details' ? 'var(--primary-dim)' : 'transparent', color: activeTab === 'details' ? 'var(--primary)' : 'var(--text-muted)' }}>DETAILS</button><button onClick={() => setActiveTab('comments')} className="rounded px-3 py-1 text-xs mono" style={{ background: activeTab === 'comments' ? 'var(--primary-dim)' : 'transparent', color: activeTab === 'comments' ? 'var(--primary)' : 'var(--text-muted)' }}>COMMENTS</button></div>
+        <div className="border-b border-white/[0.05] px-4 py-2 flex gap-2">
+          <button onClick={() => setActiveTab('details')} className={`rounded px-3 py-1 text-xs mono transition-colors ${activeTab === 'details' ? 'bg-blue-500/20 text-blue-400' : 'text-white/50'}`}>DETAILS</button>
+          <button onClick={() => setActiveTab('comments')} className={`rounded px-3 py-1 text-xs mono transition-colors ${activeTab === 'comments' ? 'bg-blue-500/20 text-blue-400' : 'text-white/50'}`}>COMMENTS</button>
+        </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
@@ -369,11 +363,11 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
           {/* INTEL HEADER */}
           <div>
             <SectionHeader label="INTEL HEADER" />
-            <div className="space-y-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              {locationDisplay !== 'Location unknown' && <div className="grid grid-cols-[100px_1fr] gap-1"><span style={{ color: 'var(--text-muted)' }}>Location</span><span style={{ color: 'var(--text-primary)' }}>{locationDisplay} · {locationConfidence.icon} {locationConfidence.label}</span></div>}
+            <div className="space-y-2 text-xs text-white/80">
+              {locationDisplay !== 'Location unknown' && <div className="grid grid-cols-[100px_1fr] gap-1"><span className="text-white/50">Location</span><span className="text-white">{locationDisplay} · {locationConfidence.icon} {locationConfidence.label}</span></div>}
               <div className="grid grid-cols-[100px_1fr] gap-1">
-                <span style={{ color: 'var(--text-muted)' }}>Coordinates</span>
-                <span className="mono" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
+                <span className="text-white/50">Coordinates</span>
+                <span className="mono text-white font-mono">
                   {coordInfo && !coordInfo.isCentroid
                     ? `${coordInfo.lat.toFixed(4)}, ${coordInfo.lng.toFixed(4)}`
                     : coordInfo?.isCentroid
@@ -382,29 +376,27 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
                 </span>
               </div>
               <div className="grid grid-cols-[100px_1fr] gap-1">
-                <span style={{ color: 'var(--text-muted)' }}>Category</span>
-                <span style={{ color: 'var(--text-primary)' }}>
+                <span className="text-white/50">Category</span>
+                <span className="text-white">
                   {item.event_type ? item.event_type.replace(/_/g, ' ') : '—'}
                 </span>
               </div>
-              <div className="grid grid-cols-[100px_1fr] gap-1"><span style={{ color: 'var(--text-muted)' }}>Significance</span><span title="Significance tier based on source corroboration, recency, and strategic impact" className={`inline-flex w-fit rounded-full px-2 py-0.5 text-xs font-medium ${significanceTier.bgColor} ${significanceTier.color}`}>{significanceTier.label}</span></div>
+              <div className="grid grid-cols-[100px_1fr] gap-1"><span className="text-white/50">Significance</span><span title="Significance tier based on source corroboration, recency, and strategic impact" className={`inline-flex w-fit rounded-full px-2 py-0.5 text-xs font-medium ${significanceTier.bgColor} ${significanceTier.color}`}>{significanceTier.label}</span></div>
               <div className="grid grid-cols-[100px_1fr] gap-1">
-                <span style={{ color: 'var(--text-muted)' }}>Source</span>
-                <span style={{ color: 'var(--text-primary)' }}>{sourceLabel}</span>
+                <span className="text-white/50">Source</span>
+                <span className="text-white">{sourceLabel}</span>
               </div>
               <div className="grid grid-cols-[100px_1fr] gap-1 items-center">
-                <span style={{ color: 'var(--text-muted)' }}>Corroboration</span>
+                <span className="text-white/50">Corroboration</span>
                 {(item._source_count ?? 1) > 1 ? (
-                  <span style={{
+                  <span className="font-semibold text-sm" style={{
                     color: item._confidence === 'confirmed' ? '#22c55e' : '#eab308',
-                    fontWeight: 600,
-                    fontSize: '12px',
                   }}>
                     {item._source_count} independent source{(item._source_count ?? 1) !== 1 ? 's' : ''}
                     {item._confidence === 'confirmed' ? ' — CONFIRMED' : ' — CORROBORATED'}
                   </span>
                 ) : (
-                  <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                  <span className="text-white/50 text-sm">
                     Single source — treat as unverified
                   </span>
                 )}
@@ -414,10 +406,10 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
 
           <div>
             <SectionHeader label="TIMING" />
-            <div className="space-y-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              <div className="grid grid-cols-[100px_1fr] gap-1"><span style={{ color: 'var(--text-muted)' }}>Published</span><span className="mono" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{safeAbsoluteTime(item.occurred_at)}</span></div>
-              <div className="grid grid-cols-[100px_1fr] gap-1"><span style={{ color: 'var(--text-muted)' }}>Relative</span><span className="mono" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{safeRelativeTime(item.occurred_at)}</span></div>
-              <div className="grid grid-cols-[100px_1fr] gap-1 items-center"><span style={{ color: 'var(--text-muted)' }}>Freshness</span><FreshnessBadge freshness={freshness} /></div>
+            <div className="space-y-2 text-xs text-white/80">
+              <div className="grid grid-cols-[100px_1fr] gap-1"><span className="text-white/50">Published</span><span className="mono text-white font-mono">{safeAbsoluteTime(item.occurred_at)}</span></div>
+              <div className="grid grid-cols-[100px_1fr] gap-1"><span className="text-white/50">Relative</span><span className="mono text-white font-mono">{safeRelativeTime(item.occurred_at)}</span></div>
+              <div className="grid grid-cols-[100px_1fr] gap-1 items-center"><span className="text-white/50">Freshness</span><FreshnessBadge freshness={freshness} /></div>
             </div>
           </div>
 
@@ -428,17 +420,15 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
           {item.url && (
             <div>
               <SectionHeader label="SOURCES" />
-              <div className="flex items-center justify-between rounded-lg px-3 py-2"
-                style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border)' }}>
-                <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+              <div className="flex items-center justify-between rounded-lg px-3 py-2 bg-white/[0.03] border border-white/[0.05]">
+                <span className="text-xs font-medium text-white">
                   {sourceLabel}
                 </span>
                 <a
                   href={item.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-medium hover:underline flex items-center gap-1"
-                  style={{ color: 'var(--primary)' }}
+                  className="text-xs font-medium hover:underline flex items-center gap-1 text-blue-400"
                 >
                   Read full article <span>↗</span>
                 </a>
@@ -455,13 +445,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
                 <button
                   onClick={handleViewOnMap}
                   title={coordInfo.isCentroid ? 'View approximate location on map' : 'View on map'}
-                  className="px-3 py-2 rounded-lg text-xs font-medium border transition-colors"
-                  style={{
-                    background: 'rgba(37,99,235,0.1)',
-                    borderColor: 'rgba(37,99,235,0.4)',
-                    color: '#60A5FA',
-                    cursor: 'pointer',
-                  }}
+                  className="px-3 py-2 rounded-lg text-xs font-medium border border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
                 >
                   🗺 View on Map{coordInfo.isCentroid ? ' (approx.)' : ''}
                 </button>
@@ -470,13 +454,11 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
               {/* Copy Link */}
               <button
                 onClick={() => void handleCopyLink()}
-                className="px-3 py-2 rounded-lg text-xs font-medium border transition-colors"
-                style={{
-                  background: copyFeedback ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.05)',
-                  borderColor: copyFeedback ? 'rgba(34,197,94,0.4)' : 'var(--border)',
-                  color: copyFeedback ? '#22C55E' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                }}
+                className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                  copyFeedback
+                    ? 'bg-green-500/10 border-green-500/40 text-green-400'
+                    : 'bg-white/[0.05] border-white/[0.08] text-white/60 hover:bg-white/[0.08]'
+                }`}
               >
                 {copyFeedback ? '✓ Copied!' : '🔗 Copy Link'}
               </button>
@@ -492,13 +474,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
                     result: null,
                   }))
                 }}
-                className="px-3 py-2 rounded-lg text-xs font-medium border transition-colors col-span-2"
-                style={{
-                  background: 'rgba(239,68,68,0.08)',
-                  borderColor: 'rgba(239,68,68,0.3)',
-                  color: '#F87171',
-                  cursor: 'pointer',
-                }}
+                className="px-3 py-2 rounded-lg text-xs font-medium border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors col-span-2"
               >
                 ★ Create Alert
               </button>
@@ -506,21 +482,18 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
 
             {/* Inline alert form */}
             {alertForm.open && (
-              <div className="mt-3 rounded-lg border p-3 space-y-2"
-                style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
-                <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>New Alert</div>
+              <div className="mt-3 rounded-lg border border-white/[0.05] p-3 space-y-2 bg-white/[0.03]">
+                <div className="text-xs font-medium text-white">New Alert</div>
                 <input
                   value={alertForm.name}
                   onChange={e => setAlertForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="Alert name"
-                  className="w-full rounded px-3 py-1.5 text-xs"
-                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                  className="w-full rounded px-3 py-1.5 text-xs bg-white/[0.015] border border-white/[0.06] text-white placeholder:text-white/20"
                 />
                 <select
                   value={alertForm.severity}
                   onChange={e => setAlertForm(f => ({ ...f, severity: parseInt(e.target.value) }))}
-                  className="w-full rounded px-3 py-1.5 text-xs"
-                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                  className="w-full rounded px-3 py-1.5 text-xs bg-white/[0.015] border border-white/[0.06] text-white"
                 >
                   <option value={1}>1 — Low</option>
                   <option value={2}>2 — Medium</option>
@@ -531,23 +504,21 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
                   <button
                     onClick={() => void handleCreateAlert()}
                     disabled={alertForm.saving || !alertForm.name}
-                    className="flex-1 rounded px-3 py-1.5 text-xs font-medium"
-                    style={{ background: 'var(--primary)', color: '#fff', opacity: alertForm.saving ? 0.6 : 1 }}
+                    className="flex-1 rounded px-3 py-1.5 text-xs font-medium bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-60"
                   >
                     {alertForm.saving ? 'Saving…' : 'Confirm'}
                   </button>
                   <button
                     onClick={() => setAlertForm(f => ({ ...f, open: false }))}
-                    className="rounded px-3 py-1.5 text-xs"
-                    style={{ border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+                    className="rounded px-3 py-1.5 text-xs border border-white/[0.05] text-white/50"
                   >
                     Cancel
                   </button>
                 </div>
                 {alertForm.result && (
-                  <div className="text-xs" style={{
-                    color: alertForm.result.includes('✓') ? '#22C55E' : '#F87171',
-                  }}>
+                  <div className={`text-xs ${
+                    alertForm.result.includes('✓') ? 'text-green-400' : 'text-red-400'
+                  }`}>
                     {alertForm.result}
                   </div>
                 )}
@@ -561,8 +532,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
               <SectionHeader label="RELATED INTEL" />
               <button
                 onClick={() => setRelatedOpen(o => !o)}
-                className="flex items-center gap-2 text-xs mb-2 hover:opacity-80"
-                style={{ color: 'var(--text-secondary)' }}
+                className="flex items-center gap-2 text-xs mb-2 hover:opacity-80 text-white/80"
               >
                 <span>{relatedOpen ? '▼' : '▶'}</span>
                 <span>{related.length} related item{related.length !== 1 ? 's' : ''}</span>
@@ -570,11 +540,10 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
               {relatedOpen && (
                 <div className="space-y-2">
                   {related.map(r => (
-                    <div key={r.id} className="flex items-start gap-2 text-xs p-2 rounded-lg"
-                      style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border)' }}>
-                      <span className="shrink-0 text-[10px] mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>{sanitizeSourceDisplay(r.source)}</span>
-                      <span className="flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{r.title}</span>
-                      <span className="shrink-0 mono" style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
+                    <div key={r.id} className="flex items-start gap-2 text-xs p-2 rounded-lg bg-white/[0.03] border border-white/[0.05]">
+                      <span className="shrink-0 text-[10px] mono px-1.5 py-0.5 rounded bg-white/[0.06] text-white/50">{sanitizeSourceDisplay(r.source)}</span>
+                      <span className="flex-1 truncate text-white">{r.title}</span>
+                      <span className="shrink-0 mono text-white/50 font-mono">
                         {safeTimeAgo(r.occurred_at)}
                       </span>
                     </div>
@@ -588,8 +557,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
           </>}
 
           {items.length > 1 && (
-            <div className="text-[10px] mono pt-3 border-t"
-              style={{ borderColor: 'var(--border)', color: 'var(--text-disabled)', fontFamily: 'JetBrains Mono, monospace' }}>
+            <div className="text-[10px] mono pt-3 border-t border-white/[0.05] text-white/20 font-mono">
               {currentIndex + 1} / {items.length} · ↑↓ navigate · Esc close
             </div>
           )}

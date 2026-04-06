@@ -25,7 +25,7 @@ const GlobeView = dynamic(() => import('./GlobeView'), {
     <div className="w-full h-full bg-black flex items-center justify-center">
       <div className="text-center space-y-3">
         <div className="w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-sm text-gray-400">Loading globe...</p>
+        <p className="text-sm text-white/80">Loading globe...</p>
       </div>
     </div>
   ),
@@ -100,22 +100,19 @@ function parseCoords(location: unknown): { lat: number; lng: number } | null {
 function SetupCard({ layerKey, onClose }: { layerKey: SetupCardKey; onClose: () => void }) {
   const card = SETUP_CARDS[layerKey]
   return (
-    <div className="rounded-lg border p-4 text-xs mt-2"
-      style={{ borderColor: 'rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.06)', position: 'relative' }}>
-      <button onClick={onClose} className="absolute top-2 right-2 opacity-50 hover:opacity-100"
-        style={{ color: 'var(--text-muted)' }}>
+    <div className="rounded-lg border p-4 text-xs mt-2 bg-white/[0.03] border-white/[0.06] relative">
+      <button onClick={onClose} className="absolute top-2 right-2 opacity-50 hover:opacity-100 text-white/50">
         <X size={12} />
       </button>
-      <div className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+      <div className="font-semibold mb-2 text-white">
         {card.icon} {card.title}
       </div>
-      <p style={{ color: 'var(--text-muted)' }} className="mb-2">{card.desc}</p>
-      <p style={{ color: 'var(--text-muted)' }} className="mb-3">
+      <p className="text-white/50 mb-2">{card.desc}</p>
+      <p className="text-white/50 mb-3">
         {card.freeNote}{' '}
-        <span className="mono" style={{ color: 'var(--primary-text)' }}>{card.url}</span>
+        <span className="mono text-blue-400">{card.url}</span>
       </p>
-      <a href="/settings/api" className="inline-flex items-center gap-1 text-xs rounded px-3 py-1.5"
-        style={{ background: 'var(--primary)', color: 'var(--primary-text)', textDecoration: 'none' }}>
+      <a href="/settings/api" className="inline-flex items-center gap-1 text-xs rounded px-3 py-1.5 bg-blue-500 text-white no-underline">
         Configure in Settings <ExternalLink size={10} />
       </a>
     </div>
@@ -131,8 +128,7 @@ function SelectedEventPanel({ event, onClose }: { event: IntelEvent; onClose: ()
   const snippet = desc.length > 200 ? desc.slice(0, 200) + '…' : desc
 
   return (
-    <div className="rounded-lg border p-3 text-xs"
-      style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', borderLeft: `3px solid ${sevColor}` }}>
+    <div className="rounded-lg border p-3 text-xs bg-white/[0.015] border-white/[0.05]" style={{ borderLeft: `3px solid ${sevColor}` }}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="rounded px-1.5 py-0.5 text-[10px] font-bold mono"
@@ -140,22 +136,21 @@ function SelectedEventPanel({ event, onClose }: { event: IntelEvent; onClose: ()
             {sevLabel.toUpperCase()}
           </span>
           {event.event_type && (
-            <span className="text-[10px] mono uppercase" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-[10px] mono uppercase text-white/50">
               {event.event_type}
             </span>
           )}
         </div>
-        <button onClick={onClose} className="shrink-0 opacity-50 hover:opacity-100"
-          style={{ color: 'var(--text-muted)' }}>
+        <button onClick={onClose} className="shrink-0 opacity-50 hover:opacity-100 text-white/50">
           <X size={12} />
         </button>
       </div>
 
-      <div className="font-medium mb-2" style={{ color: 'var(--text-primary)', lineHeight: 1.4 }}>
+      <div className="font-medium mb-2 text-white" style={{ lineHeight: 1.4 }}>
         {event.title}
       </div>
 
-      <div className="space-y-1 mb-3" style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
+      <div className="space-y-1 mb-3 text-white/50 font-mono">
         {(event.region || event.country_code) && (
           <div>📍 {event.region || event.country_code}</div>
         )}
@@ -166,15 +161,14 @@ function SelectedEventPanel({ event, onClose }: { event: IntelEvent; onClose: ()
       </div>
 
       {snippet && (
-        <p className="mb-3 text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+        <p className="mb-3 text-[11px] leading-relaxed text-white/80">
           {snippet}
         </p>
       )}
 
       <a
         href={`/feed?eventId=${event.id}`}
-        className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium"
-        style={{ background: 'var(--bg-active)', color: 'var(--primary-text)', textDecoration: 'none' }}>
+        className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium bg-blue-500 text-white no-underline">
         View in Intel Feed <ExternalLink size={10} />
       </a>
     </div>
@@ -184,8 +178,7 @@ function SelectedEventPanel({ event, onClose }: { event: IntelEvent; onClose: ()
 // ─── Section header ───────────────────────────────────────────────────────────
 function SectionLabel({ label }: { label: string }) {
   return (
-    <div className="text-[10px] font-bold uppercase tracking-[0.1em] mb-2 mt-4 first:mt-0"
-      style={{ color: 'var(--text-muted)' }}>
+    <div className="text-[10px] font-bold uppercase tracking-[0.1em] mb-2 mt-4 first:mt-0 text-white/50">
       {label}
     </div>
   )
@@ -295,28 +288,23 @@ export function TrackingPanel() {
   return (
     <div className="grid h-full" style={{ gridTemplateColumns: '1fr 320px', gap: 0 }}>
       {/* ── Map / Globe area ──────────────────────────────────────────────── */}
-      <div className="overflow-hidden relative" style={{ background: 'var(--bg-base)' }}>
+      <div className="overflow-hidden relative bg-[#070B11]">
 
         {/* View toggle */}
-        <div className="absolute top-3 right-3 z-20 flex rounded-lg overflow-hidden border"
-          style={{ borderColor: 'var(--border)', background: 'rgba(7,11,17,0.9)' }}>
+        <div className="absolute top-3 right-3 z-20 flex rounded-lg overflow-hidden border border-white/[0.05] bg-black/90">
           <button
             onClick={() => setViewMode('globe')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors"
-            style={{
-              color: viewMode === 'globe' ? 'var(--primary-text)' : 'var(--text-muted)',
-              background: viewMode === 'globe' ? 'var(--bg-active)' : 'transparent',
-            }}>
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+              viewMode === 'globe' ? 'bg-blue-500 text-white' : 'text-white/50'
+            }`}>
             <GlobeLucide size={12} />
             Globe
           </button>
           <button
             onClick={() => setViewMode('map')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors"
-            style={{
-              color: viewMode === 'map' ? 'var(--primary-text)' : 'var(--text-muted)',
-              background: viewMode === 'map' ? 'var(--bg-active)' : 'transparent',
-            }}>
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+              viewMode === 'map' ? 'bg-blue-500 text-white' : 'text-white/50'
+            }`}>
             <MapLucide size={12} />
             Map
           </button>
@@ -349,14 +337,12 @@ export function TrackingPanel() {
               onIntelClick={(event: IntelEvent) => setSelectedEvent(event)}
             />
             {filteredEvents.length > 0 && (
-              <div className="absolute top-3 left-3 rounded-md px-2 py-1 text-xs mono pointer-events-none"
-                style={{ background: 'rgba(7,11,17,0.85)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+              <div className="absolute top-3 left-3 rounded-md px-2 py-1 text-xs mono pointer-events-none text-white border border-white/[0.05] bg-black/85">
                 {filteredEvents.length} events · {timeWindow}
               </div>
             )}
             {loading && (
-              <div className="absolute top-3 left-3 rounded-md px-2 py-1 text-xs mono"
-                style={{ background: 'rgba(7,11,17,0.85)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+              <div className="absolute top-3 left-3 rounded-md px-2 py-1 text-xs mono text-white/50 border border-white/[0.05] bg-black/85">
                 Loading…
               </div>
             )}
@@ -365,8 +351,7 @@ export function TrackingPanel() {
       </div>
 
       {/* ── Right Panel ──────────────────────────────────────────────────── */}
-      <div className="border-l flex flex-col overflow-hidden"
-        style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+      <div className="border-l border-white/[0.05] flex flex-col overflow-hidden bg-white/[0.015]">
         <div className="overflow-y-auto flex-1 px-3 py-3 space-y-0">
 
           {/* LAYERS */}
@@ -374,38 +359,35 @@ export function TrackingPanel() {
           <div className="space-y-1.5 mb-1">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={showEvents} onChange={e => setShowEvents(e.target.checked)}
-                className="rounded" style={{ accentColor: 'var(--primary)' }} />
-              <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Conflict Events</span>
-              <span className="ml-auto text-[10px] mono px-1.5 py-0.5 rounded"
-                style={{ background: 'rgba(34,197,94,0.12)', color: '#22C55E' }}>
+                className="rounded accent-blue-500" />
+              <span className="text-xs text-white">Conflict Events</span>
+              <span className="ml-auto text-[10px] mono px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
                 {filteredEvents.length}
               </span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={showHeatmap} onChange={e => setShowHeatmap(e.target.checked)}
-                className="rounded" style={{ accentColor: 'var(--primary)' }} />
-              <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Heatmap view</span>
+                className="rounded accent-blue-500" />
+              <span className="text-xs text-white">Heatmap view</span>
             </label>
             {viewMode === 'globe' && (
               <>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={showChoropleth} onChange={e => setShowChoropleth(e.target.checked)}
-                    className="rounded" style={{ accentColor: 'var(--primary)' }} />
-                  <span className="text-xs" style={{ color: 'var(--text-primary)' }}>🗺 Risk Overlay</span>
-                  <span className="ml-auto text-[9px] mono px-1 py-0.5 rounded"
-                    style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>threat</span>
+                    className="rounded accent-blue-500" />
+                  <span className="text-xs text-white">🗺 Risk Overlay</span>
+                  <span className="ml-auto text-[9px] mono px-1 py-0.5 rounded bg-red-500/20 text-red-400">threat</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={showAttackArcs} onChange={e => setShowAttackArcs(e.target.checked)}
-                    className="rounded" style={{ accentColor: 'var(--primary)' }} />
-                  <span className="text-xs" style={{ color: 'var(--text-primary)' }}>⚔ Attack Vectors</span>
-                  <span className="ml-auto text-[9px] mono px-1 py-0.5 rounded"
-                    style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316' }}>live</span>
+                    className="rounded accent-blue-500" />
+                  <span className="text-xs text-white">⚔ Attack Vectors</span>
+                  <span className="ml-auto text-[9px] mono px-1 py-0.5 rounded bg-orange-500/20 text-orange-400">live</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={showShippingLanes} onChange={e => setShowShippingLanes(e.target.checked)}
-                    className="rounded" style={{ accentColor: 'var(--primary)' }} />
-                  <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Shipping Lanes</span>
+                    className="rounded accent-blue-500" />
+                  <span className="text-xs text-white">Shipping Lanes</span>
                 </label>
               </>
             )}
@@ -416,16 +398,15 @@ export function TrackingPanel() {
           <div className="space-y-2 mb-1">
             {/* Time window */}
             <div>
-              <div className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Time window</div>
+              <div className="text-[10px] mb-1 text-white/50">Time window</div>
               <div className="flex gap-1">
                 {(['24h', '7d', '30d'] as TimeWindow[]).map(w => (
                   <button key={w} onClick={() => setTimeWindow(w)}
-                    className="flex-1 rounded py-1 text-[11px] mono border transition-colors"
-                    style={{
-                      borderColor: timeWindow === w ? 'var(--primary)' : 'var(--border)',
-                      color: timeWindow === w ? 'var(--primary-text)' : 'var(--text-muted)',
-                      background: timeWindow === w ? 'var(--bg-active)' : 'transparent',
-                    }}>
+                    className={`flex-1 rounded py-1 text-[11px] mono border transition-colors ${
+                      timeWindow === w
+                        ? 'bg-blue-500 text-white border-blue-500'
+                        : 'bg-transparent text-white/50 border-white/[0.05] hover:border-white/[0.08]'
+                    }`}>
                     {w}
                   </button>
                 ))}
@@ -434,16 +415,15 @@ export function TrackingPanel() {
 
             {/* Severity */}
             <div>
-              <div className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Severity</div>
+              <div className="text-[10px] mb-1 text-white/50">Severity</div>
               <div className="flex gap-1">
                 {([['all', 'All'], ['high', 'High+'], ['critical', 'Crit']] as [SeverityFilter, string][]).map(([v, label]) => (
                   <button key={v} onClick={() => setSeverityFilter(v)}
-                    className="flex-1 rounded py-1 text-[11px] border transition-colors"
-                    style={{
-                      borderColor: severityFilter === v ? 'var(--primary)' : 'var(--border)',
-                      color: severityFilter === v ? 'var(--primary-text)' : 'var(--text-muted)',
-                      background: severityFilter === v ? 'var(--bg-active)' : 'transparent',
-                    }}>
+                    className={`flex-1 rounded py-1 text-[11px] border transition-colors ${
+                      severityFilter === v
+                        ? 'bg-blue-500 text-white border-blue-500'
+                        : 'bg-transparent text-white/50 border-white/[0.05] hover:border-white/[0.08]'
+                    }`}>
                     {label}
                   </button>
                 ))}
@@ -452,10 +432,9 @@ export function TrackingPanel() {
 
             {/* Category */}
             <div>
-              <div className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Category</div>
+              <div className="text-[10px] mb-1 text-white/50">Category</div>
               <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
-                className="w-full rounded border px-2 py-1 text-xs"
-                style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }}>
+                className="w-full rounded border border-white/[0.06] px-2 py-1 text-xs bg-white/[0.03] text-white">
                 {CATEGORY_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
@@ -464,14 +443,13 @@ export function TrackingPanel() {
 
             {/* Country */}
             <div>
-              <div className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Country / Region</div>
+              <div className="text-[10px] mb-1 text-white/50">Country / Region</div>
               <input
                 type="text"
                 placeholder="e.g. UA, Syria, Sahel…"
                 value={countryFilter}
                 onChange={e => setCountryFilter(e.target.value)}
-                className="w-full rounded border px-2 py-1 text-xs"
-                style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }} />
+                className="w-full rounded border border-white/[0.06] px-2 py-1 text-xs bg-white/[0.03] text-white placeholder:text-white/20" />
             </div>
           </div>
 
@@ -484,24 +462,21 @@ export function TrackingPanel() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm">🛸</span>
-                  <span className="text-xs flex-1" style={{ color: 'var(--text-primary)' }}>
+                  <span className="text-xs flex-1 text-white">
                     ISS Tracker
                   </span>
-                  <span className="text-[9px] mono px-1 py-0.5 rounded mr-1"
-                    style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
+                  <span className="text-[9px] mono px-1 py-0.5 rounded mr-1 bg-purple-500/20 text-purple-400">
                     free
                   </span>
                   <button
                     onClick={() => setShowISS(prev => !prev)}
-                    className="w-8 h-4 rounded-full flex items-center transition-colors relative"
-                    style={{
-                      background: showISS ? '#a78bfa' : 'var(--border)',
-                      flexShrink: 0,
-                    }}>
+                    className={`w-8 h-4 rounded-full flex items-center transition-colors relative ${
+                      showISS ? 'bg-purple-500' : 'bg-white/[0.1]'
+                    }`}
+                    style={{ flexShrink: 0 }}>
                     <div
-                      className="w-3 h-3 rounded-full transition-transform"
+                      className="w-3 h-3 rounded-full transition-transform bg-white"
                       style={{
-                        background: 'white',
                         transform: showISS ? 'translateX(18px)' : 'translateX(2px)',
                       }}
                     />
@@ -509,8 +484,7 @@ export function TrackingPanel() {
                 </div>
                 {/* ISS status chip */}
                 {showISS && (
-                  <div className="mt-1.5 ml-6 text-[10px] mono rounded px-2 py-1"
-                    style={{ background: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.2)' }}>
+                  <div className="mt-1.5 ml-6 text-[10px] mono rounded px-2 py-1 bg-purple-500/10 text-purple-400 border border-purple-500/20">
                     🛸 Live position · updating every 5s
                   </div>
                 )}
@@ -521,31 +495,29 @@ export function TrackingPanel() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm">✈</span>
-                <span className="text-xs flex-1" style={{ color: 'var(--text-primary)' }}>
+                <span className="text-xs flex-1 text-white">
                   Live Flights
                 </span>
                 {/* Functional toggle */}
                 <button
                   onClick={() => setShowAircraft(prev => !prev)}
-                  className="w-8 h-4 rounded-full flex items-center transition-colors relative"
-                  style={{
-                    background: showAircraft ? 'var(--primary)' : 'var(--border)',
-                    flexShrink: 0,
-                  }}
+                  className={`w-8 h-4 rounded-full flex items-center transition-colors relative ${
+                    showAircraft ? 'bg-blue-500' : 'bg-white/[0.1]'
+                  }`}
+                  style={{ flexShrink: 0 }}
                   title="Toggle live aircraft via OpenSky Network">
                   <div
-                    className="w-3 h-3 rounded-full transition-transform"
+                    className="w-3 h-3 rounded-full transition-transform bg-white"
                     style={{
-                      background: 'white',
                       transform: showAircraft ? 'translateX(18px)' : 'translateX(2px)',
                     }}
                   />
                 </button>
               </div>
-              <div className="text-[10px] mt-0.5 ml-6" style={{ color: 'var(--text-muted)' }}>
+              <div className="text-[10px] mt-0.5 ml-6 text-white/50">
                 Powered by{' '}
                 <a href="https://opensky-network.org" target="_blank" rel="noopener noreferrer"
-                  style={{ color: 'var(--primary-text)', textDecoration: 'none' }}>
+                  className="text-blue-400 no-underline">
                   OpenSky Network
                 </a>{' '}(free)
               </div>
@@ -555,19 +527,17 @@ export function TrackingPanel() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm">⚓</span>
-                <span className="text-xs flex-1" style={{ color: 'var(--text-muted)' }}>
+                <span className="text-xs flex-1 text-white/50">
                   Vessel tracking
                 </span>
                 <button
                   onClick={() => setSetupCard(prev => prev === 'vessels' ? null : 'vessels')}
-                  className="text-[10px] rounded px-2 py-0.5 border transition-colors"
-                  style={{ borderColor: 'var(--border)', color: 'var(--text-muted)', background: 'transparent' }}>
+                  className="text-[10px] rounded px-2 py-0.5 border border-white/[0.05] text-white/50 bg-transparent transition-colors">
                   Setup
                 </button>
                 {/* Disabled toggle */}
-                <div className="w-8 h-4 rounded-full flex items-center opacity-30 cursor-not-allowed"
-                  style={{ background: 'var(--border)' }}>
-                  <div className="w-3 h-3 rounded-full mx-0.5" style={{ background: 'var(--text-muted)' }} />
+                <div className="w-8 h-4 rounded-full flex items-center opacity-30 cursor-not-allowed bg-white/[0.1]">
+                  <div className="w-3 h-3 rounded-full mx-0.5 bg-white/50" />
                 </div>
               </div>
               {setupCard === 'vessels' && (
@@ -579,19 +549,17 @@ export function TrackingPanel() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm">🔥</span>
-                <span className="text-xs flex-1" style={{ color: 'var(--text-muted)' }}>
+                <span className="text-xs flex-1 text-white/50">
                   Thermal anomalies
                 </span>
                 <button
                   onClick={() => setSetupCard(prev => prev === 'thermal' ? null : 'thermal')}
-                  className="text-[10px] rounded px-2 py-0.5 border transition-colors"
-                  style={{ borderColor: 'var(--border)', color: 'var(--text-muted)', background: 'transparent' }}>
+                  className="text-[10px] rounded px-2 py-0.5 border border-white/[0.05] text-white/50 bg-transparent transition-colors">
                   Setup
                 </button>
                 {/* Disabled toggle */}
-                <div className="w-8 h-4 rounded-full flex items-center opacity-30 cursor-not-allowed"
-                  style={{ background: 'var(--border)' }}>
-                  <div className="w-3 h-3 rounded-full mx-0.5" style={{ background: 'var(--text-muted)' }} />
+                <div className="w-8 h-4 rounded-full flex items-center opacity-30 cursor-not-allowed bg-white/[0.1]">
+                  <div className="w-3 h-3 rounded-full mx-0.5 bg-white/50" />
                 </div>
               </div>
               {setupCard === 'thermal' && (
@@ -609,8 +577,7 @@ export function TrackingPanel() {
               onClose={() => setSelectedEvent(null)}
             />
           ) : (
-            <div className="rounded-lg border border-dashed py-6 text-center text-xs"
-              style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+            <div className="rounded-lg border border-dashed border-white/[0.05] py-6 text-center text-xs text-white/50">
               <div className="mb-1 text-lg">{viewMode === 'globe' ? '🌐' : '🗺'}</div>
               Click a marker to<br />view event details
             </div>

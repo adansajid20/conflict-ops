@@ -225,15 +225,15 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
           width: 'min(440px, 100vw)',
           height: 'auto',
           maxHeight: '90vh',
-          background: 'var(--bg-surface)',
-          borderLeft: '1px solid var(--border)',
+          background: 'rgb(11, 16, 32)',
+          borderLeft: '1px solid rgba(255,255,255,0.05)',
           marginTop: '5vh',
           marginBottom: '5vh',
         }}
       >
         <div
-          className="sticky top-0 z-10 flex items-center justify-between px-5 py-4"
-          style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}
+          className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.05] px-5 py-4"
+          style={{ background: 'rgb(11, 16, 32)' }}
         >
           <div className="flex items-center gap-2">
             {severityVisible && (
@@ -259,8 +259,7 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
                 href={linkUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-lg p-2 transition-colors hover:bg-white/10"
-                style={{ color: 'var(--text-muted)' }}
+                className="rounded-lg p-2 text-white/50 transition-colors hover:bg-white/10"
                 aria-label="Open source"
               >
                 <IconExternalLink size={16} />
@@ -268,8 +267,7 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
             )}
             <button
               onClick={onClose}
-              className="rounded-lg p-2 transition-colors hover:bg-white/10"
-              style={{ color: 'var(--text-muted)' }}
+              className="rounded-lg p-2 text-white/50 transition-colors hover:bg-white/10"
               aria-label="Close"
             >
               <IconX size={16} />
@@ -279,10 +277,10 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
 
         <div className="flex-1 space-y-6 px-5 py-5">
           <div>
-            <h2 className="text-2xl font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
+            <h2 className="text-2xl font-bold leading-tight text-white">
               {event.title ?? 'Untitled Event'}
             </h2>
-            <div className="mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <div className="mt-3 text-sm text-white/80">
               {[outlet, region, timeAgo].filter(Boolean).join(' · ')}
             </div>
           </div>
@@ -290,54 +288,53 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
           <section
             className="rounded-xl p-4"
             style={{
-              border: '1px solid var(--border)',
+              border: `1px solid ${summaryShort ? detailAccent : 'rgba(255,255,255,0.05)'}`,
               background: 'rgba(255,255,255,0.03)',
-              borderLeft: summaryShort ? `4px solid ${detailAccent}` : '1px solid var(--border)',
+              borderLeft: summaryShort ? `4px solid ${detailAccent}` : undefined,
             }}
           >
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: summaryShort ? detailAccent : 'var(--text-muted)' }}>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: summaryShort ? detailAccent : 'rgba(255,255,255,0.5)' }}>
               {summaryShort ? 'Intelligence Brief' : 'Details'}
             </div>
 
             {summaryShort ? (
               <>
-                <p className="text-sm leading-7" style={{ color: 'var(--text-primary)' }}>
+                <p className="text-sm leading-7 text-white">
                   {summaryShort}
                 </p>
                 <button
                   onClick={() => setDetailsOpen((current) => !current)}
-                  className="mt-4 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em]"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="mt-4 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/50"
                 >
                   Full Details {detailsOpen ? <IconChevUp size={12} /> : <IconChevDown size={12} />}
                 </button>
                 {detailsOpen && (
-                  <p className="mt-3 text-sm leading-7" style={{ color: 'var(--text-secondary)' }}>
+                  <p className="mt-3 text-sm leading-7 text-white/80">
                     {description || 'No additional details available.'}
                   </p>
                 )}
               </>
             ) : (
-              <p className="text-sm leading-7" style={{ color: 'var(--text-secondary)' }}>
+              <p className="text-sm leading-7 text-white/80">
                 {description || 'No additional details available.'}
               </p>
             )}
           </section>
 
           <section className={`grid gap-3 ${significanceScore && significanceScore > 0 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
-            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.02)' }}>
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>Published</div>
-              <div className="text-sm leading-6" style={{ color: 'var(--text-primary)' }}>{formatPublishedUtc(event.occurred_at)}</div>
+            <div className="rounded-xl border border-white/[0.05] bg-white/[0.025] p-3">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/50">Published</div>
+              <div className="text-sm leading-6 text-white">{formatPublishedUtc(event.occurred_at)}</div>
             </div>
-            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.02)' }}>
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>Event Type</div>
-              <div className="text-sm leading-6" style={{ color: 'var(--text-primary)' }}>{EVENT_TYPE_LABELS[event.event_type ?? ''] ?? event.event_type ?? 'General'}</div>
+            <div className="rounded-xl border border-white/[0.05] bg-white/[0.025] p-3">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/50">Event Type</div>
+              <div className="text-sm leading-6 text-white">{EVENT_TYPE_LABELS[event.event_type ?? ''] ?? event.event_type ?? 'General'}</div>
             </div>
             {significanceScore !== null && significanceScore > 0 && (
-              <div className="rounded-xl border p-3" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.02)' }}>
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>Significance</div>
-                <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{significanceScore} / 100</div>
-                <div className="mt-2 h-1.5 w-full rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+              <div className="rounded-xl border border-white/[0.05] bg-white/[0.025] p-3">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/50">Significance</div>
+                <div className="text-sm font-semibold text-white">{significanceScore} / 100</div>
+                <div className="mt-2 h-1.5 w-full rounded-full bg-white/[0.08]">
                   <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(significanceScore, 100))}%`, background: significanceBarColor }} />
                 </div>
               </div>
@@ -346,7 +343,7 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
 
           {actors.length > 0 && (
             <section>
-              <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-muted)' }}>Key Actors</div>
+              <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/50">Key Actors</div>
               <div className="flex flex-wrap gap-2">
                 {actors.map((actor, index) => (
                   <span
@@ -367,7 +364,7 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
 
           {related.length > 0 && (
             <section>
-              <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--text-muted)' }}>Related Events</div>
+              <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/50">Related Events</div>
               <div className="space-y-2">
                 {related.map((relatedEvent) => {
                   const dotColor = relatedEvent.severity && relatedEvent.severity >= 4
@@ -382,15 +379,14 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
                     <button
                       key={relatedEvent.id}
                       onClick={() => onSelect?.({ ...event, ...relatedEvent })}
-                      className="w-full rounded-xl border px-3 py-3 text-left transition-colors hover:bg-white/5"
-                      style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.02)' }}
+                      className="w-full rounded-xl border border-white/[0.05] bg-white/[0.025] px-3 py-3 text-left transition-colors hover:bg-white/5"
                     >
-                      <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-primary)' }}>
+                      <div className="flex items-center gap-2 text-sm text-white">
                         <span className="h-2 w-2 rounded-full" style={{ background: dotColor }} />
                         <span>{truncate(relatedEvent.title ?? 'Untitled event')}</span>
-                        <span style={{ color: 'var(--text-muted)' }}>· {formatRelativeOccurredTime(relatedEvent.occurred_at)}</span>
+                        <span className="text-white/50">· {formatRelativeOccurredTime(relatedEvent.occurred_at)}</span>
                       </div>
-                      <div className="mt-1 pl-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      <div className="mt-1 pl-4 text-xs text-white/50">
                         {getRegionDisplay(relatedEvent.region) ?? 'Global'}
                       </div>
                     </button>
@@ -402,17 +398,16 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
         </div>
 
         <div
-          className="sticky bottom-0 grid grid-cols-3 gap-2 px-5 py-4"
+          className="sticky bottom-0 grid grid-cols-3 gap-2 border-t border-white/[0.05] px-5 py-4"
           style={{
             background: 'rgba(10,10,10,0.78)',
             backdropFilter: 'blur(8px)',
-            borderTop: '1px solid var(--border)',
           }}
         >
           <button
             onClick={handleCopyLink}
-            className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-white/5"
-            style={{ color: copied ? '#10b981' : 'var(--text-primary)', border: '1px solid var(--border)' }}
+            className="flex items-center justify-center gap-2 rounded-lg border border-white/[0.05] px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/5"
+            style={{ color: copied ? '#10b981' : undefined }}
           >
             <IconCopy size={14} />
             {copied ? 'Copied!' : 'Copy Link'}
@@ -421,16 +416,15 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
           {hasOrg ? (
             <a
               href="/alerts"
-              className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-white/5"
-              style={{ color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+              className="flex items-center justify-center gap-2 rounded-lg border border-white/[0.05] px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/5"
             >
               <IconBell size={14} /> Create Alert
             </a>
           ) : (
             <button
               title="Workspace required — create a workspace to set alerts"
-              className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium"
-              style={{ color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: 0.6, cursor: 'default' }}
+              className="flex items-center justify-center gap-2 rounded-lg border border-white/[0.05] px-3 py-2.5 text-sm font-medium text-white/50 opacity-60"
+              style={{ cursor: 'default' }}
             >
               <IconBell size={14} /> Create Alert
             </button>
@@ -438,8 +432,7 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
 
           <button
             onClick={handleCopilotOpen}
-            className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-white/5"
-            style={{ color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+            className="flex items-center justify-center gap-2 rounded-lg border border-white/[0.05] px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/5"
           >
             <IconBot size={14} /> Intel Co-pilot
           </button>

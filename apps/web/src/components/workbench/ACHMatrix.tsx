@@ -169,9 +169,9 @@ export function ACHMatrix({ planHasACH }: { planHasACH: boolean }) {
 
   if (!planHasACH) {
     return (
-      <div className="rounded border p-8 text-center" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-        <div className="text-sm mono mb-2" style={{ color: 'var(--primary)' }}>ACH MATRIX</div>
-        <div className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
+      <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-8 text-center">
+        <div className="mb-2 text-sm mono text-blue-400">ACH MATRIX</div>
+        <div className="text-xs mono text-white/50">
           UPGRADE TO PRO TO ACCESS ANALYSIS OF COMPETING HYPOTHESES
         </div>
       </div>
@@ -215,25 +215,25 @@ export function ACHMatrix({ planHasACH }: { planHasACH: boolean }) {
   }
 
   return (
-    <div className="rounded border" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-      <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-        <div className="text-xs mono tracking-widest" style={{ color: 'var(--text-muted)' }}>ANALYSIS OF COMPETING HYPOTHESES (ACH)</div>
-        <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>CLICK CELLS TO CYCLE: — → C (consistent) → I (inconsistent) → N (neutral)</div>
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.015]">
+      <div className="border-b border-white/[0.05] px-4 py-3">
+        <div className="text-xs mono tracking-widest text-white/50">ANALYSIS OF COMPETING HYPOTHESES (ACH)</div>
+        <div className="mt-1 text-xs text-white/50">CLICK CELLS TO CYCLE: — → C (consistent) → I (inconsistent) → N (neutral)</div>
       </div>
 
       <div className="p-4 overflow-x-auto">
         <table className="w-full text-xs mono" style={{ borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th className="text-left p-2" style={{ color: 'var(--text-muted)', minWidth: '360px' }}>HYPOTHESIS</th>
+              <th className="p-2 text-left text-white/50" style={{ minWidth: '360px' }}>HYPOTHESIS</th>
               {evidence.map((ev) => (
-                <th key={ev.id} className="p-2 text-center" style={{ color: 'var(--text-muted)', minWidth: '80px' }}>
-                  <div className="truncate max-w-20 text-xs">{ev.title.substring(0, 20)}</div>
-                  <div style={{ color: 'var(--accent-blue)' }}>CR:{ev.credibility}</div>
+                <th key={ev.id} className="p-2 text-center text-white/50" style={{ minWidth: '80px' }}>
+                  <div className="max-w-20 truncate text-xs">{ev.title.substring(0, 20)}</div>
+                  <div className="text-blue-400">CR:{ev.credibility}</div>
                 </th>
               ))}
-              <th className="p-2 text-center" style={{ color: 'var(--text-muted)' }}>INCON. SCORE</th>
-              <th className="p-2 text-center" style={{ color: 'var(--text-muted)' }}>STATUS</th>
+              <th className="p-2 text-center text-white/50">INCON. SCORE</th>
+              <th className="p-2 text-center text-white/50">STATUS</th>
             </tr>
           </thead>
           <tbody>
@@ -242,18 +242,18 @@ export function ACHMatrix({ planHasACH }: { planHasACH: boolean }) {
               const diff = diffs[hyp.id]
               const healthBadge = deriveHealthBadge(hyp)
               return (
-                <tr key={hyp.id} style={{ borderTop: '1px solid var(--border)' }}>
-                  <td className="p-2 align-top">
+                <tr key={hyp.id} className="border-t border-white/[0.05]">
+                  <td className="align-top p-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div style={{ color: 'var(--text-primary)' }}>{hyp.title}</div>
-                        <div style={{ color: 'var(--text-muted)' }} className="text-xs truncate">{hyp.description}</div>
+                        <div className="text-white">{hyp.title}</div>
+                        <div className="truncate text-xs text-white/50">{hyp.description}</div>
                       </div>
                       <span className="rounded-full px-2 py-1 text-[10px]" style={{ color: badgeColor(healthBadge), background: `${badgeColor(healthBadge)}22` }}>{healthBadge}</span>
                     </div>
-                    {idx === 0 && <div className="text-xs mt-1" style={{ color: 'var(--primary)' }}>★ MOST LIKELY</div>}
-                    <div className="mt-3 rounded border p-2" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
-                      <div className="text-[11px] mb-2" style={{ color: 'var(--text-muted)' }}>Probability history</div>
+                    {idx === 0 && <div className="mt-1 text-xs text-blue-400">★ MOST LIKELY</div>}
+                    <div className="mt-3 rounded-lg border border-white/[0.05] bg-white/[0.025] p-2">
+                      <div className="mb-2 text-[11px] text-white/50">Probability history</div>
                       <div style={{ width: '100%', height: 120 }}>
                         <ResponsiveContainerChart>
                           <LineChartComponent data={hyp.probability_history.map((point) => ({ label: new Date(point.at).toLocaleDateString(), probability: Math.round(point.probability * 100) }))}>
@@ -264,7 +264,7 @@ export function ACHMatrix({ planHasACH }: { planHasACH: boolean }) {
                           </LineChartComponent>
                         </ResponsiveContainerChart>
                       </div>
-                      <div className="mt-2 text-[11px]" style={{ color: 'var(--text-primary)' }}>Current: {Math.round(hyp.probability * 100)}%</div>
+                      <div className="mt-2 text-[11px] text-white">Current: {Math.round(hyp.probability * 100)}%</div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {hyp.key_indicators.map((indicator) => (
@@ -273,16 +273,16 @@ export function ACHMatrix({ planHasACH }: { planHasACH: boolean }) {
                         </span>
                       ))}
                     </div>
-                    <button onClick={() => void fetchHypothesisDiff(hyp.id)} className="mt-2 rounded border px-2 py-1 text-[11px]" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                    <button onClick={() => void fetchHypothesisDiff(hyp.id)} className="mt-2 rounded-lg border border-white/[0.05] px-2 py-1 text-[11px] text-white">
                       {diff?.loading ? 'Checking…' : 'What changed?'}
                     </button>
                     {diff && !diff.loading && (
-                      <div className="mt-2 space-y-1 rounded border p-2 text-[11px]" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
-                        <div style={{ color: 'var(--text-muted)' }}>{diff.changedIds.length === 0 ? 'No new linked evidence since last view.' : `${diff.changedIds.length} new/updated evidence item(s)`}</div>
+                      <div className="mt-2 space-y-1 rounded-lg border border-white/[0.05] bg-white/[0.025] p-2 text-[11px]">
+                        <div className="text-white/50">{diff.changedIds.length === 0 ? 'No new linked evidence since last view.' : `${diff.changedIds.length} new/updated evidence item(s)`}</div>
                         {diff.items.slice(0, 3).map((item) => {
                           const changed = diff.changedIds.includes(item.id)
                           return (
-                            <div key={item.id} className="rounded px-2 py-1" style={{ background: changed ? 'rgba(234,179,8,0.12)' : 'transparent', color: changed ? 'var(--primary)' : 'var(--text-primary)' }}>
+                            <div key={item.id} className="rounded px-2 py-1" style={{ background: changed ? 'rgba(234,179,8,0.12)' : 'transparent', color: changed ? '#EAB308' : 'text-white' }}>
                               • {item.title}
                             </div>
                           )
@@ -294,16 +294,16 @@ export function ACHMatrix({ planHasACH }: { planHasACH: boolean }) {
                     const rating = matrix[hyp.id]?.[ev.id] ?? 'na'
                     const style = RATING_STYLES[rating]
                     return (
-                      <td key={ev.id} className="p-2 text-center cursor-pointer" onClick={() => cycleRating(hyp.id, ev.id)}>
-                        <span className="inline-block w-6 h-6 rounded text-center leading-6 font-bold border" style={{ color: style.color, borderColor: style.color, backgroundColor: `${style.color}15` }}>{style.label}</span>
+                      <td key={ev.id} className="cursor-pointer p-2 text-center" onClick={() => cycleRating(hyp.id, ev.id)}>
+                        <span className="inline-block h-6 w-6 rounded border text-center font-bold leading-6" style={{ color: style.color, borderColor: style.color, backgroundColor: `${style.color}15` }}>{style.label}</span>
                       </td>
                     )
                   })}
                   <td className="p-2 text-center">
-                    <span className="font-bold text-sm" style={{ color: inconsistencyScore > 5 ? 'var(--alert-red)' : inconsistencyScore > 2 ? 'var(--alert-amber)' : 'var(--alert-green)' }}>{inconsistencyScore}</span>
+                    <span className="text-sm font-bold" style={{ color: inconsistencyScore > 5 ? '#EF4444' : inconsistencyScore > 2 ? '#F59E0B' : '#22C55E' }}>{inconsistencyScore}</span>
                   </td>
                   <td className="p-2 text-center">
-                    <span className="px-2 py-1 rounded text-xs" style={{ color: STATUS_COLORS[hyp.status], border: `1px solid ${STATUS_COLORS[hyp.status]}` }}>{hyp.status.toUpperCase()}</span>
+                    <span className="rounded-lg px-2 py-1 text-xs" style={{ color: STATUS_COLORS[hyp.status], border: `1px solid ${STATUS_COLORS[hyp.status]}` }}>{hyp.status.toUpperCase()}</span>
                   </td>
                 </tr>
               )
@@ -312,7 +312,7 @@ export function ACHMatrix({ planHasACH }: { planHasACH: boolean }) {
         </table>
 
         <div className="mt-4 flex gap-2">
-          <input type="text" value={newHypothesis} onChange={(e) => setNewHypothesis(e.target.value)} placeholder="ADD HYPOTHESIS..." className="flex-1 px-3 py-2 rounded text-xs mono border bg-transparent" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)', outline: 'none' }} />
+          <input type="text" value={newHypothesis} onChange={(e) => setNewHypothesis(e.target.value)} placeholder="ADD HYPOTHESIS..." className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs mono text-white placeholder:text-white/20" />
           <button
             onClick={() => {
               if (!newHypothesis.trim()) return
@@ -320,8 +320,8 @@ export function ACHMatrix({ planHasACH }: { planHasACH: boolean }) {
               setHypotheses((prev) => [...prev, { id: String(Date.now()), title: newHypothesis, description: '', status: 'active', probability: 0.5, lastEvidenceAt: now, probability_history: [{ at: now, probability: 0.5 }], key_indicators: [] }])
               setNewHypothesis('')
             }}
-            className="px-4 py-2 rounded text-xs mono border"
-            style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+            className="rounded-lg border border-blue-500 px-4 py-2 text-xs mono text-white hover:bg-blue-600"
+            style={{ backgroundColor: '#3B82F6' }}
           >
             + ADD
           </button>

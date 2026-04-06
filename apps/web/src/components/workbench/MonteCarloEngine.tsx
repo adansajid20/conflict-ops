@@ -81,12 +81,12 @@ export function MonteCarloEngine({ planHasScenarios }: { planHasScenarios: boole
 
   if (!planHasScenarios) {
     return (
-      <div className="rounded border p-8 text-center" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-        <div className="text-sm mono mb-2" style={{ color: 'var(--primary)' }}>MONTE CARLO SCENARIO ENGINE</div>
-        <div className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
+      <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-8 text-center">
+        <div className="mb-2 text-sm mono text-blue-400">MONTE CARLO SCENARIO ENGINE</div>
+        <div className="text-xs mono text-white/50">
           UPGRADE TO PRO TO ACCESS SCENARIO MODELING
         </div>
-        <a href="/settings/billing" className="inline-block mt-4 px-4 py-2 rounded text-xs mono border" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
+        <a href="/settings/billing" className="mt-4 inline-block rounded-lg border border-blue-500 px-4 py-2 text-xs mono text-white hover:bg-blue-600" style={{ backgroundColor: '#3B82F6' }}>
           UPGRADE PLAN →
         </a>
       </div>
@@ -94,25 +94,25 @@ export function MonteCarloEngine({ planHasScenarios }: { planHasScenarios: boole
   }
 
   return (
-    <div className="rounded border" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-      <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-        <div className="text-xs mono tracking-widest" style={{ color: 'var(--text-muted)' }}>
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.015]">
+      <div className="border-b border-white/[0.05] px-4 py-3">
+        <div className="text-xs mono tracking-widest text-white/50">
           MONTE CARLO SCENARIO ENGINE — 1,000 ITERATIONS
         </div>
       </div>
 
-      <div className="p-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 p-4 lg:grid-cols-2">
         <div>
-          <div className="text-xs mono tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>
+          <div className="mb-3 text-xs mono tracking-widest text-white/50">
             ASSUMPTIONS (±20% UNIFORM DISTRIBUTION)
           </div>
           {assumptions.map(assumption => (
             <div key={assumption.id} className="mb-4">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs mono" style={{ color: 'var(--text-primary)' }}>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs mono text-white">
                   {assumption.parameter}
                 </span>
-                <span className="text-xs mono" style={{ color: 'var(--primary)' }}>
+                <span className="text-xs mono text-blue-400">
                   {assumption.value}{assumption.unit ? ` ${assumption.unit}` : ''}
                 </span>
               </div>
@@ -127,10 +127,10 @@ export function MonteCarloEngine({ planHasScenarios }: { planHasScenarios: boole
                   ))
                   setResult(null)
                 }}
-                className="w-full h-1 rounded appearance-none cursor-pointer"
-                style={{ accentColor: 'var(--primary)' }}
+                className="w-full h-1 appearance-none cursor-pointer rounded"
+                style={{ accentColor: '#3B82F6' }}
               />
-              <div className="flex justify-between text-xs mono" style={{ color: 'var(--text-muted)' }}>
+              <div className="flex justify-between text-xs mono text-white/50">
                 <span>{assumption.min}</span>
                 <span>{assumption.max}</span>
               </div>
@@ -140,67 +140,67 @@ export function MonteCarloEngine({ planHasScenarios }: { planHasScenarios: boole
           <button
             onClick={runSimulation}
             disabled={running}
-            className="w-full py-2 rounded text-xs mono font-bold tracking-wider border transition-colors hover:bg-white/5 disabled:opacity-50"
-            style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+            className="w-full rounded-lg border border-blue-500 px-4 py-2 text-xs mono font-bold tracking-wider text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
+            style={{ backgroundColor: '#3B82F6' }}
           >
             {running ? 'RUNNING SIMULATION...' : 'RUN 1,000 ITERATIONS'}
           </button>
         </div>
 
         <div>
-          <div className="text-xs mono tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>
+          <div className="mb-3 text-xs mono tracking-widest text-white/50">
             SIMULATION RESULTS
           </div>
 
           {!result ? (
-            <div className="text-xs mono text-center py-12" style={{ color: 'var(--text-muted)' }}>
+            <div className="py-12 text-center text-xs mono text-white/50">
               ADJUST ASSUMPTIONS AND RUN SIMULATION
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="mb-4 grid grid-cols-3 gap-2">
                 {[
-                  { label: 'P10 (OPTIMISTIC)', value: result.p10, color: 'var(--alert-green)' },
-                  { label: 'P50 (BASE CASE)', value: result.p50, color: 'var(--accent-blue)' },
-                  { label: 'P90 (PESSIMISTIC)', value: result.p90, color: 'var(--alert-red)' },
+                  { label: 'P10 (OPTIMISTIC)', value: result.p10, color: '#22C55E' },
+                  { label: 'P50 (BASE CASE)', value: result.p50, color: '#3B82F6' },
+                  { label: 'P90 (PESSIMISTIC)', value: result.p90, color: '#EF4444' },
                 ].map(stat => (
-                  <div key={stat.label} className="rounded border p-2 text-center" style={{ borderColor: 'var(--border)' }}>
-                    <div className="text-2xl font-bold mono" style={{ color: stat.color }}>
+                  <div key={stat.label} className="rounded-lg border border-white/[0.05] bg-white/[0.025] p-2 text-center">
+                    <div className="mono text-2xl font-bold" style={{ color: stat.color }}>
                       {Math.round(stat.value * 100)}%
                     </div>
-                    <div className="text-xs mono mt-1" style={{ color: 'var(--text-muted)' }}>
+                    <div className="mono mt-1 text-xs text-white/50">
                       {stat.label}
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="rounded border p-3" style={{ borderColor: 'var(--border)' }}>
-                <div className="flex items-end gap-1 h-32">
+              <div className="rounded-lg border border-white/[0.05] bg-white/[0.025] p-3">
+                <div className="flex h-32 items-end gap-1">
                   {result.histogram.map((bar, idx) => {
                     const maxCount = Math.max(...result.histogram.map(h => h.count), 1)
                     const height = `${Math.max((bar.count / maxCount) * 100, 4)}%`
                     const isMedianBucket = idx === Math.min(Math.floor(result.p50 * 10), 9)
                     return (
-                      <div key={bar.bucket} className="flex-1 flex flex-col items-center justify-end h-full">
+                      <div key={bar.bucket} className="flex h-full flex-1 flex-col items-center justify-end">
                         <div
                           className="w-full rounded-t"
                           style={{
                             height,
-                            backgroundColor: isMedianBucket ? 'var(--accent-blue)' : 'var(--primary)',
+                            backgroundColor: isMedianBucket ? '#3B82F6' : '#3B82F6',
                             opacity: 0.85,
                             minHeight: '4px',
                           }}
                           title={`${bar.bucket}: ${bar.count}`}
                         />
-                        <div className="text-[9px] mono mt-1" style={{ color: 'var(--text-muted)' }}>
+                        <div className="mono mt-1 text-[9px] text-white/50">
                           {bar.bucket.split('-')[0]}
                         </div>
                       </div>
                     )
                   })}
                 </div>
-                <div className="mt-2 text-xs mono" style={{ color: 'var(--text-muted)' }}>
+                <div className="mono mt-2 text-xs text-white/50">
                   Mean: {Math.round(result.mean * 100)}% · Median bucket highlighted in blue
                 </div>
               </div>

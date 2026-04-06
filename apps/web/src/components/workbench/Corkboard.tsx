@@ -178,8 +178,8 @@ export function Corkboard() {
       borderRadius: 12,
       padding: 10,
       minWidth: 170,
-      background: 'var(--bg-surface-2)',
-      color: 'var(--text-primary)',
+      background: 'rgba(255,255,255,0.025)',
+      color: 'rgb(255,255,255)',
       boxShadow: `0 0 0 1px ${NODE_COLORS[node.data.type]}22`,
     },
   })), [nodes])
@@ -224,37 +224,37 @@ export function Corkboard() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded border p-4" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+      <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4">
         <div className="grid gap-3 md:grid-cols-4">
           <div>
-            <div className="mb-1 text-[11px] uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>Node type</div>
-            <select value={selectedNodeType} onChange={(e) => setSelectedNodeType(e.target.value as CorkboardNodeType)} className="w-full rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }}>
+            <div className="mb-1 text-[11px] uppercase tracking-[0.16em] text-white/50">Node type</div>
+            <select value={selectedNodeType} onChange={(e) => setSelectedNodeType(e.target.value as CorkboardNodeType)} className="w-full rounded-lg border border-white/[0.06] bg-white/[0.025] px-3 py-2 text-sm text-white">
               {Object.keys(NODE_COLORS).map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </div>
           <div>
-            <div className="mb-1 text-[11px] uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>Edge type</div>
-            <select value={selectedEdgeType} onChange={(e) => setSelectedEdgeType(e.target.value as CorkboardEdgeType)} className="w-full rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }}>
+            <div className="mb-1 text-[11px] uppercase tracking-[0.16em] text-white/50">Edge type</div>
+            <select value={selectedEdgeType} onChange={(e) => setSelectedEdgeType(e.target.value as CorkboardEdgeType)} className="w-full rounded-lg border border-white/[0.06] bg-white/[0.025] px-3 py-2 text-sm text-white">
               {Object.keys(EDGE_STYLES).map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </div>
           <div>
-            <div className="mb-1 text-[11px] uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>New node label</div>
-            <input value={draftLabel} onChange={(e) => setDraftLabel(e.target.value)} placeholder="Add actor, event, evidence…" className="w-full rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }} />
+            <div className="mb-1 text-[11px] uppercase tracking-[0.16em] text-white/50">New node label</div>
+            <input value={draftLabel} onChange={(e) => setDraftLabel(e.target.value)} placeholder="Add actor, event, evidence…" className="w-full rounded-lg border border-white/[0.06] bg-white/[0.025] px-3 py-2 text-sm text-white placeholder:text-white/20" />
           </div>
           <div className="flex items-end gap-2">
-            <button onClick={addNode} className="rounded px-3 py-2 text-sm font-medium" style={{ background: 'var(--primary)', color: '#fff' }}>Add node</button>
-            <button onClick={() => void exportPng()} className="rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>Export PNG</button>
-            <button onClick={exportJson} className="rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>Export JSON</button>
+            <button onClick={addNode} className="rounded-lg px-3 py-2 text-sm font-medium text-white hover:bg-blue-600" style={{ backgroundColor: '#3B82F6' }}>Add node</button>
+            <button onClick={() => void exportPng()} className="rounded-lg border border-white/[0.05] px-3 py-2 text-sm text-white/80 hover:bg-white/5">Export PNG</button>
+            <button onClick={exportJson} className="rounded-lg border border-white/[0.05] px-3 py-2 text-sm text-white/80 hover:bg-white/5">Export JSON</button>
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-white/50">
           <span>Connect nodes to create <span style={{ color: EDGE_STYLES[selectedEdgeType].stroke }}>{selectedEdgeType}</span> links. Drag to rearrange the case narrative.</span>
           <span>{saveStatus === 'loading' ? 'Loading…' : saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Save failed' : 'Ready'}</span>
         </div>
       </div>
 
-      <div ref={boardRef} className="rounded border overflow-hidden" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)', height: 640 }}>
+      <div ref={boardRef} className="rounded-xl border border-white/[0.05] bg-white/[0.015] overflow-hidden" style={{ height: 640 }}>
         <Flow
           nodes={styledNodes}
           edges={styledEdges}

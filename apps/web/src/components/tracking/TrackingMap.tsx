@@ -241,7 +241,7 @@ export default function TrackingMap({ vessels, flights, thermals, intelEvents = 
             'text-max-width': 10,
           },
           paint: {
-            'text-color': '#e2e8f0',
+            'text-color': '#ffffff',
             'text-halo-color': '#070B11',
             'text-halo-width': 1,
           },
