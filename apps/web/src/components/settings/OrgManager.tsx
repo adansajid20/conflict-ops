@@ -73,7 +73,7 @@ export function OrgManager() {
     <div>
       {/* Org summary */}
       {org && (
-        <div className="p-4 rounded border mb-6" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+        <div className="p-4 rounded border border-white/[0.05] bg-white/[0.015] mb-6">
           <div className="grid grid-cols-2 gap-4 text-xs mono">
             {[
               { label: 'ORG NAME', val: org.name },
@@ -82,8 +82,8 @@ export function OrgManager() {
               { label: 'SSO', val: org.sso_enabled ? `✓ ${org.sso_provider?.toUpperCase()}` : '✗ DISABLED' },
             ].map(f => (
               <div key={f.label}>
-                <div style={{ color: 'var(--text-muted)' }}>{f.label}</div>
-                <div className="font-bold" style={{ color: 'var(--text-primary)' }}>{f.val}</div>
+                <div className="text-white/30">{f.label}</div>
+                <div className="font-bold text-white">{f.val}</div>
               </div>
             ))}
           </div>
@@ -91,15 +91,14 @@ export function OrgManager() {
       )}
 
       {/* Members */}
-      <div className="text-xs mono font-bold mb-2" style={{ color: 'var(--text-muted)' }}>
+      <div className="text-xs mono font-bold mb-2 text-white/30">
         MEMBERS ({members.length})
       </div>
       {members.map(m => (
-        <div key={m.id} className="p-3 rounded border mb-2 flex items-center gap-3"
-          style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+        <div key={m.id} className="p-3 rounded border border-white/[0.05] bg-white/[0.015] mb-2 flex items-center gap-3">
           <div className="flex-1">
-            <div className="text-xs mono font-bold" style={{ color: 'var(--text-primary)' }}>{m.email}</div>
-            <div className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-xs mono font-bold text-white">{m.email}</div>
+            <div className="text-xs mono text-white/30">
               Joined {new Date(m.created_at).toLocaleDateString()}
               {m.last_active && ` · Last active ${new Date(m.last_active).toLocaleDateString()}`}
             </div>
@@ -108,8 +107,7 @@ export function OrgManager() {
             value={m.role}
             onChange={e => void updateRole(m.id, e.target.value)}
             disabled={updating === m.id || m.role === 'owner'}
-            className="px-2 py-1 text-xs mono rounded border"
-            style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+            className="px-2 py-1 text-xs mono rounded border border-white/[0.05] bg-white/[0.03] text-white"
           >
             {Object.entries(ROLE_LABELS).map(([val, label]) => (
               <option key={val} value={val}>{label}</option>
@@ -117,8 +115,7 @@ export function OrgManager() {
           </select>
           {m.role !== 'owner' && (
             <button onClick={() => void removeMember(m.id)} disabled={updating === m.id}
-              className="px-2 py-1 text-xs mono rounded border"
-              style={{ borderColor: '#EF4444', color: '#EF4444' }}>
+              className="px-2 py-1 text-xs mono rounded border border-red-400/35 text-red-400 hover:bg-red-500/10">
               ✕
             </button>
           )}
@@ -127,11 +124,11 @@ export function OrgManager() {
 
       {/* SSO note */}
       {org && !org.sso_enabled && (
-        <div className="mt-6 p-4 rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-          <div className="text-xs mono font-bold mb-1" style={{ color: 'var(--text-muted)' }}>SSO / SAML</div>
-          <p className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
+        <div className="mt-6 p-4 rounded border border-white/[0.05] bg-white/[0.015]">
+          <div className="text-xs mono font-bold mb-1 text-white/30">SSO / SAML</div>
+          <p className="text-xs mono text-white/30">
             SSO with SAML 2.0 or OIDC is available on the Enterprise plan.
-            Contact sales to enable: <span style={{ color: 'var(--primary)' }}>enterprise@conflictradar.co</span>
+            Contact sales to enable: <span className="text-blue-400">enterprise@conflictradar.co</span>
           </p>
         </div>
       )}

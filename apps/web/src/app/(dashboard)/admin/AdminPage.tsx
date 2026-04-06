@@ -172,9 +172,9 @@ export default function AdminPage() {
       {toast && (
         <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-lg border text-sm font-mono font-bold shadow-xl"
           style={{
-            backgroundColor: 'var(--bg-surface-2)',
-            borderColor: toast.ok ? 'var(--primary)' : '#FF4444',
-            color: 'var(--text-primary)',
+            backgroundColor: 'rgba(255,255,255,0.03)',
+            borderColor: toast.ok ? '#3b82f6' : '#FF4444',
+            color: 'text-white',
             maxWidth: 380,
           }}>
           {toast.msg}
@@ -184,10 +184,10 @@ export default function AdminPage() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-lg font-bold tracking-widest uppercase font-mono" style={{ color: 'var(--primary)' }}>
+          <h1 className="text-lg font-bold tracking-widest uppercase font-mono text-blue-400">
             DOCTOR MODE
           </h1>
-          <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs font-mono mt-0.5 text-white/30">
             sha:{sha} · {env.toUpperCase()}
             {data?.timestamp && ` · ${new Date(data.timestamp).toISOString().slice(11, 19)}Z`}
           </p>
@@ -215,17 +215,17 @@ export default function AdminPage() {
       {/* System status banner */}
       <div className="mb-5 p-3 rounded-lg border flex items-center gap-3 flex-wrap"
         style={{
-          borderColor: data?.ok ? 'var(--alert-green)' : '#FF4444',
+          borderColor: data?.ok ? '#10b981' : '#FF4444',
           backgroundColor: data?.ok ? 'rgba(16,185,129,0.05)' : 'rgba(255,68,68,0.05)',
         }}>
-        <span className="font-bold font-mono text-sm" style={{ color: data?.ok ? 'var(--alert-green)' : '#FF4444' }}>
+        <span className="font-bold font-mono text-sm" style={{ color: data?.ok ? '#10b981' : '#FF4444' }}>
           {data?.ok ? '● ALL SYSTEMS NOMINAL' : '● DEGRADATION DETECTED'}
         </span>
-        <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-xs font-mono text-white/30">
           {data?.latencyMs}ms
         </span>
         {data?.errors && data.errors.length > 0 && (
-          <span className="text-xs font-mono" style={{ color: '#FF4444' }}>
+          <span className="text-xs font-mono text-red-400">
             {data.errors.slice(0, 2).join(' · ')}
           </span>
         )}
@@ -243,7 +243,7 @@ export default function AdminPage() {
               { label: 'INGEST (2h)', ok: data?.ingestOk ?? false },
             ].map(s => (
               <div key={s.label} className="flex items-center justify-between">
-                <span className="text-xs font-mono" style={{ color: 'var(--text-primary)' }}>{s.label}</span>
+                <span className="text-xs font-mono text-white">{s.label}</span>
                 <StatusPill ok={s.ok} label={s.ok ? 'OK' : 'FAIL'} />
               </div>
             ))}
@@ -254,18 +254,18 @@ export default function AdminPage() {
         <Panel header="INGEST STATUS">
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <StatCard label="TOTAL EVENTS" value={data?.eventCount ?? 0} color="var(--primary)" icon="◈" />
-              <StatCard label="LAST INGEST" value={timeAgo(data?.lastIngestAt ?? null)} color="var(--accent-blue)" icon="◷" />
+              <StatCard label="TOTAL EVENTS" value={data?.eventCount ?? 0} color="#3b82f6" icon="◈" />
+              <StatCard label="LAST INGEST" value={timeAgo(data?.lastIngestAt ?? null)} color="#60a5fa" icon="◷" />
             </div>
             <div>
-              <div className="text-xs font-mono mb-2" style={{ color: 'var(--text-muted)' }}>SOURCES (last 3h)</div>
+              <div className="text-xs font-mono mb-2 text-white/30">SOURCES (last 3h)</div>
               <div className="space-y-1.5">
                 {(data?.enabledSources ?? []).map(s => (
                   <div key={s.name} className="flex items-center justify-between">
-                    <span className="text-xs font-mono" style={{ color: 'var(--text-primary)' }}>{s.name.toUpperCase()}</span>
+                    <span className="text-xs font-mono text-white">{s.name.toUpperCase()}</span>
                     <div className="flex items-center gap-2">
                       {s.last_seen_at && (
-                        <span className="text-xs font-mono" style={{ color: 'var(--text-disabled)' }}>
+                        <span className="text-xs font-mono text-white/25">
                           {timeAgo(s.last_seen_at)}
                         </span>
                       )}
@@ -282,7 +282,7 @@ export default function AdminPage() {
         <Panel header="LAST INGESTED EVENTS" className="lg:col-span-2">
           {lastEvents.length === 0 && (data?.eventCount ?? 0) === 0 ? (
             <div className="text-center py-6">
-              <p className="text-xs font-mono mb-3" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs font-mono mb-3 text-white/30">
                 No events in DB yet — trigger an ingest run
               </p>
               <Btn variant="primary" onClick={() => void triggerIngest()} loading={ingestLoading}>
@@ -291,20 +291,20 @@ export default function AdminPage() {
             </div>
           ) : (data?.eventCount ?? 0) > 0 ? (
             <div className="text-center py-4">
-              <span className="font-mono text-2xl font-bold" style={{ color: 'var(--primary)' }}>
+              <span className="font-mono text-2xl font-bold text-blue-400">
                 {data?.eventCount}
               </span>
-              <span className="text-xs font-mono ml-2" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-xs font-mono ml-2 text-white/30">
                 events in DB · last ingest {timeAgo(data?.lastIngestAt ?? null)}
               </span>
               <div className="mt-3">
-                <a href="/feed" className="text-xs font-mono" style={{ color: 'var(--primary)' }}>
+                <a href="/feed" className="text-xs font-mono text-blue-400">
                   View Intel Feed →
                 </a>
               </div>
             </div>
           ) : (
-            <div className="text-center py-4 text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-center py-4 text-xs font-mono text-white/30">
               Run ingest to populate
             </div>
           )}
@@ -317,7 +317,7 @@ export default function AdminPage() {
               {data.errors.map((e, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs font-mono" style={{ color: '#FF4444' }}>
                   <span>●</span>
-                  <span style={{ color: 'var(--text-primary)' }}>{e}</span>
+                  <span className="text-white">{e}</span>
                 </li>
               ))}
             </ul>

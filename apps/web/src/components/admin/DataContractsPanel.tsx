@@ -20,14 +20,14 @@ export function DataContractsPanel() {
   }, [])
 
   return (
-    <div className="rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-      <div className="border-b px-4 py-3 text-sm font-semibold" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.015]">
+      <div className="border-b border-white/[0.05] px-4 py-3 text-sm font-semibold text-white">
         Data Contracts
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ color: 'var(--text-muted)' }}>
+            <tr className="text-white/30">
               <th className="px-4 py-3 text-left">Source</th>
               <th className="px-4 py-3 text-left">Status</th>
               <th className="px-4 py-3 text-left">Last success</th>
@@ -37,15 +37,15 @@ export function DataContractsPanel() {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.source} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                <td className="px-4 py-3" style={{ color: 'var(--text-primary)' }}>{row.source}</td>
+              <tr key={row.source} className="border-t border-white/[0.05]">
+                <td className="px-4 py-3 text-white">{row.source}</td>
                 <td className="px-4 py-3"><span style={{ color: statusColor(row.status) }}>{row.status.toUpperCase()}</span></td>
-                <td className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>{row.last_success_at ? new Date(row.last_success_at).toLocaleString() : 'Never'}</td>
-                <td className="px-4 py-3" style={{ color: 'var(--text-primary)' }}>{row.avg_fetch_interval_mins ?? '—'} min</td>
-                <td className="px-4 py-3" style={{ color: 'var(--text-primary)' }}>{Math.round(row.failure_rate_7d * 100)}%</td>
+                <td className="px-4 py-3 text-white/30">{row.last_success_at ? new Date(row.last_success_at).toLocaleString() : 'Never'}</td>
+                <td className="px-4 py-3 text-white">{row.avg_fetch_interval_mins ?? '—'} min</td>
+                <td className="px-4 py-3 text-white">{Math.round(row.failure_rate_7d * 100)}%</td>
               </tr>
             ))}
-            {rows.length === 0 ? <tr><td colSpan={5} className="px-4 py-4" style={{ color: 'var(--text-muted)' }}>No SLA data available.</td></tr> : null}
+            {rows.length === 0 ? <tr><td colSpan={5} className="px-4 py-4 text-white/30">No SLA data available.</td></tr> : null}
           </tbody>
         </table>
       </div>

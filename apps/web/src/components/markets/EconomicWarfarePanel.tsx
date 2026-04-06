@@ -29,14 +29,14 @@ export function EconomicWarfarePanel() {
   }, [])
 
   return (
-    <div className="rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-      <div className="border-b px-4 py-3" style={{ borderColor: 'var(--border)' }}>
-        <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Economic Warfare Monitor</div>
+    <div className="rounded-xl border bg-white/[0.015] border-white/[0.05]">
+      <div className="border-b px-4 py-3 border-white/[0.05]">
+        <div className="text-sm font-semibold text-white">Economic Warfare Monitor</div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ color: 'var(--text-muted)' }}>
+            <tr className="text-white/30">
               <th className="px-4 py-3 text-left">Country</th>
               <th className="px-4 py-3 text-left">GDP trend</th>
               <th className="px-4 py-3 text-left">Active sanctions</th>
@@ -46,15 +46,15 @@ export function EconomicWarfarePanel() {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.iso2} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                <td className="px-4 py-3" style={{ color: 'var(--text-primary)' }}>{row.name}</td>
-                <td className="px-4 py-3" style={{ color: row.trend === 'down' ? '#EF4444' : row.trend === 'up' ? '#22C55E' : 'var(--text-primary)' }}>{trendGlyph(row.trend)} {row.trend}</td>
-                <td className="px-4 py-3" style={{ color: 'var(--text-primary)' }}>{row.activeSanctionsCount}</td>
+              <tr key={row.iso2} className="border-t border-white/[0.05]">
+                <td className="px-4 py-3 text-white">{row.name}</td>
+                <td className="px-4 py-3" style={{ color: row.trend === 'down' ? '#EF4444' : row.trend === 'up' ? '#22C55E' : '#FFFFFF' }}>{trendGlyph(row.trend)} {row.trend}</td>
+                <td className="px-4 py-3 text-white">{row.activeSanctionsCount}</td>
                 <td className="px-4 py-3" style={{ color: row.riskTier === 'High' ? '#EF4444' : row.riskTier === 'Medium' ? '#F59E0B' : '#22C55E' }}>{row.riskTier}</td>
-                <td className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>{row.latestGdp ? `$${Math.round(row.latestGdp).toLocaleString()}` : '—'}</td>
+                <td className="px-4 py-3 text-white/30">{row.latestGdp ? `$${Math.round(row.latestGdp).toLocaleString()}` : '—'}</td>
               </tr>
             ))}
-            {rows.length === 0 ? <tr><td colSpan={5} className="px-4 py-4" style={{ color: 'var(--text-muted)' }}>No economic indicators available.</td></tr> : null}
+            {rows.length === 0 ? <tr><td colSpan={5} className="px-4 py-4 text-white/30">No economic indicators available.</td></tr> : null}
           </tbody>
         </table>
       </div>

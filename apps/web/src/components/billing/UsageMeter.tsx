@@ -12,15 +12,15 @@ export function UsageMeter({ items }: { items: UsageItem[] }) {
         const percentage = pct(item.used, item.limit)
         const warning = percentage >= 80
         return (
-          <div key={item.label} className="p-4 rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+          <div key={item.label} className="p-4 rounded border bg-white/[0.015] border-white/[0.05]">
             <div className="flex items-center justify-between text-xs mono mb-2">
-              <span style={{ color: 'var(--text-muted)' }}>{item.label}</span>
-              <span style={{ color: warning ? 'var(--alert-amber)' : 'var(--text-primary)' }}>{item.used} / {item.limit === -1 ? '∞' : item.limit}</span>
+              <span className="text-white/30">{item.label}</span>
+              <span className={warning ? 'text-amber-400' : 'text-white'}>{item.used} / {item.limit === -1 ? '∞' : item.limit}</span>
             </div>
-            <div className="h-2 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-              <div className="h-2 rounded" style={{ width: `${item.limit === -1 ? 0 : percentage}%`, backgroundColor: warning ? 'var(--alert-amber)' : 'var(--primary)' }} />
+            <div className="h-2 rounded bg-white/[0.08]">
+              <div className="h-2 rounded" style={{ width: `${item.limit === -1 ? 0 : percentage}%`, backgroundColor: warning ? '#FBBF24' : '#3B82F6' }} />
             </div>
-            {warning ? <div className="mt-2 text-xs mono" style={{ color: 'var(--alert-amber)' }}>Overage warning: {percentage}% consumed.</div> : null}
+            {warning ? <div className="mt-2 text-xs mono text-amber-400">Overage warning: {percentage}% consumed.</div> : null}
           </div>
         )
       })}

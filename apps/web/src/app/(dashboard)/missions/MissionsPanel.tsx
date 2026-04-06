@@ -22,7 +22,7 @@ type MissionsResponse = {
 
 function MissionSkeleton() {
   return (
-    <div className="p-4 rounded border mb-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+    <div className="p-4 rounded border border-white/[0.05] bg-white/[0.015] mb-3">
       <div className="skeleton h-4 rounded mb-2" style={{ width: '50%' }} />
       <div className="skeleton h-3 rounded mb-2" style={{ width: '80%' }} />
       <div className="skeleton h-3 rounded" style={{ width: '30%' }} />
@@ -98,17 +98,16 @@ export default function MissionsPanel() {
     <div className="p-6 max-w-5xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-widest uppercase mono" style={{ color: 'var(--text-primary)' }}>
+          <h1 className="text-xl font-bold tracking-widest uppercase mono text-white">
             MISSIONS
           </h1>
-          <p className="text-xs mt-1 mono" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs mt-1 mono text-white/30">
             Focused intelligence collection campaigns. Group events, alerts, and forecasts by objective.
           </p>
         </div>
         {!personalMode && (
           <button onClick={() => setShowForm(s => !s)}
-            className="px-4 py-2 rounded text-xs mono font-bold"
-            style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
+            className="px-4 py-2 rounded text-xs mono font-bold bg-blue-400 text-black">
             + NEW MISSION
           </button>
         )}
@@ -116,33 +115,32 @@ export default function MissionsPanel() {
 
       {/* New mission form */}
       {showForm && (
-        <div className="mb-6 p-5 rounded border" style={{ borderColor: 'var(--primary)', backgroundColor: 'var(--primary-dim)' }}>
-          <h3 className="text-xs mono font-bold mb-4" style={{ color: 'var(--primary)' }}>CREATE MISSION</h3>
+        <div className="mb-6 p-5 rounded border border-blue-400 bg-blue-500/10">
+          <h3 className="text-xs mono font-bold mb-4 text-blue-400">CREATE MISSION</h3>
           <div className="space-y-3">
             <div>
-              <label className="text-xs mono mb-1 block" style={{ color: 'var(--text-muted)' }}>NAME *</label>
+              <label className="text-xs mono mb-1 block text-white/30">NAME *</label>
               <input value={name} onChange={e => setName(e.target.value)}
                 placeholder="e.g. Ukraine Conflict Monitoring"
-                className="w-full px-3 py-2 rounded border text-sm mono"
-                style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border)', color: 'var(--text-primary)', outline: 'none' }} />
+                className="w-full px-3 py-2 rounded border border-white/[0.05] bg-[#070B11] text-sm mono text-white" />
             </div>
             <div>
-              <label className="text-xs mono mb-1 block" style={{ color: 'var(--text-muted)' }}>DESCRIPTION</label>
+              <label className="text-xs mono mb-1 block text-white/30">DESCRIPTION</label>
               <textarea value={description} onChange={e => setDescription(e.target.value)}
                 rows={2} placeholder="Optional context..."
-                className="w-full px-3 py-2 rounded border text-sm"
-                style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border)', color: 'var(--text-primary)', outline: 'none', resize: 'none' }} />
+                className="w-full px-3 py-2 rounded border border-white/[0.05] bg-[#070B11] text-sm text-white"
+                style={{ resize: 'none' }} />
             </div>
             <div>
-              <label className="text-xs mono mb-2 block" style={{ color: 'var(--text-muted)' }}>VISIBILITY</label>
+              <label className="text-xs mono mb-2 block text-white/30">VISIBILITY</label>
               <div className="flex gap-2">
                 {(['private', 'org', 'shared'] as const).map((option) => (
                   <button key={option} onClick={() => setVisibility(option)}
                     className="px-2 py-1 rounded text-xs mono border"
                     style={{
-                      borderColor: visibility === option ? 'var(--primary)' : 'var(--border)',
-                      color: visibility === option ? 'var(--primary)' : 'var(--text-muted)',
-                      backgroundColor: visibility === option ? 'var(--primary-dim)' : 'transparent',
+                      borderColor: visibility === option ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                      color: visibility === option ? '#3b82f6' : 'text-white/30',
+                      backgroundColor: visibility === option ? 'rgba(59,130,246,0.1)' : 'transparent',
                     }}>
                     {option.toUpperCase()}
                   </button>
@@ -150,31 +148,30 @@ export default function MissionsPanel() {
               </div>
             </div>
             <div>
-              <label className="text-xs mono mb-2 block" style={{ color: 'var(--text-muted)' }}>REGIONS</label>
+              <label className="text-xs mono mb-2 block text-white/30">REGIONS</label>
               <div className="flex flex-wrap gap-2">
                 {REGIONS.map(r => (
                   <button key={r} onClick={() => setSelectedRegions(p => p.includes(r) ? p.filter(x => x !== r) : [...p, r])}
                     className="px-2 py-1 rounded text-xs mono border"
                     style={{
-                      borderColor: selectedRegions.includes(r) ? 'var(--primary)' : 'var(--border)',
-                      color: selectedRegions.includes(r) ? 'var(--primary)' : 'var(--text-muted)',
-                      backgroundColor: selectedRegions.includes(r) ? 'var(--primary-dim)' : 'transparent',
+                      borderColor: selectedRegions.includes(r) ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                      color: selectedRegions.includes(r) ? '#3b82f6' : 'text-white/30',
+                      backgroundColor: selectedRegions.includes(r) ? 'rgba(59,130,246,0.1)' : 'transparent',
                     }}>
                     {r}
                   </button>
                 ))}
               </div>
             </div>
-            {createError && <p className="text-xs mono" style={{ color: '#FF4444' }}>⚠ {createError}</p>}
+            {createError && <p className="text-xs mono text-red-400">⚠ {createError}</p>}
             <div className="flex gap-2">
               <button onClick={() => void createMission()} disabled={!name.trim() || creating}
-                className="px-6 py-2 rounded text-xs mono font-bold"
-                style={{ backgroundColor: 'var(--primary)', color: '#000', opacity: (!name.trim() || creating) ? 0.5 : 1 }}>
+                className="px-6 py-2 rounded text-xs mono font-bold bg-blue-400 text-black"
+                style={{ opacity: (!name.trim() || creating) ? 0.5 : 1 }}>
                 {creating ? 'CREATING...' : 'CREATE MISSION'}
               </button>
               <button onClick={() => setShowForm(false)}
-                className="px-4 py-2 rounded text-xs mono border"
-                style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+                className="px-4 py-2 rounded text-xs mono border border-white/[0.05] text-white/30">
                 CANCEL
               </button>
             </div>
@@ -186,68 +183,62 @@ export default function MissionsPanel() {
       {loading ? (
         <div>{Array.from({ length: 3 }).map((_, i) => <MissionSkeleton key={i} />)}</div>
       ) : error ? (
-        <div className="p-8 text-center rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-          <p className="text-xs mono mb-3" style={{ color: '#FF4444' }}>⚠ {error}</p>
+        <div className="p-8 text-center rounded border border-white/[0.05] bg-white/[0.015]">
+          <p className="text-xs mono mb-3 text-red-400">⚠ {error}</p>
           <button onClick={() => void fetchMissions()}
-            className="px-4 py-2 rounded text-xs mono border"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+            className="px-4 py-2 rounded text-xs mono border border-white/[0.05] text-white/30">
             RETRY
           </button>
         </div>
       ) : personalMode ? (
-        <div className="p-12 text-center rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+        <div className="p-12 text-center rounded border border-white/[0.05] bg-white/[0.015]">
           <div className="text-4xl mb-4">◉</div>
-          <p className="text-sm mono font-bold mb-2" style={{ color: 'var(--text-muted)' }}>COMPLETE ONBOARDING TO CREATE MISSIONS</p>
-          <p className="text-xs mb-6" style={{ color: 'var(--text-disabled)' }}>
+          <p className="text-sm mono font-bold mb-2 text-white/30">COMPLETE ONBOARDING TO CREATE MISSIONS</p>
+          <p className="text-xs mb-6 text-white/25">
             Missions are scoped to organizations. Set up your org in the onboarding flow.
           </p>
-          <a href="/onboarding" className="inline-block px-8 py-3 rounded text-xs mono font-bold"
-            style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
+          <a href="/onboarding" className="inline-block px-8 py-3 rounded text-xs mono font-bold bg-blue-400 text-black">
             COMPLETE ONBOARDING →
           </a>
         </div>
       ) : missions.length === 0 ? (
-        <div className="p-12 text-center rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+        <div className="p-12 text-center rounded border border-white/[0.05] bg-white/[0.015]">
           <div className="text-4xl mb-4">◉</div>
-          <p className="text-sm mono font-bold mb-2" style={{ color: 'var(--text-muted)' }}>NO MISSIONS YET</p>
-          <p className="text-xs mb-6" style={{ color: 'var(--text-disabled)' }}>
+          <p className="text-sm mono font-bold mb-2 text-white/30">NO MISSIONS YET</p>
+          <p className="text-xs mb-6 text-white/25">
             Create your first mission to organize intelligence collection around a focused objective.
           </p>
           <button onClick={() => setShowForm(true)}
-            className="px-8 py-3 rounded text-xs mono font-bold"
-            style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
+            className="px-8 py-3 rounded text-xs mono font-bold bg-blue-400 text-black">
             + CREATE FIRST MISSION
           </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {missions.map(m => (
-            <div key={m.id} className="p-4 rounded border hover:border-opacity-80 transition-colors"
-              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+            <div key={m.id} className="p-4 rounded border border-white/[0.05] bg-white/[0.015] hover:border-opacity-80 transition-colors">
               <div className="flex items-start justify-between mb-2">
-                <h3 className="text-sm font-bold mono" style={{ color: 'var(--text-primary)' }}>{m.name}</h3>
-                <span className="text-xs mono px-1.5 py-0.5 rounded"
-                  style={{ backgroundColor: 'var(--primary-dim)', color: 'var(--primary)' }}>
+                <h3 className="text-sm font-bold mono text-white">{m.name}</h3>
+                <span className="text-xs mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">
                   {m.visibility?.toUpperCase() ?? m.status?.toUpperCase() ?? 'ACTIVE'}
                 </span>
               </div>
               {m.description && (
-                <p className="text-xs mb-3 truncate-2" style={{ color: 'var(--text-muted)' }}>{m.description}</p>
+                <p className="text-xs mb-3 truncate-2 text-white/30">{m.description}</p>
               )}
               {m.regions.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-3">
                   {m.regions.slice(0, 3).map(r => (
-                    <span key={r} className="text-xs mono px-1.5 py-0.5 rounded"
-                      style={{ backgroundColor: 'var(--bg-surface-2)', color: 'var(--text-muted)' }}>
+                    <span key={r} className="text-xs mono px-1.5 py-0.5 rounded bg-white/[0.03] text-white/30">
                       {r}
                     </span>
                   ))}
                   {m.regions.length > 3 && (
-                    <span className="text-xs mono" style={{ color: 'var(--text-disabled)' }}>+{m.regions.length - 3}</span>
+                    <span className="text-xs mono text-white/25">+{m.regions.length - 3}</span>
                   )}
                 </div>
               )}
-              <p className="text-xs mono" style={{ color: 'var(--text-disabled)' }}>
+              <p className="text-xs mono text-white/25">
                 Created {new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </p>
             </div>

@@ -19,9 +19,9 @@ export function WaitlistForm() {
 
   return (
     <div className="flex flex-col gap-3 md:flex-row">
-      <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" className="w-full rounded-xl border px-4 py-3 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }} />
-      <button onClick={() => void submit()} className="rounded-xl px-5 py-3 text-sm font-semibold" style={{ background: 'var(--primary)', color: '#fff' }}>Join waitlist</button>
-      {message ? <div className="text-sm" style={{ color: 'var(--text-muted)' }}>{message}</div> : null}
+      <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" className="w-full rounded-xl border border-white/[0.05] bg-white/[0.015] px-4 py-3 text-sm text-white" />
+      <button onClick={() => void submit()} className="rounded-xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white">Join waitlist</button>
+      {message ? <div className="text-sm text-white/30">{message}</div> : null}
     </div>
   )
 }

@@ -65,14 +65,14 @@ export function EventComments({ eventId }: { eventId: string }) {
     <div className="space-y-3">
       <div className="relative">
         <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={3} placeholder="Add comment… Use @username to mention teammates."
-          className="w-full rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)', resize: 'vertical' }} />
+          className="w-full rounded border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-sm text-white" style={{ resize: 'vertical' }} />
         {suggestions.length > 0 && (
-          <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+          <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded border border-white/[0.05] bg-white/[0.015]">
             {suggestions.map((member) => {
               const handle = (member.email ?? 'user').split('@')[0] ?? 'user'
               return (
-                <button key={member.id} onClick={() => applyMention(handle)} className="block w-full px-3 py-2 text-left text-xs hover:bg-white/5" style={{ color: 'var(--text-primary)' }}>
-                  @{handle} <span style={{ color: 'var(--text-muted)' }}>· {member.name ?? member.email}</span>
+                <button key={member.id} onClick={() => applyMention(handle)} className="block w-full px-3 py-2 text-left text-xs hover:bg-white/5 text-white">
+                  @{handle} <span className="text-white/30">· {member.name ?? member.email}</span>
                 </button>
               )
             })}
@@ -80,16 +80,16 @@ export function EventComments({ eventId }: { eventId: string }) {
         )}
       </div>
       <div className="flex justify-end">
-        <button onClick={() => void submit()} className="rounded px-4 py-2 text-xs mono font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>POST COMMENT</button>
+        <button onClick={() => void submit()} className="rounded bg-blue-500 px-4 py-2 text-xs mono font-bold text-white">POST COMMENT</button>
       </div>
       <div className="space-y-2">
         {comments.map((comment) => (
-          <div key={comment.id} className="rounded border p-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
+          <div key={comment.id} className="rounded border border-white/[0.05] bg-white/[0.03] p-3">
             <div className="mb-1 flex items-center justify-between gap-3">
-              <div className="text-xs mono" style={{ color: 'var(--primary)' }}>{comment.user?.name ?? comment.user?.email ?? 'Operator'}</div>
-              <div className="text-[10px] mono" style={{ color: 'var(--text-muted)' }}>{new Date(comment.created_at).toLocaleString()}</div>
+              <div className="text-xs mono text-blue-400">{comment.user?.name ?? comment.user?.email ?? 'Operator'}</div>
+              <div className="text-[10px] mono text-white/30">{new Date(comment.created_at).toLocaleString()}</div>
             </div>
-            <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{comment.body}</div>
+            <div className="text-sm whitespace-pre-wrap text-white">{comment.body}</div>
           </div>
         ))}
       </div>

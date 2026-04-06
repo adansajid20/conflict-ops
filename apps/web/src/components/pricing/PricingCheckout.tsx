@@ -37,24 +37,24 @@ export function PricingCheckout({ plans }: { plans: readonly Plan[] }) {
           key={plan.id}
           className="flex flex-col rounded border p-6"
           style={{
-            borderColor: plan.popular ? 'var(--primary)' : 'var(--border)',
-            backgroundColor: plan.popular ? 'rgba(0,255,136,0.03)' : 'var(--bg-surface)',
+            borderColor: plan.popular ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+            backgroundColor: plan.popular ? 'rgba(59,130,246,0.05)' : 'rgba(255,255,255,0.015)',
           }}
         >
           {plan.popular && (
-            <div className="mb-3 text-xs font-bold tracking-widest mono" style={{ color: 'var(--primary)' }}>
+            <div className="mb-3 text-xs font-bold tracking-widest mono text-blue-400">
               ◆ MOST POPULAR
             </div>
           )}
-          <h3 className="mb-1 font-bold tracking-widest mono">{plan.name.toUpperCase()}</h3>
-          <p className="mb-4 text-xs" style={{ color: 'var(--text-muted)' }}>{plan.desc}</p>
+          <h3 className="mb-1 font-bold tracking-widest mono text-white">{plan.name.toUpperCase()}</h3>
+          <p className="mb-4 text-xs text-white/30">{plan.desc}</p>
           <div className="mb-6">
-            <span className="text-3xl font-bold">{plan.price}</span>
-            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{plan.period}</span>
+            <span className="text-3xl font-bold text-white">{plan.price}</span>
+            <span className="text-sm text-white/30">{plan.period}</span>
           </div>
           <ul className="mb-6 flex-1 space-y-2">
             {plan.features.map((f) => (
-              <li key={f} className="flex items-start gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+              <li key={f} className="flex items-start gap-2 text-sm text-white/30">
                 <span style={{ color: 'var(--alert-green)' }}>✓</span>{f}
               </li>
             ))}
@@ -62,8 +62,7 @@ export function PricingCheckout({ plans }: { plans: readonly Plan[] }) {
           {plan.id === 'enterprise' ? (
             <a
               href="mailto:enterprise@conflictradar.co"
-              className="block rounded py-2.5 text-center text-sm font-bold tracking-wider mono"
-              style={{ color: 'var(--primary)', border: '1px solid var(--primary)' }}
+              className="block rounded py-2.5 text-center text-sm font-bold tracking-wider mono text-blue-400 border border-blue-400"
             >
               Contact Sales
             </a>
@@ -73,9 +72,9 @@ export function PricingCheckout({ plans }: { plans: readonly Plan[] }) {
               disabled={loading === plan.id}
               className="block w-full rounded py-2.5 text-center text-sm font-bold tracking-wider mono cursor-pointer"
               style={{
-                backgroundColor: plan.popular ? 'var(--primary)' : 'transparent',
-                color: plan.popular ? '#000' : 'var(--primary)',
-                border: plan.popular ? 'none' : '1px solid var(--primary)',
+                backgroundColor: plan.popular ? '#3b82f6' : 'transparent',
+                color: plan.popular ? '#000' : '#3b82f6',
+                border: plan.popular ? 'none' : '1px solid #3b82f6',
                 opacity: loading === plan.id ? 0.6 : 1,
               }}
             >

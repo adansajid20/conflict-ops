@@ -96,7 +96,7 @@ export function APIKeysManager() {
     }
   }
 
-  if (loading) return <div className="text-xs mono p-4" style={{ color: 'var(--text-muted)' }}>LOADING...</div>
+  if (loading) return <div className="text-xs mono p-4 text-white/30">LOADING...</div>
 
   if (noOrg) return (
     <OrgRequired

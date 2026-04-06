@@ -10,7 +10,7 @@ interface ComingSoonProps {
 export function ComingSoon({ feature, description, eta, icon = '⊡', status = 'beta', setupNote }: ComingSoonProps) {
   const statusConfig = {
     beta: { label: 'BETA', color: '#A78BFA', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.2)' },
-    planned: { label: 'PLANNED', color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.04)', border: 'var(--border)' },
+    planned: { label: 'PLANNED', color: 'text-white/30', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.05)' },
     'setup-required': { label: 'SETUP REQUIRED', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)' },
   }[status]
 
@@ -23,10 +23,10 @@ export function ComingSoon({ feature, description, eta, icon = '⊡', status = '
           <span className="text-xs mono font-bold" style={{ color: statusConfig.color }}>
             {statusConfig.label}
           </span>
-          {eta && <span className="text-xs mono" style={{ color: 'var(--text-muted)' }}>· {eta}</span>}
+          {eta && <span className="text-xs mono text-white/30">· {eta}</span>}
         </div>
-        <h2 className="text-xl font-bold mono mb-3" style={{ color: 'var(--text-primary)' }}>{feature}</h2>
-        <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
+        <h2 className="text-xl font-bold mono mb-3 text-white">{feature}</h2>
+        <p className="text-sm leading-relaxed mb-6 text-white/30" style={{ lineHeight: 1.65 }}>
           {description}
         </p>
         {setupNote && (

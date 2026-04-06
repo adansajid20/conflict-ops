@@ -34,9 +34,9 @@ export function RecentIntelFeed({ limit = 8 }: { limit?: number }) {
   if (items.length === 0) {
     return (
       <div className="p-6 text-center">
-        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        <div className="text-xs text-white/30">
           No events yet.{' '}
-          <Link href="/admin" style={{ color: 'var(--primary)' }}>Run ingest →</Link>
+          <Link href="/admin" className="text-blue-400">Run ingest →</Link>
         </div>
       </div>
     )
@@ -48,8 +48,7 @@ export function RecentIntelFeed({ limit = 8 }: { limit?: number }) {
         <button
           key={item.id}
           onClick={() => setSelectedItem(item)}
-          className="w-full text-left flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/5 active:bg-white/10 border-b"
-          style={{ borderColor: 'var(--border)', display: 'flex' }}
+          className="w-full text-left flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/5 active:bg-white/10 border-b border-white/[0.05]"
         >
           {/* Severity badge */}
           <span className="text-xs font-mono font-bold shrink-0 px-1.5 py-0.5 rounded"
@@ -63,12 +62,12 @@ export function RecentIntelFeed({ limit = 8 }: { limit?: number }) {
             {severityLabel(item.severity)}
           </span>
           {/* Title */}
-          <p className="text-xs flex-1 truncate text-left" style={{ color: 'var(--text-primary)' }}>
+          <p className="text-xs flex-1 truncate text-left text-white">
             {item.title}
           </p>
           {/* Meta */}
-          <span className="text-xs font-mono shrink-0 flex items-center gap-1.5" style={{ color: 'var(--text-disabled)', fontSize: 10 }}>
-            <span style={{ color: 'var(--primary)' }}>{sanitizeSourceDisplay(item.source)}</span>
+          <span className="text-xs font-mono shrink-0 flex items-center gap-1.5 text-white/25" style={{ fontSize: 10 }}>
+            <span className="text-blue-400">{sanitizeSourceDisplay(item.source)}</span>
             {item.country_code && <span>{item.country_code}</span>}
             <span>{safeTimeAgo(item.occurred_at ?? item.ingested_at)}</span>
             <span>›</span>

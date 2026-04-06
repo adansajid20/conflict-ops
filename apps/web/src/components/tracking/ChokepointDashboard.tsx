@@ -90,20 +90,20 @@ export async function ChokepointDashboard() {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => (
-        <div key={card.name} className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-          <div className="text-xs uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>Chokepoint</div>
-          <div className="mt-1 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{card.name}</div>
+        <div key={card.name} className="rounded-lg border border-white/[0.05] bg-white/[0.015] p-4">
+          <div className="text-xs uppercase tracking-[0.16em] text-white/30">Chokepoint</div>
+          <div className="mt-1 text-lg font-semibold text-white">{card.name}</div>
           <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div>
-              <div style={{ color: 'var(--text-muted)' }}>Live vessels</div>
-              <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>{card.vesselCount}</div>
+              <div className="text-white/30">Live vessels</div>
+              <div className="font-semibold text-white">{card.vesselCount}</div>
             </div>
             <div>
-              <div style={{ color: 'var(--text-muted)' }}>Risk score</div>
-              <div className="font-semibold" style={{ color: card.riskScore >= 10 ? '#EF4444' : card.riskScore >= 5 ? '#F97316' : 'var(--text-primary)' }}>{card.riskScore}</div>
+              <div className="text-white/30">Risk score</div>
+              <div className="font-semibold" style={{ color: card.riskScore >= 10 ? '#EF4444' : card.riskScore >= 5 ? '#F97316' : '#ffffff' }}>{card.riskScore}</div>
             </div>
           </div>
-          <div className="mt-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <div className="mt-4 text-xs text-white/30">
             Last updated: {card.lastUpdated ? new Date(card.lastUpdated).toLocaleString() : 'No recent vessel hits'}
           </div>
         </div>

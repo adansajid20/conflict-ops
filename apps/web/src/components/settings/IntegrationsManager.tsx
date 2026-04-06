@@ -57,30 +57,30 @@ export function IntegrationsManager() {
   const connected = new Set(items.map((item) => item.provider))
 
   return (
-    <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-      <div className="mb-4 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Integrations</div>
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4">
+      <div className="mb-4 text-lg font-semibold text-white">Integrations</div>
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
-          <div className="mb-2 font-medium">Slack</div>
-          <input value={slackUrl} onChange={(event) => setSlackUrl(event.target.value)} placeholder="Incoming webhook URL" className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }} />
+        <div className="rounded-lg border border-white/[0.05] bg-white/[0.03] p-4">
+          <div className="mb-2 font-medium text-white">Slack</div>
+          <input value={slackUrl} onChange={(event) => setSlackUrl(event.target.value)} placeholder="Incoming webhook URL" className="w-full rounded-lg border border-white/[0.05] bg-white/[0.015] px-3 py-2 text-sm text-white placeholder:text-white/20" />
           <div className="mt-3 flex gap-2">
-            <button onClick={() => void save('slack')} className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--primary)', color: '#fff' }}>Connect</button>
-            <button onClick={() => void test('slack')} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>Test</button>
-            {connected.has('slack') ? <button onClick={() => void disconnect('slack')} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>Disconnect</button> : null}
+            <button onClick={() => void save('slack')} className="rounded-lg bg-blue-500 px-3 py-2 text-sm text-white hover:bg-blue-600">Connect</button>
+            <button onClick={() => void test('slack')} className="rounded-lg border border-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.02]">Test</button>
+            {connected.has('slack') ? <button onClick={() => void disconnect('slack')} className="rounded-lg border border-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.02]">Disconnect</button> : null}
           </div>
         </div>
 
-        <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
-          <div className="mb-2 font-medium">PagerDuty</div>
-          <input value={pagerDutyKey} onChange={(event) => setPagerDutyKey(event.target.value)} placeholder="Events API integration key" className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }} />
+        <div className="rounded-lg border border-white/[0.05] bg-white/[0.03] p-4">
+          <div className="mb-2 font-medium text-white">PagerDuty</div>
+          <input value={pagerDutyKey} onChange={(event) => setPagerDutyKey(event.target.value)} placeholder="Events API integration key" className="w-full rounded-lg border border-white/[0.05] bg-white/[0.015] px-3 py-2 text-sm text-white placeholder:text-white/20" />
           <div className="mt-3 flex gap-2">
-            <button onClick={() => void save('pagerduty')} className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--primary)', color: '#fff' }}>Connect</button>
-            <button onClick={() => void test('pagerduty')} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>Test</button>
-            {connected.has('pagerduty') ? <button onClick={() => void disconnect('pagerduty')} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>Disconnect</button> : null}
+            <button onClick={() => void save('pagerduty')} className="rounded-lg bg-blue-500 px-3 py-2 text-sm text-white hover:bg-blue-600">Connect</button>
+            <button onClick={() => void test('pagerduty')} className="rounded-lg border border-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.02]">Test</button>
+            {connected.has('pagerduty') ? <button onClick={() => void disconnect('pagerduty')} className="rounded-lg border border-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.02]">Disconnect</button> : null}
           </div>
         </div>
       </div>
-      {message ? <div className="mt-4 text-sm" style={{ color: 'var(--text-muted)' }}>{message}</div> : null}
+      {message ? <div className="mt-4 text-sm text-white/50">{message}</div> : null}
     </div>
   )
 }

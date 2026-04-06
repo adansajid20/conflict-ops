@@ -40,17 +40,17 @@ type Matrix = Record<string, Record<string, EvidenceRating>>
 type HypothesisDiffState = Record<string, { items: Evidence[]; changedIds: string[]; loading: boolean }>
 
 const STATUS_COLORS: Record<Hypothesis['status'], string> = {
-  active: 'var(--accent-blue)',
-  confirmed: 'var(--alert-green)',
-  refuted: 'var(--alert-red)',
-  suspended: 'var(--text-muted)',
+  active: '#60a5fa',
+  confirmed: '#22c55e',
+  refuted: '#ef4444',
+  suspended: '#ffffff50',
 }
 
 const RATING_STYLES: Record<EvidenceRating, { color: string; label: string }> = {
-  consistent: { color: 'var(--alert-green)', label: 'C' },
-  inconsistent: { color: 'var(--alert-red)', label: 'I' },
-  neutral: { color: 'var(--text-muted)', label: 'N' },
-  na: { color: 'var(--border)', label: '—' },
+  consistent: { color: '#22c55e', label: 'C' },
+  inconsistent: { color: '#ef4444', label: 'I' },
+  neutral: { color: '#ffffff50', label: 'N' },
+  na: { color: '#ffffff05', label: '—' },
 }
 
 function computeInconsistencyScore(hypothesis: Hypothesis, evidenceList: Evidence[], matrix: Matrix): number {
@@ -249,7 +249,7 @@ export function ACHMatrix({ planHasACH }: { planHasACH: boolean }) {
                         <div className="text-white">{hyp.title}</div>
                         <div className="truncate text-xs text-white/50">{hyp.description}</div>
                       </div>
-                      <span className="rounded-full px-2 py-1 text-[10px]" style={{ color: badgeColor(healthBadge), background: `${badgeColor(healthBadge)}22` }}>{healthBadge}</span>
+                      <span className="rounded-full px-2 py-1 text-[10px] text-white/50" style={{ background: `${badgeColor(healthBadge)}22`, color: badgeColor(healthBadge) }}>{healthBadge}</span>
                     </div>
                     {idx === 0 && <div className="mt-1 text-xs text-blue-400">★ MOST LIKELY</div>}
                     <div className="mt-3 rounded-lg border border-white/[0.05] bg-white/[0.025] p-2">
@@ -320,8 +320,7 @@ export function ACHMatrix({ planHasACH }: { planHasACH: boolean }) {
               setHypotheses((prev) => [...prev, { id: String(Date.now()), title: newHypothesis, description: '', status: 'active', probability: 0.5, lastEvidenceAt: now, probability_history: [{ at: now, probability: 0.5 }], key_indicators: [] }])
               setNewHypothesis('')
             }}
-            className="rounded-lg border border-blue-500 px-4 py-2 text-xs mono text-white hover:bg-blue-600"
-            style={{ backgroundColor: '#3B82F6' }}
+            className="rounded-lg border border-blue-500 bg-blue-500 px-4 py-2 text-xs mono text-white hover:bg-blue-600"
           >
             + ADD
           </button>

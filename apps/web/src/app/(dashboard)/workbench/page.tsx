@@ -46,9 +46,9 @@ export default function WorkbenchPage() {
 
   return (
     <div className="h-full">
-      <div className="border-b px-4" style={{ borderColor: 'var(--border)' }}>
+      <div className="border-b border-white/[0.05] px-4">
         {TABS.map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className="px-4 py-3 text-sm font-medium active:scale-[0.97]" style={{ borderBottom: activeTab === tab ? '2px solid var(--primary)' : '2px solid transparent', color: activeTab === tab ? 'var(--primary)' : 'var(--text-muted)' }}>
+          <button key={tab} onClick={() => setActiveTab(tab)} className="px-4 py-3 text-sm font-medium active:scale-[0.97]" style={{ borderBottom: activeTab === tab ? '2px solid #3b82f6' : '2px solid transparent', color: activeTab === tab ? '#3b82f6' : 'text-white/30' }}>
             {tab}
           </button>
         ))}
@@ -67,17 +67,17 @@ export default function WorkbenchPage() {
             {activeTab === 'Correlations' && <SignalCorrelation />}
             {activeTab === 'Forecasts' && (
               <div className="space-y-6">
-                <div className="rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+                <div className="rounded-xl border border-white/[0.05] bg-white/[0.015]">
                   {forecastData.forecasts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-3 p-10 text-center">
-                      <BarChart3Icon size={32} style={{ color: 'var(--text-muted)' }} />
-                      <div style={{ color: 'var(--text-primary)' }}>Run ingest to generate forecasts</div>
-                      <a href="/admin" className="btn-primary rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--primary)', color: '#fff' }}>Go to Admin</a>
+                      <BarChart3Icon size={32} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                      <div className="text-white">Run ingest to generate forecasts</div>
+                      <a href="/admin" className="btn-primary rounded-lg bg-blue-500 px-3 py-2 text-sm text-white">Go to Admin</a>
                     </div>
                   ) : (
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="text-left" style={{ color: 'var(--text-muted)' }}>
+                        <tr className="text-left text-white/30">
                           <th className="px-4 py-3">Region</th>
                           <th className="px-4 py-3">P50 Score</th>
                           <th className="px-4 py-3">Events 7d</th>
@@ -88,11 +88,11 @@ export default function WorkbenchPage() {
                         {forecastData.forecasts.map((row) => {
                           const pct = Math.round((row.score ?? 0) * 100)
                           return (
-                            <tr key={row.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                              <td className="px-4 py-3" style={{ color: 'var(--text-primary)' }}>{row.region || row.country_code || 'Unknown'}</td>
-                              <td className="px-4 py-3"><div className="flex items-center gap-3"><div className="h-2 w-40 rounded-full" style={{ background: 'var(--bg-surface-3)' }}><div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct > 70 ? 'var(--sev-critical)' : pct > 40 ? 'var(--sev-medium)' : 'var(--sev-low)' }} /></div><span style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{pct}%</span></div></td>
-                              <td className="px-4 py-3" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{row.event_count ?? 0}</td>
-                              <td className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>{timeAgo(row.updated_at)}</td>
+                            <tr key={row.id} className="border-t border-white/[0.05]">
+                              <td className="px-4 py-3 text-white">{row.region || row.country_code || 'Unknown'}</td>
+                              <td className="px-4 py-3"><div className="flex items-center gap-3"><div className="h-2 w-40 rounded-full bg-white/[0.05]"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct > 70 ? 'var(--sev-critical)' : pct > 40 ? 'var(--sev-medium)' : 'var(--sev-low)' }} /></div><span className="text-white" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{pct}%</span></div></td>
+                              <td className="px-4 py-3 text-white" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{row.event_count ?? 0}</td>
+                              <td className="px-4 py-3 text-white/30">{timeAgo(row.updated_at)}</td>
                             </tr>
                           )
                         })}

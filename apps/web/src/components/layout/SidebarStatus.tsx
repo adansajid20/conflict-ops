@@ -29,8 +29,7 @@ export function SidebarStatus() {
   const eventCount = health?.events?.total ?? health?.eventCount ?? null
 
   return (
-    <div className="p-3 border-t text-xs space-y-1.5 shrink-0"
-      style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+    <div className="p-3 border-t border-white/[0.05] text-xs space-y-1.5 shrink-0 text-white/30">
       {/* System status */}
       <div className="flex items-center gap-2">
         <span className={`status-dot ${statusLevel === 'nominal' ? 'green' : statusLevel === 'degraded' ? 'amber' : 'red'}`} />
@@ -47,19 +46,19 @@ export function SidebarStatus() {
       </div>
 
       {/* Sources */}
-      <div className="mono" style={{ color: 'var(--text-disabled)', fontSize: 10 }}>
+      <div className="mono" style={{ fontSize: 10 }}>
         {health === null ? 'SOURCES: ...' : `FEEDS: ${liveCount}/${totalCount}`}
       </div>
 
       {/* Events */}
       {eventCount !== null && (
-        <div className="mono" style={{ color: 'var(--text-disabled)', fontSize: 10 }}>
+        <div className="mono" style={{ fontSize: 10 }}>
           EVENTS: {eventCount.toLocaleString()}
         </div>
       )}
 
       {/* Last ingest */}
-      <div className="mono flex items-center gap-1" style={{ color: 'var(--text-disabled)', fontSize: 10 }}>
+      <div className="mono flex items-center gap-1" style={{ fontSize: 10 }}>
         INGEST: {health === null ? '...' : safeTimeAgo(lastIngestAt)}
         {ingestAge !== null && ingestAge > 120 && (
           <span style={{ color: 'var(--alert-amber)' }}>⚠</span>

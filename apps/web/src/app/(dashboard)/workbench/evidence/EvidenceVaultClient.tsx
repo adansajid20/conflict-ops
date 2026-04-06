@@ -24,10 +24,10 @@ export function EvidenceVaultClient() {
   return (
     <div className="p-6 space-y-4">
       <div>
-        <h1 className="text-2xl font-bold mono tracking-wide" style={{ color: 'var(--text-primary)' }}>Evidence Vault</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Integrity checks and chain-of-custody exports.</p>
+        <h1 className="text-2xl font-bold mono tracking-wide text-white">Evidence Vault</h1>
+        <p className="text-sm mt-1 text-white/30">Integrity checks and chain-of-custody exports.</p>
       </div>
-      {items.length === 0 ? <div style={{ color: 'var(--text-muted)' }}>No evidence items found.</div> : null}
+      {items.length === 0 ? <div className="text-white/30">No evidence items found.</div> : null}
       {items.map((item) => <EvidenceChain key={item.id} item={item} />)}
     </div>
   )

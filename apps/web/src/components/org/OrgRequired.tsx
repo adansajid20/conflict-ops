@@ -40,7 +40,7 @@ export function OrgRequired({ feature, description, children }: OrgRequiredProps
     return (
       <div className="p-8 text-center">
         <div className="text-2xl mb-3">✓</div>
-        <div className="text-sm font-bold" style={{ color: 'var(--alert-green)' }}>Organization created — reloading...</div>
+        <div className="text-sm font-bold text-green-500">Organization created — reloading...</div>
       </div>
     )
   }
@@ -48,10 +48,10 @@ export function OrgRequired({ feature, description, children }: OrgRequiredProps
   return (
     <div className="p-8 max-w-md mx-auto text-center">
       <div className="text-3xl mb-4 opacity-40">⊕</div>
-      <h3 className="text-base font-bold mono mb-2" style={{ color: 'var(--text-primary)' }}>
+      <h3 className="text-base font-bold mono mb-2 text-white">
         {feature} requires an organization
       </h3>
-      <p className="text-sm mb-6" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
+      <p className="text-sm mb-6 text-white/30" style={{ lineHeight: 1.6 }}>
         {description ?? 'Create a free organization to unlock this feature. Takes 2 seconds.'}
       </p>
 
@@ -60,17 +60,13 @@ export function OrgRequired({ feature, description, children }: OrgRequiredProps
       <button
         onClick={() => void createOrg()}
         disabled={creating}
-        className="px-5 py-2.5 rounded text-sm font-bold mono transition-all disabled:opacity-50"
-        style={{
-          backgroundColor: 'var(--primary)',
-          color: '#080A0E',
-        }}
+        className="px-5 py-2.5 rounded text-sm font-bold mono transition-all disabled:opacity-50 bg-blue-500 text-[#080A0E]"
       >
         {creating ? 'CREATING...' : '+ CREATE ORGANIZATION'}
       </button>
 
       {error && (
-        <p className="text-xs mt-3" style={{ color: '#EF4444' }}>{error}</p>
+        <p className="text-xs mt-3 text-red-400">{error}</p>
       )}
     </div>
   )

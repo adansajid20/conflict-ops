@@ -12,15 +12,15 @@ export default function TrackingPage({ searchParams }: { searchParams?: { tab?: 
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-4 py-3 border-b shrink-0" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+      <div className="px-4 py-3 border-b border-white/[0.05] bg-white/[0.015] shrink-0">
         <div className="flex items-center gap-3">
-          <h1 className="text-sm font-bold tracking-widest uppercase mono" style={{ color: 'var(--text-primary)' }}>Operational Map</h1>
+          <h1 className="text-sm font-bold tracking-widest uppercase mono text-white">Operational Map</h1>
           <span className="text-xs px-2 py-0.5 rounded" style={{ backgroundColor: 'rgba(139,92,246,0.15)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.2)' }}>β</span>
         </div>
-        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Real-time conflict intelligence overlay</p>
+        <p className="text-xs mt-1 text-white/30">Real-time conflict intelligence overlay</p>
         <div className="mt-3 flex gap-2">
-          <a href="/tracking" className="rounded px-3 py-1.5 text-xs font-medium" style={{ background: activeTab === 'map' ? 'var(--primary)' : 'transparent', color: activeTab === 'map' ? '#fff' : 'var(--text-muted)', border: '1px solid var(--border)' }}>Map</a>
-          <a href="/tracking?tab=chokepoints" className="rounded px-3 py-1.5 text-xs font-medium" style={{ background: activeTab === 'chokepoints' ? 'var(--primary)' : 'transparent', color: activeTab === 'chokepoints' ? '#fff' : 'var(--text-muted)', border: '1px solid var(--border)' }}>Chokepoints</a>
+          <a href="/tracking" className="rounded px-3 py-1.5 text-xs font-medium border border-white/[0.05]" style={{ background: activeTab === 'map' ? '#3b82f6' : 'transparent', color: activeTab === 'map' ? '#fff' : 'text-white/30' }}>Map</a>
+          <a href="/tracking?tab=chokepoints" className="rounded px-3 py-1.5 text-xs font-medium border border-white/[0.05]" style={{ background: activeTab === 'chokepoints' ? '#3b82f6' : 'transparent', color: activeTab === 'chokepoints' ? '#fff' : 'text-white/30' }}>Chokepoints</a>
         </div>
       </div>
       <div className="flex-1 overflow-hidden p-0">

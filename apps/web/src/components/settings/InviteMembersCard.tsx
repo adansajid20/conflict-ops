@@ -55,13 +55,13 @@ export function InviteMembersCard({ isAdmin }: { isAdmin: boolean }) {
   if (!isAdmin) return null
 
   return (
-    <div className="mt-6 rounded border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+    <div className="mt-6 rounded border border-white/[0.05] bg-white/[0.015] p-4">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <div className="text-xs mono tracking-widest" style={{ color: 'var(--text-muted)' }}>MEMBER INVITES</div>
-          <div className="text-sm" style={{ color: 'var(--text-primary)' }}>Invite analysts without leaving the dashboard.</div>
+          <div className="text-xs mono tracking-widest text-white/30">MEMBER INVITES</div>
+          <div className="text-sm text-white">Invite analysts without leaving the dashboard.</div>
         </div>
-        <button onClick={() => setOpen((value) => !value)} className="rounded px-4 py-2 text-xs mono font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>
+        <button onClick={() => setOpen((value) => !value)} className="rounded bg-blue-500 px-4 py-2 text-xs mono font-bold text-white hover:bg-blue-600">
           {open ? 'CLOSE' : 'INVITE MEMBER'}
         </button>
       </div>
@@ -69,31 +69,31 @@ export function InviteMembersCard({ isAdmin }: { isAdmin: boolean }) {
       {open && (
         <div className="mb-4 grid gap-3 md:grid-cols-[1fr_160px_auto]">
           <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com"
-            className="rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-base)', color: 'var(--text-primary)' }} />
+            className="rounded border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/20" />
           <select value={role} onChange={(event) => setRole(event.target.value)}
-            className="rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-base)', color: 'var(--text-primary)' }}>
+            className="rounded border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-sm text-white">
             <option value="viewer">viewer</option>
             <option value="analyst">analyst</option>
             <option value="admin">admin</option>
           </select>
-          <button disabled={!email || loading} onClick={() => void submit()} className="rounded px-4 py-2 text-xs mono font-bold" style={{ background: 'var(--primary)', color: '#fff', opacity: !email || loading ? 0.5 : 1 }}>
+          <button disabled={!email || loading} onClick={() => void submit()} className="rounded bg-blue-500 px-4 py-2 text-xs mono font-bold text-white hover:bg-blue-600 disabled:opacity-50">
             {loading ? 'SENDING...' : 'SEND INVITE'}
           </button>
         </div>
       )}
 
-      {error && <div className="mb-3 text-xs mono" style={{ color: 'var(--sev-critical)' }}>{error}</div>}
+      {error && <div className="mb-3 text-xs mono text-red-400">{error}</div>}
 
       <div className="space-y-2">
         {pending.length === 0 ? (
-          <div className="text-xs mono" style={{ color: 'var(--text-muted)' }}>No pending invites.</div>
+          <div className="text-xs mono text-white/30">No pending invites.</div>
         ) : pending.map((invite) => (
-          <div key={invite.id} className="flex items-center justify-between rounded border px-3 py-2" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
+          <div key={invite.id} className="flex items-center justify-between rounded border border-white/[0.05] bg-white/[0.03] px-3 py-2">
             <div>
-              <div className="text-sm" style={{ color: 'var(--text-primary)' }}>{invite.email}</div>
-              <div className="text-[11px] mono" style={{ color: 'var(--text-muted)' }}>{invite.role.toUpperCase()} · expires {new Date(invite.expires_at).toLocaleDateString()}</div>
+              <div className="text-sm text-white">{invite.email}</div>
+              <div className="text-[11px] mono text-white/30">{invite.role.toUpperCase()} · expires {new Date(invite.expires_at).toLocaleDateString()}</div>
             </div>
-            <div className="text-[11px] mono" style={{ color: 'var(--text-muted)' }}>{new Date(invite.created_at).toLocaleDateString()}</div>
+            <div className="text-[11px] mono text-white/30">{new Date(invite.created_at).toLocaleDateString()}</div>
           </div>
         ))}
       </div>

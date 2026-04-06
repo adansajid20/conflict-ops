@@ -30,41 +30,18 @@ export class ErrorBoundary extends React.Component<Props, State> {
       if (this.props.fallback) return this.props.fallback
       return (
         <div
-          style={{
-            position: 'fixed',
-            right: 0,
-            top: 0,
-            bottom: 0,
-            width: 'min(560px, 95vw)',
-            backgroundColor: 'var(--bg-surface)',
-            borderLeft: '1px solid var(--border)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '2rem',
-            zIndex: 50,
-            gap: '1rem',
-          }}
+          className="fixed right-0 top-0 bottom-0 w-[min(560px,_95vw)] bg-white/[0.015] border-l border-white/[0.05] flex flex-col items-center justify-center p-8 z-50 gap-4"
         >
           <div style={{ fontSize: '2rem' }}>⚠️</div>
-          <div style={{ color: 'var(--text-primary)', fontWeight: 600, textAlign: 'center' }}>
+          <div className="font-semibold text-center text-white">
             Error loading event details
           </div>
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>
+          <div className="text-white/30 text-sm text-center">
             Something went wrong rendering this event.
           </div>
           <button
             onClick={() => this.setState({ hasError: false })}
-            style={{
-              background: 'var(--primary)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '8px 20px',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-            }}
+            className="bg-blue-500 text-white border-none rounded px-5 py-2 cursor-pointer text-sm"
           >
             Retry
           </button>

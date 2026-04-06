@@ -18,12 +18,12 @@ export function IPAllowlistEditor({ initial = [] }: { initial?: string[] }) {
   }
 
   return (
-    <div className="p-4 rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-      <div className="text-xs mono font-bold mb-2" style={{ color: 'var(--text-muted)' }}>IP ALLOWLIST</div>
-      <textarea value={value} onChange={(event) => setValue(event.target.value)} rows={6} className="w-full rounded border px-3 py-2 text-xs mono" style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} placeholder={'203.0.113.10\n203.0.113.0/24'} />
-      <div className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>One IP or CIDR block per line. Empty allowlist means allow all.</div>
-      <button onClick={() => void save()} disabled={saving} className="mt-4 px-4 py-2 rounded text-xs mono font-bold" style={{ backgroundColor: 'var(--primary)', color: '#000' }}>{saving ? 'SAVING...' : 'SAVE ALLOWLIST'}</button>
-      {message ? <div className="mt-2 text-xs mono" style={{ color: 'var(--text-muted)' }}>{message}</div> : null}
+    <div className="p-4 rounded border border-white/[0.05] bg-white/[0.015]">
+      <div className="text-xs mono font-bold mb-2 text-white/30">IP ALLOWLIST</div>
+      <textarea value={value} onChange={(event) => setValue(event.target.value)} rows={6} className="w-full rounded border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-xs mono text-white placeholder:text-white/20" placeholder={'203.0.113.10\n203.0.113.0/24'} />
+      <div className="mt-2 text-xs text-white/30">One IP or CIDR block per line. Empty allowlist means allow all.</div>
+      <button onClick={() => void save()} disabled={saving} className="mt-4 px-4 py-2 rounded text-xs mono font-bold bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50">{saving ? 'SAVING...' : 'SAVE ALLOWLIST'}</button>
+      {message ? <div className="mt-2 text-xs mono text-white/30">{message}</div> : null}
     </div>
   )
 }

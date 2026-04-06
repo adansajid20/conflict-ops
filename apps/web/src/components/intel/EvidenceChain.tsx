@@ -26,13 +26,13 @@ export function EvidenceChain({ item }: { item: EvidenceItem }) {
   const chain = useMemo(() => item.chain_of_custody ?? [], [item.chain_of_custody])
 
   return (
-    <div className="rounded-xl border p-4 print:border-0" id={`evidence-chain-${item.id}`} style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4 print:border-0" id={`evidence-chain-${item.id}`}>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</div>
-          <div className="text-xs mt-1 break-all" style={{ color: 'var(--text-muted)' }}>SHA-256: {item.hash_sha256 ?? 'Unavailable'}</div>
+          <div className="text-sm font-semibold text-white">{item.title}</div>
+          <div className="text-xs mt-1 break-all text-white/30">SHA-256: {item.hash_sha256 ?? 'Unavailable'}</div>
         </div>
-        <button onClick={() => window.print()} className="rounded border px-3 py-2 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+        <button onClick={() => window.print()} className="rounded border border-white/[0.05] px-3 py-2 text-xs text-white">
           Export Chain of Custody
         </button>
       </div>
@@ -42,12 +42,12 @@ export function EvidenceChain({ item }: { item: EvidenceItem }) {
         </span>
       </div>
       <div className="mt-4 space-y-3">
-        {chain.length === 0 ? <div className="text-sm" style={{ color: 'var(--text-muted)' }}>No custody events recorded.</div> : null}
+        {chain.length === 0 ? <div className="text-sm text-white/30">No custody events recorded.</div> : null}
         {chain.map((entry, index) => (
-          <div key={`${entry.at ?? 'na'}-${index}`} className="rounded-lg border p-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
-            <div className="text-sm" style={{ color: 'var(--text-primary)' }}>{entry.action ?? 'Captured'} · {entry.actor ?? 'System'}</div>
-            <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{formatAt(entry.at)}</div>
-            {entry.note ? <div className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>{entry.note}</div> : null}
+          <div key={`${entry.at ?? 'na'}-${index}`} className="rounded-lg border border-white/[0.05] bg-white/[0.03] p-3">
+            <div className="text-sm text-white">{entry.action ?? 'Captured'} · {entry.actor ?? 'System'}</div>
+            <div className="text-xs mt-1 text-white/30">{formatAt(entry.at)}</div>
+            {entry.note ? <div className="text-xs mt-2 text-white/50">{entry.note}</div> : null}
           </div>
         ))}
       </div>

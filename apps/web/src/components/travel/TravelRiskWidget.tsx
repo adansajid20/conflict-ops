@@ -78,7 +78,7 @@ export function TravelRiskWidget() {
     } finally { setBriefing(false) }
   }
 
-  const riskColor = risk ? RISK_COLORS[risk.risk_level] : 'var(--text-muted)'
+  const riskColor = risk ? RISK_COLORS[risk.risk_level] : 'text-white/30'
 
   return (
     <div className="rounded border border-white/[0.05] bg-white/[0.015] p-4 hover:bg-white/[0.03]">

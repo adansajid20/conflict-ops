@@ -39,40 +39,37 @@ export function NotificationBell() {
     <div className="relative">
       <button
         onClick={() => setOpen((value) => !value)}
-        className="relative rounded-lg border px-3 py-2 text-xs mono"
-        style={{ borderColor: 'var(--border)', color: 'var(--text-primary)', background: 'var(--bg-surface)' }}
+        className="relative rounded-lg border border-white/[0.05] bg-white/[0.015] px-3 py-2 text-xs mono text-white"
       >
         🔔
         {unread > 0 && (
-          <span className="absolute -right-2 -top-2 rounded-full px-1.5 py-0.5 text-[10px] mono"
-            style={{ background: 'var(--sev-critical)', color: '#fff' }}>
+          <span className="absolute -right-2 -top-2 rounded-full px-1.5 py-0.5 text-[10px] mono bg-red-500 text-white">
             {unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 z-50 w-[360px] rounded-lg border p-3 shadow-xl"
-          style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+        <div className="absolute right-0 top-12 z-50 w-[360px] rounded-lg border border-white/[0.05] bg-white/[0.015] p-3 shadow-xl">
           <div className="mb-3 flex items-center justify-between">
-            <div className="text-xs mono font-bold" style={{ color: 'var(--text-primary)' }}>NOTIFICATIONS</div>
-            <button onClick={() => void markAllRead()} className="text-[11px] mono" style={{ color: 'var(--primary)' }}>MARK ALL READ</button>
+            <div className="text-xs mono font-bold text-white">NOTIFICATIONS</div>
+            <button onClick={() => void markAllRead()} className="text-[11px] mono text-blue-400">MARK ALL READ</button>
           </div>
           <div className="max-h-[420px] overflow-y-auto space-y-2">
             {items.length === 0 ? (
-              <div className="rounded border p-3 text-xs mono" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>No notifications.</div>
+              <div className="rounded border border-white/[0.05] p-3 text-xs mono text-white/30">No notifications.</div>
             ) : items.map((item) => (
               <button
                 key={item.id}
                 onClick={() => void markRead(item.id)}
                 className="block w-full rounded border p-3 text-left"
-                style={{ borderColor: item.read ? 'var(--border)' : 'var(--primary)', background: item.read ? 'var(--bg-surface-2)' : 'var(--primary-dim)' }}
+                style={{ borderColor: item.read ? 'rgba(255,255,255,0.05)' : '#3b82f6', background: item.read ? 'rgba(255,255,255,0.03)' : 'rgba(59,130,246,0.1)' }}
               >
                 <div className="mb-1 flex items-center justify-between gap-3">
-                  <span className="text-[10px] mono" style={{ color: item.read ? 'var(--text-muted)' : 'var(--primary)' }}>{item.type.toUpperCase()}</span>
-                  <span className="text-[10px] mono" style={{ color: 'var(--text-muted)' }}>{new Date(item.created_at).toLocaleString()}</span>
+                  <span className="text-[10px] mono" style={{ color: item.read ? 'text-white/30' : '#3b82f6' }}>{item.type.toUpperCase()}</span>
+                  <span className="text-[10px] mono text-white/30">{new Date(item.created_at).toLocaleString()}</span>
                 </div>
-                <div className="text-xs" style={{ color: 'var(--text-primary)' }}>{item.body}</div>
+                <div className="text-xs text-white">{item.body}</div>
               </button>
             ))}
           </div>

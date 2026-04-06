@@ -34,22 +34,17 @@ export function ActorsClient() {
     <div className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
+          <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
             ACTOR PROFILES
           </h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-1 text-sm text-white/30">
             {actors.length} tracked entities · States, armed groups, individuals
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           {['all', 'state', 'non-state', 'individual', 'organization'].map(f => (
             <button key={f} onClick={() => setFilter(f)}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium transition-all"
-              style={{
-                background: filter === f ? 'var(--accent, #3b82f6)' : 'var(--bg-surface)',
-                color: filter === f ? '#fff' : 'var(--text-muted)',
-                border: '1px solid var(--border)',
-              }}>
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all border ${filter === f ? 'bg-blue-500 border-blue-400 text-white' : 'bg-white/[0.015] border-white/[0.05] text-white/30'}`}>
               {f === 'all' ? 'All' : f.replace('-', ' ')}
             </button>
           ))}
@@ -58,38 +53,36 @@ export function ActorsClient() {
 
       {loading ? (
         <div className="grid gap-3 sm:grid-cols-2">
-          {[...Array(6)].map((_, i) => <div key={i} className="h-24 animate-pulse rounded-xl" style={{ background: 'var(--bg-surface)' }} />)}
+          {[...Array(6)].map((_, i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-white/[0.015]" />)}
         </div>
       ) : filtered.length === 0 ? (
         <div className="py-16 text-center">
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No actors tracked yet. They&apos;ll populate as events are classified.</p>
+          <p className="text-sm text-white/30">No actors tracked yet. They&apos;ll populate as events are classified.</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {filtered.map(actor => (
             <Link key={actor.id} href={`/actors/${actor.id}`}
-              className="block rounded-xl border p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg"
-              style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+              className="block rounded-xl border p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg bg-white/[0.015] border-white/[0.05]">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-base">{TYPE_ICON[actor.actor_type ?? ''] ?? '🔵'}</span>
-                    <span className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+                    <span className="font-semibold text-sm truncate text-white">
                       {actor.name}
                     </span>
                     {actor.is_sanctioned && (
-                      <span className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase"
-                        style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
+                      <span className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase bg-red-500/15 text-red-400">
                         Sanctioned
                       </span>
                     )}
                   </div>
                   {actor.description && (
-                    <p className="mt-1.5 text-xs line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-1.5 text-xs line-clamp-2 text-white/30">
                       {actor.description}
                     </p>
                   )}
-                  <div className="mt-2 flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  <div className="mt-2 flex items-center gap-3 text-[10px] text-white/30">
                     {actor.country && <span>📍 {actor.country}</span>}
                     {actor.alignment && <span>🧭 {actor.alignment}</span>}
                     {actor.event_count > 0 && <span>📰 {actor.event_count} mentions</span>}

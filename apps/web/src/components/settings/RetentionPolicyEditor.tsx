@@ -23,18 +23,18 @@ export function RetentionPolicyEditor({ initialDays = 365 }: { initialDays?: num
   }
 
   return (
-    <div className="p-4 rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-      <div className="text-xs mono font-bold mb-2" style={{ color: 'var(--text-muted)' }}>DATA RETENTION</div>
+    <div className="p-4 rounded border border-white/[0.05] bg-white/[0.015]">
+      <div className="text-xs mono font-bold mb-2 text-white/30">DATA RETENTION</div>
       <input type="range" min={0} max={OPTIONS.length - 1} value={index} onChange={(event) => setIndex(Number(event.target.value))} className="w-full" />
-      <div className="mt-3 text-sm font-bold mono" style={{ color: 'var(--text-primary)' }}>{value} DAYS</div>
-      <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{estimate}</div>
+      <div className="mt-3 text-sm font-bold mono text-white">{value} DAYS</div>
+      <div className="text-xs text-white/30">{estimate}</div>
       <div className="mt-3 flex gap-2 text-xs mono">
-        {OPTIONS.map((option, optionIndex) => <span key={option} style={{ color: optionIndex === index ? 'var(--primary)' : 'var(--text-muted)' }}>{option}</span>)}
+        {OPTIONS.map((option, optionIndex) => <span key={option} style={{ color: optionIndex === index ? '#60a5fa' : '#ffffff50' }}>{option}</span>)}
       </div>
-      <button onClick={() => void save()} disabled={saving} className="mt-4 px-4 py-2 rounded text-xs mono font-bold" style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
+      <button onClick={() => void save()} disabled={saving} className="mt-4 px-4 py-2 rounded text-xs mono font-bold bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50">
         {saving ? 'SAVING...' : 'SAVE POLICY'}
       </button>
-      {message ? <div className="mt-2 text-xs mono" style={{ color: 'var(--text-muted)' }}>{message}</div> : null}
+      {message ? <div className="mt-2 text-xs mono text-white/30">{message}</div> : null}
     </div>
   )
 }

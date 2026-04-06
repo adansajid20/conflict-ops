@@ -35,14 +35,14 @@ export function ActorDetailClient({ id }: { id: string }) {
 
   if (loading) return (
     <div className="mx-auto max-w-3xl px-4 py-8 space-y-4">
-      {[...Array(3)].map((_, i) => <div key={i} className="h-16 animate-pulse rounded-xl" style={{ background: 'var(--bg-surface)' }} />)}
+      {[...Array(3)].map((_, i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-white/[0.015]" />)}
     </div>
   )
 
   if (!data) return (
     <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-      <p style={{ color: 'var(--text-muted)' }}>Actor not found.</p>
-      <Link href="/actors" className="mt-4 inline-block text-sm underline" style={{ color: 'var(--accent)' }}>← Back to actors</Link>
+      <p className="text-white/30">Actor not found.</p>
+      <Link href="/actors" className="mt-4 inline-block text-sm underline text-blue-400">← Back to actors</Link>
     </div>
   )
 
@@ -51,24 +51,23 @@ export function ActorDetailClient({ id }: { id: string }) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <Link href="/actors" className="mb-6 inline-flex items-center gap-1.5 text-sm hover:opacity-70"
-        style={{ color: 'var(--text-muted)' }}>
+      <Link href="/actors" className="mb-6 inline-flex items-center gap-1.5 text-sm hover:opacity-70 text-white/30">
         <ArrowLeft size={14} /> Actor Profiles
       </Link>
 
-      <div className="rounded-xl border p-6 mb-6" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+      <div className="rounded-xl border p-6 mb-6 bg-white/[0.015] border-white/[0.05]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
+            <h1 className="text-xl font-bold text-white" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
               {actor.name}
             </h1>
             {actor.aliases && actor.aliases.length > 0 && (
-              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs mt-1 text-white/30">
                 Also known as: {actor.aliases.join(', ')}
               </p>
             )}
             {actor.description && (
-              <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              <p className="mt-3 text-sm leading-relaxed text-white/30">
                 {actor.description}
               </p>
             )}
@@ -78,7 +77,7 @@ export function ActorDetailClient({ id }: { id: string }) {
               <div className="text-lg font-bold uppercase" style={{ color: tc, fontFamily: 'JetBrains Mono, monospace' }}>
                 {actor.threat_level}
               </div>
-              <div className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+              <div className="text-[9px] uppercase tracking-wider text-white/30">
                 Threat Level
               </div>
             </div>
@@ -92,17 +91,17 @@ export function ActorDetailClient({ id }: { id: string }) {
             { label: 'Alignment', value: actor.alignment ?? '—' },
             { label: 'Mentions', value: actor.event_count.toString() },
           ].map(({ label, value }) => (
-            <div key={label} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.04)' }}>
-              <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{label}</div>
-              <div className="font-medium capitalize" style={{ color: 'var(--text-primary)' }}>{value}</div>
+            <div key={label} className="rounded-lg p-3 bg-white/[0.04]">
+              <div className="text-[10px] uppercase tracking-wider mb-1 text-white/30">{label}</div>
+              <div className="font-medium capitalize text-white">{value}</div>
             </div>
           ))}
         </div>
 
         {actor.is_sanctioned && actor.sanctions_lists && (
-          <div className="mt-4 rounded-lg p-3" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
-            <span className="text-xs font-bold" style={{ color: '#ef4444' }}>⚠️ SANCTIONED</span>
-            <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>
+          <div className="mt-4 rounded-lg p-3 bg-red-500/10 border border-red-500/30">
+            <span className="text-xs font-bold text-red-400">⚠️ SANCTIONED</span>
+            <span className="text-xs ml-2 text-white/30">
               Lists: {actor.sanctions_lists.join(', ')}
             </span>
           </div>
@@ -111,7 +110,7 @@ export function ActorDetailClient({ id }: { id: string }) {
         {actor.wikipedia_url && (
           <div className="mt-3">
             <a href={actor.wikipedia_url} target="_blank" rel="noreferrer"
-              className="text-xs underline" style={{ color: 'var(--text-muted)' }}>
+              className="text-xs underline text-white/30">
               Wikipedia →
             </a>
           </div>
@@ -119,18 +118,17 @@ export function ActorDetailClient({ id }: { id: string }) {
       </div>
 
       {/* Mentions */}
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-white/30">
         Recent Mentions ({mentions.length})
       </h2>
       {mentions.length === 0 ? (
-        <p className="py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="py-8 text-center text-sm text-white/30">
           No event mentions tracked yet.
         </p>
       ) : (
         <div className="space-y-2">
           {mentions.map(m => (
-            <div key={m.id} className="rounded-lg border p-3 flex gap-3"
-              style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+            <div key={m.id} className="rounded-lg border p-3 flex gap-3 bg-white/[0.015] border-white/[0.05]">
               {m.events && (
                 <span className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold h-fit"
                   style={{ background: SEV_COLOR[m.events.severity] + '22', color: SEV_COLOR[m.events.severity] }}>
@@ -138,16 +136,16 @@ export function ActorDetailClient({ id }: { id: string }) {
                 </span>
               )}
               <div className="min-w-0">
-                <p className="text-sm line-clamp-2" style={{ color: 'var(--text-primary)' }}>
+                <p className="text-sm line-clamp-2 text-white">
                   {m.events?.title ?? 'Unknown event'}
                 </p>
-                <div className="mt-1 flex gap-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                <div className="mt-1 flex gap-2 text-[10px] text-white/30">
                   {m.role && <span className="capitalize">Role: {m.role}</span>}
                   {m.events?.occurred_at && <span>{new Date(m.events.occurred_at).toLocaleDateString()}</span>}
                   {m.sentiment && <span className="capitalize">Sentiment: {m.sentiment}</span>}
                 </div>
                 {m.context && (
-                  <p className="mt-1 text-xs italic line-clamp-1" style={{ color: 'var(--text-muted)' }}>
+                  <p className="mt-1 text-xs italic line-clamp-1 text-white/30">
                     &ldquo;{m.context}&rdquo;
                   </p>
                 )}

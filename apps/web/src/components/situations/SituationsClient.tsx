@@ -45,10 +45,10 @@ export function SituationsClient() {
     <div className="mx-auto max-w-5xl px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>
+        <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
           ACTIVE SITUATIONS
         </h1>
-        <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1 text-sm text-white/30">
           {situations.length} monitored conflicts · Live intelligence tracking
         </p>
       </div>
@@ -56,15 +56,14 @@ export function SituationsClient() {
       {loading ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl" style={{ background: 'var(--bg-surface)' }} />
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-white/[0.015]" />
           ))}
         </div>
       ) : (
         <div className="space-y-3">
           {situations.map(sit => (
             <Link key={sit.id} href={`/situations/${sit.slug}`}
-              className="block rounded-xl border p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg"
-              style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+              className="block rounded-xl border border-white/[0.05] bg-white/[0.015] p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -72,28 +71,27 @@ export function SituationsClient() {
                       style={{ background: SEVERITY_COLOR[sit.severity] + '22', color: SEVERITY_COLOR[sit.severity] }}>
                       {sit.severity}
                     </span>
-                    <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    <span className="text-[10px] uppercase tracking-wider text-white/30">
                       {sit.status}
                     </span>
                     {sit.primary_region && (
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      <span className="text-[10px] text-white/30">
                         {sit.primary_region.replace(/_/g, ' ').toUpperCase()}
                       </span>
                     )}
                   </div>
-                  <h2 className="mt-1.5 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  <h2 className="mt-1.5 text-base font-semibold text-white">
                     {sit.name}
                   </h2>
                   {sit.description && (
-                    <p className="mt-1 text-sm line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-1 text-sm line-clamp-2 text-white/30">
                       {sit.description}
                     </p>
                   )}
                   {sit.tags && sit.tags.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {sit.tags.slice(0, 5).map(tag => (
-                        <span key={tag} className="rounded-full px-2 py-0.5 text-[10px]"
-                          style={{ background: 'var(--bg-surface-2, rgba(255,255,255,0.06))', color: 'var(--text-muted)' }}>
+                        <span key={tag} className="rounded-full px-2 py-0.5 text-[10px] bg-white/[0.03] text-white/30">
                           {tag}
                         </span>
                       ))}
@@ -107,14 +105,14 @@ export function SituationsClient() {
                     style={{ color: RISK_BAR_COLOR(sit.risk_score), fontFamily: 'JetBrains Mono, monospace' }}>
                     {sit.risk_score.toFixed(1)}
                   </div>
-                  <div className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  <div className="text-[10px] uppercase tracking-wider text-white/30">
                     Risk Score
                   </div>
-                  <div className="mt-1 h-1.5 w-20 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                  <div className="mt-1 h-1.5 w-20 rounded-full overflow-hidden bg-white/[0.05]">
                     <div className="h-full rounded-full transition-all"
                       style={{ width: `${(sit.risk_score / 10) * 100}%`, background: RISK_BAR_COLOR(sit.risk_score) }} />
                   </div>
-                  <div className="mt-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  <div className="mt-1.5 text-[10px] text-white/30">
                     {sit.event_count.toLocaleString()} events/30d
                   </div>
                 </div>

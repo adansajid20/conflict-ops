@@ -154,11 +154,9 @@ export function AlertPanel() {
               })
               return (
                 <div key={alert.id}
-                  className="feed-item-enter cursor-pointer rounded border-l-2 p-3 transition-colors hover:bg-white/[0.03]"
+                  className={`feed-item-enter cursor-pointer rounded border-l-2 p-3 transition-colors hover:bg-white/[0.03] ${alert.read ? 'bg-white/[0.015] opacity-70' : 'bg-white/[0.03]'}`}
                   style={{
-                    backgroundColor: alert.read ? 'var(--bg-surface)' : 'var(--bg-surface-2)',
                     borderLeftColor: color,
-                    opacity: alert.read ? 0.7 : 1,
                   }}
                   onClick={() => !alert.read && void markRead([alert.id])}>
                   <div className="flex items-start justify-between gap-2">

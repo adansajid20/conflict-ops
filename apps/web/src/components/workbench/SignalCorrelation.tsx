@@ -26,16 +26,16 @@ export function SignalCorrelation() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="rounded-xl border p-6" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>Scanning for lead indicators…</div>
+  if (loading) return <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-6 text-white/50">Scanning for lead indicators…</div>
 
   return (
-    <div className="rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.015]">
       {rows.length === 0 ? (
-        <div className="p-6 text-sm" style={{ color: 'var(--text-muted)' }}>No meaningful correlations found for the selected window.</div>
+        <div className="p-6 text-sm text-white/30">No meaningful correlations found for the selected window.</div>
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ color: 'var(--text-muted)' }}>
+            <tr className="text-white/30">
               <th className="px-4 py-3 text-left">Lead</th>
               <th className="px-4 py-3 text-left">Follow</th>
               <th className="px-4 py-3 text-left">Region</th>
@@ -48,13 +48,13 @@ export function SignalCorrelation() {
             {rows.map((row, index) => {
               const confidence = Math.min(100, Math.round(row.count * 12 + Math.max(0, 24 - row.avg_lag_hours)))
               return (
-                <tr key={`${row.region}-${row.lead_event_type}-${row.follow_event_type}-${index}`} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                  <td className="px-4 py-3" style={{ color: 'var(--text-primary)' }}>{row.lead_event_type}</td>
-                  <td className="px-4 py-3" style={{ color: 'var(--text-primary)' }}>{row.follow_event_type}</td>
-                  <td className="px-4 py-3" style={{ color: 'var(--text-secondary)' }}>{row.region}</td>
-                  <td className="px-4 py-3">{row.count}</td>
-                  <td className="px-4 py-3">{row.avg_lag_hours}h</td>
-                  <td className="px-4 py-3" style={{ color: confidence >= 70 ? 'var(--sev-low)' : 'var(--sev-medium)' }}>{confidence}%</td>
+                <tr key={`${row.region}-${row.lead_event_type}-${row.follow_event_type}-${index}`} className="border-t border-white/[0.05]">
+                  <td className="px-4 py-3 text-white">{row.lead_event_type}</td>
+                  <td className="px-4 py-3 text-white">{row.follow_event_type}</td>
+                  <td className="px-4 py-3 text-white/50">{row.region}</td>
+                  <td className="px-4 py-3 text-white">{row.count}</td>
+                  <td className="px-4 py-3 text-white">{row.avg_lag_hours}h</td>
+                  <td className="px-4 py-3" style={{ color: confidence >= 70 ? '#22c55e' : '#f97316' }}>{confidence}%</td>
                 </tr>
               )
             })}

@@ -59,51 +59,51 @@ export function AlertRulesBuilder() {
   }
 
   return (
-    <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+    <div className="rounded-xl border p-4 bg-white/[0.015] border-white/[0.05]">
       <div className="mb-2 flex items-center justify-between">
-        <div className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Alert rules</div>
-        <div className="text-sm" style={{ color: 'var(--text-muted)' }}>{rules.length} / {getRuleLimit(planId)} rules</div>
+        <div className="text-lg font-semibold text-white">Alert rules</div>
+        <div className="text-sm text-white/30">{rules.length} / {getRuleLimit(planId)} rules</div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Rule name" className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }} />
-        <select value={logic} onChange={(event) => setLogic(event.target.value as 'AND' | 'OR')} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}><option value="AND">AND</option><option value="OR">OR</option></select>
-        <select value={action} onChange={(event) => setAction(event.target.value as 'notify' | 'webhook' | 'email')} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}><option value="notify">In-app notify</option><option value="webhook">Webhook</option><option value="email">Email</option></select>
-        <button onClick={() => void saveRule()} className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--primary)', color: '#fff' }}>Save rule</button>
+        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Rule name" className="rounded-lg border px-3 py-2 text-sm bg-white/[0.03] border-white/[0.06] text-white" />
+        <select value={logic} onChange={(event) => setLogic(event.target.value as 'AND' | 'OR')} className="rounded-lg border px-3 py-2 text-sm bg-white/[0.03] border-white/[0.06] text-white"><option value="AND">AND</option><option value="OR">OR</option></select>
+        <select value={action} onChange={(event) => setAction(event.target.value as 'notify' | 'webhook' | 'email')} className="rounded-lg border px-3 py-2 text-sm bg-white/[0.03] border-white/[0.06] text-white"><option value="notify">In-app notify</option><option value="webhook">Webhook</option><option value="email">Email</option></select>
+        <button onClick={() => void saveRule()} className="rounded-lg px-3 py-2 text-sm bg-blue-500 text-white">Save rule</button>
       </div>
 
       <div className="mt-4 space-y-3">
         {conditions.map((condition, index) => (
           <div key={`${condition.field}-${index}`} className="grid gap-3 md:grid-cols-[180px_1fr_auto]">
-            <select value={condition.field} onChange={(event) => setConditions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, field: event.target.value as Condition['field'] } : item))} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
+            <select value={condition.field} onChange={(event) => setConditions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, field: event.target.value as Condition['field'] } : item))} className="rounded-lg border px-3 py-2 text-sm bg-white/[0.03] border-white/[0.06] text-white">
               <option value="country_code">country_code</option>
               <option value="event_type">event_type</option>
               <option value="severity_gte">severity_gte</option>
               <option value="keyword_match">keyword_match</option>
               <option value="region">region</option>
             </select>
-            <input value={condition.value} onChange={(event) => setConditions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} placeholder="Value" className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }} />
-            <button onClick={() => setConditions((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>Remove</button>
+            <input value={condition.value} onChange={(event) => setConditions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} placeholder="Value" className="rounded-lg border px-3 py-2 text-sm bg-white/[0.03] border-white/[0.06] text-white" />
+            <button onClick={() => setConditions((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="rounded-lg border px-3 py-2 text-sm border-white/[0.06] text-white">Remove</button>
           </div>
         ))}
-        <button onClick={() => setConditions((current) => [...current, { field: 'country_code', value: '' }])} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>Add condition</button>
+        <button onClick={() => setConditions((current) => [...current, { field: 'country_code', value: '' }])} className="rounded-lg border px-3 py-2 text-sm border-white/[0.06] text-white">Add condition</button>
       </div>
 
       <div className="mt-6 space-y-3">
         {rules.map((rule) => (
-          <div key={rule.id} className="rounded-lg border p-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
+          <div key={rule.id} className="rounded-lg border p-3 bg-white/[0.03] border-white/[0.06]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="font-medium" style={{ color: 'var(--text-primary)' }}>{rule.name}</div>
-                <div className="text-sm" style={{ color: 'var(--text-muted)' }}>{rule.conditions.logic} • {rule.action} • {rule.conditions.conditions.map((condition) => `${condition.field}:${condition.value}`).join(', ')}</div>
+                <div className="font-medium text-white">{rule.name}</div>
+                <div className="text-sm text-white/30">{rule.conditions.logic} • {rule.action} • {rule.conditions.conditions.map((condition) => `${condition.field}:${condition.value}`).join(', ')}</div>
               </div>
-              <button onClick={() => void removeRule(rule.id)} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>Delete</button>
+              <button onClick={() => void removeRule(rule.id)} className="rounded-lg border px-3 py-2 text-sm border-white/[0.06] text-white">Delete</button>
             </div>
           </div>
         ))}
       </div>
 
-      {message ? <div className="mt-4 text-sm" style={{ color: 'var(--text-muted)' }}>{message}</div> : null}
+      {message ? <div className="mt-4 text-sm text-white/30">{message}</div> : null}
     </div>
   )
 }

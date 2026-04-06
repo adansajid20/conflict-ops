@@ -27,11 +27,11 @@ export function DashboardStatCard({
   const data = sparkData.map((point, index) => ({ index, value: point }))
 
   return (
-    <div className="rounded-lg border p-5 interactive-card" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+    <div className="rounded-lg border border-white/[0.05] bg-white/[0.015] p-5 interactive-card">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <div className="text-[12px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>{label}</div>
-          <div className="mt-2 text-[32px] font-semibold number-shimmer" style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{displayValue}</div>
+          <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/30">{label}</div>
+          <div className="mt-2 text-[32px] font-semibold number-shimmer text-white" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{displayValue}</div>
         </div>
         <div className="rounded-lg p-2" style={{ background: `${color}22` }}><Icon size={20} style={{ color }} /></div>
       </div>
