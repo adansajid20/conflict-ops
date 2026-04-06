@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ExternalLink, Bell, Bot, Copy, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, ExternalLink, Bell, Bot, Copy, ChevronDown, ChevronUp, Clock, Tag, BarChart3 } from 'lucide-react'
 import type { EntityMention, OverviewEvent } from './types'
 import { getBestDescription, cleanDescription, getOutletDisplay, getRegionDisplay } from '@/lib/event-presentation'
 
@@ -13,20 +13,23 @@ const IconBot = Bot as React.ComponentType<{ size?: number; style?: React.CSSPro
 const IconCopy = Copy as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
 const IconChevUp = ChevronUp as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
 const IconChevDown = ChevronDown as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
+const IconClock = Clock as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
+const IconTag = Tag as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
+const IconBar = BarChart3 as React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
 
 const SEVERITY_CONFIG = {
   4: { label: 'Critical', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
   3: { label: 'High', color: '#f97316', bg: 'rgba(249,115,22,0.12)' },
-  2: { label: 'Medium', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+  2: { label: 'Medium', color: '#eab308', bg: 'rgba(234,179,8,0.12)' },
   1: { label: 'Low', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)' },
 } as const
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   confirmed: { label: 'Confirmed', color: '#10b981' },
-  developing: { label: 'Developing', color: '#f59e0b' },
+  developing: { label: 'Developing', color: '#94a3b8' },
   disputed: { label: 'Disputed', color: '#8b5cf6' },
   corrected: { label: 'Corrected', color: '#6b7280' },
-  pending: { label: 'Developing', color: '#f59e0b' },
+  pending: { label: 'Developing', color: '#94a3b8' },
 }
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
@@ -37,6 +40,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   civil_unrest: 'Civil Unrest',
   protest: 'Protest',
   political_crisis: 'Political Crisis',
+  political: 'Political',
   sanctions: 'Sanctions',
   ceasefire: 'Ceasefire',
   diplomacy: 'Diplomacy',
@@ -170,11 +174,11 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
 
   const sevKey = (event.severity ?? 1) as 1 | 2 | 3 | 4
   const sev = SEVERITY_CONFIG[sevKey] ?? SEVERITY_CONFIG[1]
-  const rawStatus = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG.pending ?? { label: 'Developing', color: '#f59e0b' }
+  const rawStatus = STATUS_CONFIG[event.status ?? 'pending'] ?? STATUS_CONFIG.pending ?? { label: 'Developing', color: '#94a3b8' }
   const statusPill = isBreakingEvent(event)
     ? { label: 'BREAKING', color: '#ef4444', background: 'rgba(239,68,68,0.14)', pulse: true }
     : isDevelopingEvent(event)
-      ? { label: 'DEVELOPING', color: '#cbd5e1', background: 'rgba(148,163,184,0.14)', pulse: false }
+      ? { label: 'DEVELOPING', color: '#94a3b8', background: 'rgba(148,163,184,0.10)', pulse: false }
       : { label: rawStatus.label.toUpperCase(), color: rawStatus.color, background: 'rgba(255,255,255,0.06)', pulse: false }
 
   const severityVisible = (event.severity ?? 1) > 1
@@ -189,7 +193,7 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
   const summaryShort = (event.summary_short ?? '').trim()
   const significanceScore = typeof event.significance_score === 'number' ? event.significance_score : null
   const significanceBarColor = significanceScore !== null ? getSeverityBarColor(significanceScore) : '#6b7280'
-  const detailAccent = severityVisible ? sev.color : '#6b7280'
+  const eventTypeLabel = EVENT_TYPE_LABELS[event.event_type ?? ''] ?? event.event_type ?? 'General'
 
   function handleCopyLink() {
     copyToClipboard(`https://conflictradar.co/feed?event=${eventId}`)
@@ -210,7 +214,7 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
         className="fixed inset-0 z-40"
-        style={{ background: 'rgba(0,0,0,0.5)' }}
+        style={{ background: 'rgba(0,0,0,0.6)' }}
         onClick={onClose}
       />
 
@@ -220,139 +224,165 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="fixed right-0 top-0 z-50 flex flex-col overflow-y-auto"
+        className="fixed right-0 top-0 z-50 flex h-full flex-col overflow-y-auto"
         style={{
-          width: 'min(440px, 100vw)',
-          height: 'auto',
-          maxHeight: '90vh',
-          background: 'rgb(11, 16, 32)',
-          borderLeft: '1px solid rgba(255,255,255,0.05)',
-          marginTop: '5vh',
-          marginBottom: '5vh',
+          width: 'min(460px, 100vw)',
+          background: '#0B1020',
+          borderLeft: '1px solid rgba(255,255,255,0.06)',
         }}
       >
-        <div
-          className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.05] px-5 py-4"
-          style={{ background: 'rgb(11, 16, 32)' }}
-        >
+        {/* Header bar */}
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] px-5 py-3" style={{ background: '#0B1020' }}>
           <div className="flex items-center gap-2">
             {severityVisible && (
               <span
-                className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-                style={{ background: sev.color, color: '#fff' }}
+                className="rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
+                style={{ background: sev.bg, color: sev.color, border: `1px solid ${sev.color}30` }}
               >
                 {sev.label}
               </span>
             )}
             <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-              style={{ background: statusPill.background, color: statusPill.color }}
+              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+              style={{ background: statusPill.background, color: statusPill.color, border: `1px solid ${statusPill.color}20` }}
             >
               {statusPill.pulse && <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: '#ef4444' }} />}
               {statusPill.label}
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             {linkUrl && (
               <a
                 href={linkUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-lg p-2 text-white/50 transition-colors hover:bg-white/10"
+                className="rounded-lg p-2 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/60"
                 aria-label="Open source"
               >
-                <IconExternalLink size={16} />
+                <IconExternalLink size={15} />
               </a>
             )}
             <button
               onClick={onClose}
-              className="rounded-lg p-2 text-white/50 transition-colors hover:bg-white/10"
+              className="rounded-lg p-2 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/60"
               aria-label="Close"
             >
-              <IconX size={16} />
+              <IconX size={15} />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 space-y-6 px-5 py-5">
+        {/* Content */}
+        <div className="flex-1 space-y-5 px-5 py-5">
+          {/* Title + source line */}
           <div>
-            <h2 className="text-2xl font-bold leading-tight text-white">
+            <h2 className="text-xl font-bold leading-snug text-white">
               {event.title ?? 'Untitled Event'}
             </h2>
-            <div className="mt-3 text-sm text-white/80">
-              {[outlet, region, timeAgo].filter(Boolean).join(' · ')}
+            <div className="mt-2 flex items-center gap-1.5 text-[13px] text-white/40">
+              {linkUrl ? (
+                <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400/70 hover:text-blue-400 transition-colors">{outlet}</a>
+              ) : (
+                <span>{outlet}</span>
+              )}
+              <span className="text-white/15">·</span>
+              <span>{region}</span>
+              <span className="text-white/15">·</span>
+              <span>{timeAgo}</span>
             </div>
           </div>
 
-          <section
-            className="rounded-xl p-4"
-            style={{
-              border: `1px solid ${summaryShort ? detailAccent : 'rgba(255,255,255,0.05)'}`,
-              background: 'rgba(255,255,255,0.03)',
-              borderLeft: summaryShort ? `4px solid ${detailAccent}` : undefined,
-            }}
-          >
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: summaryShort ? detailAccent : 'rgba(255,255,255,0.5)' }}>
-              {summaryShort ? 'Intelligence Brief' : 'Details'}
-            </div>
-
+          {/* Description — flat, no nested box */}
+          <div>
             {summaryShort ? (
               <>
-                <p className="text-sm leading-7 text-white">
+                <p className="text-[14px] leading-7 text-white/80">
                   {summaryShort}
                 </p>
-                <button
-                  onClick={() => setDetailsOpen((current) => !current)}
-                  className="mt-4 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/50"
-                >
-                  Full Details {detailsOpen ? <IconChevUp size={12} /> : <IconChevDown size={12} />}
-                </button>
-                {detailsOpen && (
-                  <p className="mt-3 text-sm leading-7 text-white/80">
-                    {description || 'No additional details available.'}
-                  </p>
+                {description && description !== summaryShort && (
+                  <>
+                    <button
+                      onClick={() => setDetailsOpen((c) => !c)}
+                      className="mt-3 flex items-center gap-1.5 text-[12px] font-medium text-white/30 transition-colors hover:text-white/50"
+                    >
+                      {detailsOpen ? 'Hide details' : 'Show full details'}
+                      {detailsOpen ? <IconChevUp size={12} /> : <IconChevDown size={12} />}
+                    </button>
+                    {detailsOpen && (
+                      <motion.p
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="mt-3 text-[13px] leading-7 text-white/50"
+                      >
+                        {description}
+                      </motion.p>
+                    )}
+                  </>
                 )}
               </>
             ) : (
-              <p className="text-sm leading-7 text-white/80">
-                {description || 'No additional details available.'}
+              <p className="text-[14px] leading-7 text-white/70">
+                {description || 'No details available for this event.'}
               </p>
             )}
-          </section>
+          </div>
 
-          <section className={`grid gap-3 ${significanceScore && significanceScore > 0 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
-            <div className="rounded-xl border border-white/[0.05] bg-white/[0.025] p-3">
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/50">Published</div>
-              <div className="text-sm leading-6 text-white">{formatPublishedUtc(event.occurred_at)}</div>
+          {/* Metadata row — flat inline instead of separate boxes */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3">
+            <div className="flex items-center gap-2">
+              <IconClock size={13} className="text-white/20" />
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-widest text-white/25">Published</div>
+                <div className="text-[12px] text-white/70">{formatPublishedUtc(event.occurred_at)}</div>
+              </div>
             </div>
-            <div className="rounded-xl border border-white/[0.05] bg-white/[0.025] p-3">
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/50">Event Type</div>
-              <div className="text-sm leading-6 text-white">{EVENT_TYPE_LABELS[event.event_type ?? ''] ?? event.event_type ?? 'General'}</div>
+            <div className="h-6 w-px bg-white/[0.06]" />
+            <div className="flex items-center gap-2">
+              <IconTag size={13} className="text-white/20" />
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-widest text-white/25">Type</div>
+                <div className="text-[12px] text-white/70">{eventTypeLabel}</div>
+              </div>
             </div>
             {significanceScore !== null && significanceScore > 0 && (
-              <div className="rounded-xl border border-white/[0.05] bg-white/[0.025] p-3">
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/50">Significance</div>
-                <div className="text-sm font-semibold text-white">{significanceScore} / 100</div>
-                <div className="mt-2 h-1.5 w-full rounded-full bg-white/[0.08]">
-                  <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(significanceScore, 100))}%`, background: significanceBarColor }} />
+              <>
+                <div className="h-6 w-px bg-white/[0.06]" />
+                <div className="flex items-center gap-2">
+                  <IconBar size={13} className="text-white/20" />
+                  <div>
+                    <div className="text-[10px] font-medium uppercase tracking-widest text-white/25">Significance</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[12px] font-semibold" style={{ color: significanceBarColor }}>{significanceScore}</span>
+                      <div className="h-1.5 w-16 rounded-full bg-white/[0.06]">
+                        <motion.div
+                          className="h-full rounded-full"
+                          style={{ background: significanceBarColor }}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.max(0, Math.min(significanceScore, 100))}%` }}
+                          transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
-          </section>
+          </div>
 
+          {/* Key Actors */}
           {actors.length > 0 && (
             <section>
-              <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/50">Key Actors</div>
+              <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/30">Key Actors</div>
               <div className="flex flex-wrap gap-2">
                 {actors.map((actor, index) => (
                   <span
                     key={`${actor.name}-${index}`}
-                    className="rounded-full px-3 py-1.5 text-xs font-medium"
+                    className="rounded-md px-2.5 py-1 text-[11px] font-medium"
                     style={{
-                      background: `${getActorColor(actor.type)}22`,
+                      background: `${getActorColor(actor.type)}15`,
                       color: getActorColor(actor.type),
-                      border: `1px solid ${getActorColor(actor.type)}33`,
+                      border: `1px solid ${getActorColor(actor.type)}25`,
                     }}
                   >
                     {actor.name}
@@ -362,32 +392,30 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
             </section>
           )}
 
+          {/* Related Events */}
           {related.length > 0 && (
             <section>
-              <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/50">Related Events</div>
-              <div className="space-y-2">
+              <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/30">Related Events</div>
+              <div className="space-y-1.5">
                 {related.map((relatedEvent) => {
                   const dotColor = relatedEvent.severity && relatedEvent.severity >= 4
                     ? '#ef4444'
                     : relatedEvent.severity === 3
                       ? '#f97316'
                       : relatedEvent.severity === 2
-                        ? '#f59e0b'
+                        ? '#eab308'
                         : '#6b7280'
 
                   return (
                     <button
                       key={relatedEvent.id}
                       onClick={() => onSelect?.({ ...event, ...relatedEvent })}
-                      className="w-full rounded-xl border border-white/[0.05] bg-white/[0.025] px-3 py-3 text-left transition-colors hover:bg-white/5"
+                      className="w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04]"
                     >
-                      <div className="flex items-center gap-2 text-sm text-white">
-                        <span className="h-2 w-2 rounded-full" style={{ background: dotColor }} />
-                        <span>{truncate(relatedEvent.title ?? 'Untitled event')}</span>
-                        <span className="text-white/50">· {formatRelativeOccurredTime(relatedEvent.occurred_at)}</span>
-                      </div>
-                      <div className="mt-1 pl-4 text-xs text-white/50">
-                        {getRegionDisplay(relatedEvent.region) ?? 'Global'}
+                      <div className="flex items-center gap-2 text-[13px]">
+                        <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: dotColor }} />
+                        <span className="text-white/70">{truncate(relatedEvent.title ?? 'Untitled event')}</span>
+                        <span className="ml-auto text-[11px] text-white/25">{formatRelativeOccurredTime(relatedEvent.occurred_at)}</span>
                       </div>
                     </button>
                   )
@@ -397,44 +425,40 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
           )}
         </div>
 
+        {/* Footer actions */}
         <div
-          className="sticky bottom-0 grid grid-cols-3 gap-2 border-t border-white/[0.05] px-5 py-4"
-          style={{
-            background: 'rgba(10,10,10,0.78)',
-            backdropFilter: 'blur(8px)',
-          }}
+          className="sticky bottom-0 flex gap-2 border-t border-white/[0.06] px-5 py-3"
+          style={{ background: 'rgba(11,16,32,0.9)', backdropFilter: 'blur(12px)' }}
         >
           <button
             onClick={handleCopyLink}
-            className="flex items-center justify-center gap-2 rounded-lg border border-white/[0.05] px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/5"
-            style={{ color: copied ? '#10b981' : undefined }}
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/[0.06] py-2.5 text-[12px] font-medium text-white/50 transition-all hover:bg-white/[0.04] hover:text-white/70"
           >
-            <IconCopy size={14} />
+            <IconCopy size={13} />
             {copied ? 'Copied!' : 'Copy Link'}
           </button>
 
           {hasOrg ? (
             <a
               href="/alerts"
-              className="flex items-center justify-center gap-2 rounded-lg border border-white/[0.05] px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/5"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/[0.06] py-2.5 text-[12px] font-medium text-white/50 transition-all hover:bg-white/[0.04] hover:text-white/70"
             >
-              <IconBell size={14} /> Create Alert
+              <IconBell size={13} /> Create Alert
             </a>
           ) : (
             <button
-              title="Workspace required — create a workspace to set alerts"
-              className="flex items-center justify-center gap-2 rounded-lg border border-white/[0.05] px-3 py-2.5 text-sm font-medium text-white/50 opacity-60"
-              style={{ cursor: 'default' }}
+              title="Workspace required"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/[0.06] py-2.5 text-[12px] font-medium text-white/20 cursor-not-allowed"
             >
-              <IconBell size={14} /> Create Alert
+              <IconBell size={13} /> Create Alert
             </button>
           )}
 
           <button
             onClick={handleCopilotOpen}
-            className="flex items-center justify-center gap-2 rounded-lg border border-white/[0.05] px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/5"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-500/10 border border-blue-500/20 py-2.5 text-[12px] font-medium text-blue-400 transition-all hover:bg-blue-500/15"
           >
-            <IconBot size={14} /> Intel Co-pilot
+            <IconBot size={13} /> Intel Co-pilot
           </button>
         </div>
       </motion.div>
