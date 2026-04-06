@@ -9,5 +9,8 @@ node_modules/
 .next/
 *.log
 
+# Vercel CLI output (breaks Git-based deployments)
+.vercel/
+
 # Cesium static assets (generated at build time from node_modules)
 apps/web/public/cesium
