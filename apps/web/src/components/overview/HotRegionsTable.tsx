@@ -97,7 +97,7 @@ export function HotRegionsTable({ regions }: { regions: HotRegion[] }) {
         </table>
       </div>
       <div className="px-1 text-right">
-        <Link href="/feed" className="text-[12px] text-white/30 hover:text-white/50 transition-colors duration-150">
+        <Link href="/analysis/countries" className="text-[12px] text-white/30 hover:text-white/50 transition-colors duration-150">
           View all regions →
         </Link>
       </div>
