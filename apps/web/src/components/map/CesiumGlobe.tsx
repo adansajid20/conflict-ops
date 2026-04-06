@@ -36,13 +36,13 @@ interface EventData {
 
 // ─── Severity config ──────────────────────────────────────────────────────────
 const SEV_COLORS: Record<string, string> = {
-  critical: '#ff1744', high: '#ff6d00', medium: '#ffab00', low: '#448aff',
+  critical: '#ff1744', high: '#ff6d00', medium: '#ffc400', low: '#448aff',
 };
 const SEV_GLOW: Record<string, string> = {
-  critical: 'rgba(255,23,68,0.5)', high: 'rgba(255,109,0,0.35)', medium: 'rgba(255,171,0,0.25)', low: 'rgba(68,138,255,0.2)',
+  critical: 'rgba(255,23,68,0.45)', high: 'rgba(255,109,0,0.3)', medium: 'rgba(255,196,0,0.2)', low: 'rgba(68,138,255,0.15)',
 };
 const SEV_SIZE: Record<string, number> = {
-  critical: 14, high: 11, medium: 9, low: 7,
+  critical: 16, high: 12, medium: 9, low: 7,
 };
 const SEV_OUTLINE: Record<string, number> = {
   critical: 3, high: 2, medium: 1.5, low: 1,
@@ -221,14 +221,25 @@ export default function CesiumGlobe() {
 
         const evtId = String(p.id ?? Math.random().toString(36).slice(2));
 
-        // Outer glow ring for critical & high severity
-        if (sevStr === 'critical' || sevStr === 'high') {
+        // Outer glow ring — all events get subtle glow, critical gets double ring
+        v.entities.add({
+          id: `evt-glow-${evtId}`,
+          position: Ce.Cartesian3.fromDegrees(lon, lat, 0),
+          point: {
+            pixelSize: size * 2.8,
+            color: glowColor,
+            outlineWidth: 0,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          },
+        } as never);
+        // Critical: extra outer pulse ring
+        if (sevStr === 'critical') {
           v.entities.add({
-            id: `evt-glow-${evtId}`,
+            id: `evt-pulse-${evtId}`,
             position: Ce.Cartesian3.fromDegrees(lon, lat, 0),
             point: {
-              pixelSize: size * 2.5,
-              color: glowColor,
+              pixelSize: size * 4.5,
+              color: Ce.Color.fromCssColorString('rgba(255,23,68,0.12)'),
               outlineWidth: 0,
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
             },
@@ -280,8 +291,10 @@ export default function CesiumGlobe() {
     const Ce = getCe(); const v = getViewer();
     if (!Ce || !v) return;
     try {
-      const res = await fetch('/api/flights');
-      const d = await res.json() as { flights: Flight[] };
+      const res = await fetch('/api/flights', { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) { console.warn('[CESIUM] flights API returned', res.status); return; }
+      const d = await res.json() as { flights: Flight[]; error?: string };
+      if (d.error) { console.warn('[CESIUM] flights:', d.error); return; }
       const airborne = (d.flights ?? []).filter(f => !f.onGround);
       setFlightCount(airborne.length);
 
@@ -464,72 +477,53 @@ export default function CesiumGlobe() {
         creditContainer: document.createElement('div'),
       }) as unknown as CesiumViewer;
 
-      // ── IMAGERY: Esri satellite base + Esri labels overlay ───────
-      // Reliable, no API key, always has city/country names
+      // ── IMAGERY: CartoDB Dark Matter — sharp vector-style dark tiles ──
+      // Clean, crisp borders + city names + dark aesthetic. No API key.
       try {
-        const esriSat = new (Ce as unknown as {
-          UrlTemplateImageryProvider: new (o: unknown) => unknown
-        }).UrlTemplateImageryProvider({
-          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-          credit: 'Esri',
-          maximumLevel: 19,
-        });
         viewer.imageryLayers.removeAll();
-        viewer.imageryLayers.addImageryProvider(esriSat);
-
-        // Labels overlay on top (cities, countries, borders)
-        const esriLabels = new (Ce as unknown as {
+        const cartoDark = new (Ce as unknown as {
           UrlTemplateImageryProvider: new (o: unknown) => unknown
         }).UrlTemplateImageryProvider({
-          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-          credit: 'Esri',
-          maximumLevel: 19,
+          url: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+          credit: 'CartoDB',
+          maximumLevel: 18,
+          minimumLevel: 0,
         });
-        viewer.imageryLayers.addImageryProvider(esriLabels);
+        viewer.imageryLayers.addImageryProvider(cartoDark);
       } catch { /* keep default */ }
 
-      // Terrain
-      void Ce.createWorldTerrainAsync().then((t: unknown) => { viewer.terrainProvider = t; }).catch(() => null);
+      // No terrain — flat is cleaner with vector tiles
 
       // ═══════════════════════════════════════
       // DARK INTELLIGENCE GLOBE THEME
       // ═══════════════════════════════════════
 
-      // ── 1. Darken the satellite imagery — visible but subdued ──
+      // ── 1. Tile layer tweaks — boost contrast on already-dark tiles ──
       const baseLayer = viewer.imageryLayers.get(0);
       if (baseLayer) {
-        baseLayer.brightness = 0.45;   // dark but terrain still visible on night side
-        baseLayer.contrast = 1.3;      // definition without blowout
-        baseLayer.saturation = 0.15;   // near-grayscale intel aesthetic
-        baseLayer.gamma = 0.9;         // lift shadows slightly so night side isn't pure black
-      }
-      // Labels overlay — crisp white text on dark globe
-      const labelLayer = viewer.imageryLayers.get(1);
-      if (labelLayer) {
-        labelLayer.brightness = 1.4;   // bright readable labels
-        labelLayer.contrast = 1.5;     // sharp against dark terrain
-        labelLayer.saturation = 0.0;   // pure white labels, no color tint
+        baseLayer.brightness = 1.05;   // tiles are already dark, tiny lift
+        baseLayer.contrast = 1.15;     // sharpen borders and text
+        baseLayer.saturation = 0.3;    // slight desaturation for intel feel
+        baseLayer.gamma = 1.0;
       }
 
-      // ── 2. Disable day/night lighting so the whole globe is always visible ──
-      // The dark base imagery already gives the intel look without needing a
-      // day/night terminator that makes half the globe invisible
+      // ── 2. No day/night — always fully visible ──
       viewer.scene.globe.enableLighting = false;
 
-      // ── 3. Atmosphere — subtle blue glow on the limb ──
+      // ── 3. Atmosphere — cool blue limb glow ──
       if (viewer.scene.skyAtmosphere) {
-        viewer.scene.skyAtmosphere.brightnessShift = -0.25;
-        viewer.scene.skyAtmosphere.saturationShift = -0.1;
-        viewer.scene.skyAtmosphere.hueShift = -0.02;  // slight cool blue shift
+        viewer.scene.skyAtmosphere.brightnessShift = -0.3;
+        viewer.scene.skyAtmosphere.saturationShift = 0.1;
+        viewer.scene.skyAtmosphere.hueShift = -0.03;
       }
       viewer.scene.globe.atmosphereBrightnessShift = -0.15;
-      viewer.scene.globe.atmosphereSaturationShift = -0.1;
+      viewer.scene.globe.atmosphereSaturationShift = 0.0;
 
-      // ── 4. Stars + deep space background ──
+      // ── 4. Stars + deep space ──
       if (viewer.scene.skyBox) viewer.scene.skyBox.show = true;
-      viewer.scene.backgroundColor = Ce.Color.fromCssColorString('#020408');
+      viewer.scene.backgroundColor = Ce.Color.fromCssColorString('#05080f');
 
-      // ── 5. Subtle atmosphere glow on globe edge ──
+      // ── 5. Atmosphere glow on globe edge ──
       viewer.scene.globe.showGroundAtmosphere = true;
 
       // ── 5. Hide Cesium default bottom bar ──
@@ -727,7 +721,7 @@ export default function CesiumGlobe() {
           <div className="flex flex-col gap-1.5">
             {[
               { c: '#ff1744', l: 'Critical', sz: 12 }, { c: '#ff6d00', l: 'High', sz: 9 },
-              { c: '#ffab00', l: 'Medium', sz: 7 }, { c: '#448aff', l: 'Low', sz: 6 },
+              { c: '#ffc400', l: 'Medium', sz: 7 }, { c: '#448aff', l: 'Low', sz: 6 },
             ].map(i => (
               <div key={i.l} className="flex items-center gap-2">
                 <div className="rounded-full flex-shrink-0"
