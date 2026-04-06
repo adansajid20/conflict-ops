@@ -163,9 +163,17 @@ export async function GET(request: NextRequest) {
   const country = searchParams.get('country')
   if (country) params.set('country', country)
 
-  // Region filter — ACLED uses numeric region codes
-  const region = searchParams.get('region')
-  if (region) params.set('region', region)
+  // Region filter — applied server-side after fetch (ACLED's region param is unreliable)
+  const ACLED_REGIONS: Record<string, string> = {
+    '1': 'Western Africa', '2': 'Middle Africa', '3': 'Eastern Africa',
+    '4': 'Southern Africa', '5': 'Northern Africa', '7': 'South Asia',
+    '9': 'Southeast Asia', '10': 'Middle East', '11': 'Europe',
+    '12': 'Caucasus and Central Asia', '13': 'Central America',
+    '14': 'South America', '15': 'Caribbean', '16': 'East Asia',
+    '17': 'North America', '18': 'Oceania',
+  }
+  const regionFilter = searchParams.get('region')
+  const regionName = regionFilter ? (ACLED_REGIONS[regionFilter] ?? regionFilter) : null
 
   // Event type filter
   const eventType = searchParams.get('event_type')
@@ -195,9 +203,10 @@ export async function GET(request: NextRequest) {
     params.set('civilian_targeting', 'Civilian targeting')
   }
 
-  // Limit — cap at 5000 to avoid huge payloads
-  const limit = Math.min(Number(searchParams.get('limit') ?? 2000), 5000)
-  params.set('limit', String(limit))
+  // Limit — fetch more if we'll filter server-side by region
+  const requestedLimit = Math.min(Number(searchParams.get('limit') ?? 2000), 5000)
+  const fetchLimit = regionName ? Math.min(requestedLimit * 4, 10000) : requestedLimit
+  params.set('limit', String(fetchLimit))
 
   // ACLED expects %20 for spaces, not + (URLSearchParams uses +)
   const apiUrl = `https://acleddata.com/api/acled/read?${params.toString().replace(/\+/g, '%20')}`
@@ -251,9 +260,15 @@ export async function GET(request: NextRequest) {
 
     const rawEvents = data.data ?? []
 
+    // Filter by region server-side (ACLED's API region param is unreliable)
+    const regionFiltered = regionName
+      ? rawEvents.filter(e => e.region === regionName)
+      : rawEvents
+
     // Transform to GeoJSON-like format for the globe
-    const events = rawEvents
+    const events = regionFiltered
       .filter(e => e.latitude && e.longitude && e.latitude !== '0' && e.longitude !== '0')
+      .slice(0, requestedLimit)
       .map(e => ({
         id: e.event_id_cnty,
         date: e.event_date,
