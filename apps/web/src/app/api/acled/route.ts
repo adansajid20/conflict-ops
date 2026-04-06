@@ -192,7 +192,29 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const data = await res.json() as { data?: AcledEvent[]; count?: number; status?: number }
+    const raw = await res.text()
+    let data: { data?: AcledEvent[]; count?: number; status?: number; error?: boolean; message?: string }
+    try {
+      data = JSON.parse(raw)
+    } catch {
+      console.error('[ACLED] Non-JSON response:', raw.slice(0, 500))
+      return NextResponse.json(
+        { events: [], count: 0, error: 'ACLED returned non-JSON response', debug: raw.slice(0, 200) },
+        { status: 502 },
+      )
+    }
+
+    // Log what ACLED returns so we can debug access issues
+    console.log(`[ACLED] Response keys: ${Object.keys(data).join(', ')}, data count: ${data.data?.length ?? 'undefined'}, status: ${data.status ?? 'none'}`)
+
+    if (data.error || data.message) {
+      console.error(`[ACLED] API error: ${data.message ?? JSON.stringify(data)}`)
+      return NextResponse.json(
+        { events: [], count: 0, error: `ACLED: ${data.message ?? 'Unknown error'}` },
+        { status: 502 },
+      )
+    }
+
     const rawEvents = data.data ?? []
 
     // Transform to GeoJSON-like format for the globe
@@ -219,9 +241,18 @@ export async function GET(request: NextRequest) {
         interaction: e.interaction,
       }))
 
+    // In debug mode, include the ACLED API URL and raw count
+    const debug = searchParams.get('debug') === 'true'
+    const payload: Record<string, unknown> = { count: events.length, events }
+    if (debug) {
+      payload.acledUrl = apiUrl
+      payload.rawCount = rawEvents.length
+      payload.tokenOk = !!token
+    }
+
     return NextResponse.json(
-      { count: events.length, events },
-      { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' } },
+      payload,
+      { headers: { 'Cache-Control': debug ? 'no-store' : 'public, s-maxage=300, stale-while-revalidate=600' } },
     )
   } catch (err) {
     console.error('[ACLED] fetch error:', err)
