@@ -220,19 +220,21 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
 
       <motion.div
         key="panel"
-        initial={{ x: '100%' }}
-        animate={{ x: 0 }}
-        exit={{ x: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="fixed right-0 top-0 z-50 flex h-full flex-col overflow-y-auto"
+        initial={{ opacity: 0, x: 40, scale: 0.97 }}
+        animate={{ opacity: 1, x: 0, scale: 1 }}
+        exit={{ opacity: 0, x: 40, scale: 0.97 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+        className="fixed right-4 top-4 z-50 flex flex-col overflow-y-auto rounded-2xl"
         style={{
-          width: 'min(460px, 100vw)',
-          background: '#0B1020',
-          borderLeft: '1px solid rgba(255,255,255,0.06)',
+          width: 'min(440px, calc(100vw - 32px))',
+          maxHeight: 'calc(100vh - 32px)',
+          background: '#0C1222',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 25px 60px rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.4)',
         }}
       >
         {/* Header bar */}
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] px-5 py-3" style={{ background: '#0B1020' }}>
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3" style={{ background: 'rgba(12,18,34,0.95)', borderRadius: '16px 16px 0 0' }}>
           <div className="flex items-center gap-2">
             {severityVisible && (
               <span
@@ -427,8 +429,8 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
 
         {/* Footer actions */}
         <div
-          className="sticky bottom-0 flex gap-2 border-t border-white/[0.06] px-5 py-3"
-          style={{ background: 'rgba(11,16,32,0.9)', backdropFilter: 'blur(12px)' }}
+          className="flex gap-2 border-t border-white/[0.06] px-5 py-3"
+          style={{ background: 'rgba(12,18,34,0.95)', borderRadius: '0 0 16px 16px' }}
         >
           <button
             onClick={handleCopyLink}
