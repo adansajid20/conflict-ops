@@ -44,6 +44,11 @@ export async function POST(req: Request): Promise<NextResponse<ApiResponse<Copil
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
+  // Rate limit: 20 requests per minute per user
+  const { checkRateLimit, AI_RATE_LIMIT } = await import('@/lib/rate-limit')
+  const rl = await checkRateLimit(userId, AI_RATE_LIMIT.prefix, AI_RATE_LIMIT.maxRequests, AI_RATE_LIMIT.windowSeconds)
+  if (!rl.allowed) return NextResponse.json({ success: false, error: 'Rate limit exceeded. Please wait a moment.' }, { status: 429 })
+
   const anthropicKey = process.env.ANTHROPIC_API_KEY
   if (!anthropicKey) {
     return NextResponse.json({ success: true, data: { response: 'AI Co-pilot unavailable — no API key configured.', grounded: false, unavailable: true } })

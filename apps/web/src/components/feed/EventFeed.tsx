@@ -84,7 +84,9 @@ function getSeverityFilterValue(filter: SeverityFilter) {
 
 function matchesSeverity(event: FeedEvent, filter: SeverityFilter) {
   if (filter === 'all') return true
-  return (event.severity ?? 1) === getSeverityFilterValue(filter)
+  const threshold = getSeverityFilterValue(filter)
+  // Show events at or above the selected severity level
+  return (event.severity ?? 1) >= threshold
 }
 
 function matchesCategory(event: FeedEvent, category: CategoryFilter) {

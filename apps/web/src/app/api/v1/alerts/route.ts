@@ -2,13 +2,20 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const supabase = createServiceClient()
   const url = new URL(req.url)
-  const userId = url.searchParams.get('user_id')
-  if (!userId) return NextResponse.json({ error: 'user_id required' }, { status: 400 })
+  // Allow passing user_id for backwards compat, but always verify it matches the authenticated user
+  const requestedUserId = url.searchParams.get('user_id') ?? userId
+  if (requestedUserId !== userId) {
+    return NextResponse.json({ error: 'Forbidden: cannot access other users alerts' }, { status: 403 })
+  }
 
   const { data, error } = await supabase
     .from('user_alerts')
@@ -20,16 +27,19 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const supabase = createServiceClient()
   try {
-    const body = await req.json() as { user_id?: string; name?: string; alert_type?: string; config?: Record<string,unknown>; channels?: string[]; cooldown_minutes?: number }
-    const { user_id, name, alert_type, config, channels, cooldown_minutes } = body
-    if (!user_id || !name || !alert_type || !config) {
-      return NextResponse.json({ error: 'user_id, name, alert_type, config required' }, { status: 400 })
+    const body = await req.json() as { name?: string; alert_type?: string; config?: Record<string,unknown>; channels?: string[]; cooldown_minutes?: number }
+    const { name, alert_type, config, channels, cooldown_minutes } = body
+    if (!name || !alert_type || !config) {
+      return NextResponse.json({ error: 'name, alert_type, config required' }, { status: 400 })
     }
 
     const { data, error } = await supabase.from('user_alerts').insert({
-      user_id, name, alert_type, config,
+      user_id: userId, name, alert_type, config,
       channels: channels ?? ['in_app'],
       cooldown_minutes: cooldown_minutes ?? 30,
       active: true,
@@ -43,10 +53,14 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const supabase = createServiceClient()
   const id = new URL(req.url).searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-  const { error } = await supabase.from('user_alerts').delete().eq('id', id)
+  // Ensure user can only delete their own alerts
+  const { error } = await supabase.from('user_alerts').delete().eq('id', id).eq('user_id', userId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ deleted: true })
 }

@@ -57,7 +57,7 @@ export function OnboardingWizard() {
       // Persist onboarding data
       setLoading(true)
       try {
-        await fetch('/api/v1/onboarding', {
+        const res = await fetch('/api/v1/onboarding', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -70,6 +70,11 @@ export function OnboardingWizard() {
             pir_keyword: pirKeyword || null,
           }),
         })
+        if (!res.ok) {
+          console.error('Onboarding save failed:', res.status)
+        }
+      } catch (e) {
+        console.error('Onboarding save error:', e)
       } finally {
         setLoading(false)
       }

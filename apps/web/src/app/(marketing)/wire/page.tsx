@@ -23,11 +23,20 @@ async function getPublicEvents() {
   }
 }
 
-const SEVERITY_COLORS: Record<number, string> = {
-  5: '#FF4444', 4: '#FF8800', 3: '#FFCC00', 2: '#00AAFF', 1: '#888888',
+const SEVERITY_COLORS: Record<number, { bg: string; text: string }> = {
+  5: { bg: 'bg-red-500/10', text: 'text-red-400' },
+  4: { bg: 'bg-orange-500/10', text: 'text-orange-400' },
+  3: { bg: 'bg-yellow-500/10', text: 'text-yellow-400' },
+  2: { bg: 'bg-blue-500/10', text: 'text-blue-400' },
+  1: { bg: 'bg-gray-500/10', text: 'text-gray-400' },
 }
+
 const SEVERITY_LABELS: Record<number, string> = {
-  5: 'CRITICAL', 4: 'HIGH', 3: 'MEDIUM', 2: 'LOW', 1: 'INFO',
+  5: 'CRITICAL',
+  4: 'HIGH',
+  3: 'MEDIUM',
+  2: 'LOW',
+  1: 'INFO',
 }
 
 function timeAgo(iso: string) {
@@ -43,90 +52,130 @@ export default async function WirePage() {
   const events = await getPublicEvents()
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
-      {/* Header */}
-      <div className="border-b sticky top-0 z-10" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <span className="font-bold tracking-widest mono" style={{ color: 'var(--primary)' }}>CONFLICTRADAR</span>
-            <span className="mx-2 text-xs" style={{ color: 'var(--border)' }}>|</span>
-            <span className="text-sm mono" style={{ color: 'var(--text-muted)' }}>LIVE WIRE</span>
+    <div className="min-h-screen" style={{ background: '#070B11' }}>
+      {/* Header Navigation */}
+      <div className="border-b sticky top-0 z-10" style={{ borderColor: 'rgba(255, 255, 255, 0.06)', background: 'rgba(7, 11, 17, 0.95)', backdropFilter: 'blur(12px)' }}>
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="text-lg font-bold tracking-tight text-white">CONFLICTRADAR</div>
+            <div className="w-px h-5" style={{ background: 'rgba(255, 255, 255, 0.06)' }} />
+            <div className="text-sm font-medium text-white/50">Live Wire</div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-xs mono" style={{ color: 'var(--alert-green)' }}>
-              <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: 'var(--alert-green)' }} />
-              LIVE
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="relative flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-xs font-semibold text-white/60 tracking-wide">LIVE</span>
+              </div>
             </div>
-            <a href="/sign-up" className="px-4 py-1.5 rounded text-xs font-bold mono tracking-widest"
-              style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
-              ACCESS FULL INTEL →
+            <a
+              href="/sign-up"
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white/90 transition-all duration-200"
+              style={{
+                background: 'rgba(96, 165, 250, 0.1)',
+                border: '1px solid rgba(96, 165, 250, 0.2)',
+              }}
+            >
+              Sign Up
             </a>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        {/* Banner */}
-        <div className="mb-6 p-4 rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-          <p className="text-sm mono" style={{ color: 'var(--text-muted)' }}>
-            Public preview — last 50 events. <a href="/sign-up" style={{ color: 'var(--primary)' }}>Sign up free</a> for full access: forecasts, alerts, vessel tracking, AI analysis, and more.
+      {/* Main Content */}
+      <div className="max-w-6xl mx-auto px-6 py-12">
+        {/* Page Header */}
+        <div className="mb-12">
+          <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">Global Events Feed</h1>
+          <p className="text-white/50 text-lg">Real-time monitoring of international conflict and geopolitical developments</p>
+        </div>
+
+        {/* Info Banner */}
+        <div className="mb-8 p-6 rounded-2xl border" style={{ borderColor: 'rgba(255, 255, 255, 0.06)', background: 'rgba(255, 255, 255, 0.02)' }}>
+          <p className="text-sm text-white/60 leading-relaxed">
+            Public preview showing the last 50 events.{' '}
+            <a href="/sign-up" className="text-blue-400 font-medium hover:text-blue-300 transition-colors">
+              Sign up free
+            </a>{' '}
+            for full access: forecasts, alerts, vessel tracking, AI analysis, and more.
           </p>
         </div>
 
+        {/* Events List or Empty State */}
         {events.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-4xl mb-4">📡</div>
-            <p className="mono text-sm" style={{ color: 'var(--text-muted)' }}>
-              Intel feed initializing — first ingest runs in &lt;15 minutes
-            </p>
-            <a href="/sign-up" className="inline-block mt-4 px-6 py-2 rounded mono text-sm font-bold"
-              style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
+          <div className="text-center py-24">
+            <div className="text-6xl mb-6 opacity-50">📡</div>
+            <p className="text-lg text-white/50 mb-2 font-medium">Intel feed initializing</p>
+            <p className="text-white/40 mb-8">First events will appear in less than 15 minutes</p>
+            <a
+              href="/sign-up"
+              className="inline-block px-8 py-3 rounded-lg font-semibold text-white/90 transition-all duration-200"
+              style={{
+                background: 'rgba(96, 165, 250, 0.15)',
+                border: '1px solid rgba(96, 165, 250, 0.3)',
+              }}
+            >
               Get Notified When Live
             </a>
           </div>
         ) : (
-          <div className="space-y-2">
-            {events.map(e => (
-              <div key={e.id} className="p-4 rounded border hover:border-primary/40 transition-colors"
-                style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-                <div className="flex items-start gap-3">
-                  <span
-                    className="text-xs mono font-bold mt-0.5 shrink-0 px-1.5 py-0.5 rounded"
-                    style={{
-                      color: SEVERITY_COLORS[e.severity] ?? '#888',
-                      backgroundColor: `${SEVERITY_COLORS[e.severity] ?? '#888'}22`,
-                    }}
-                  >
-                    {SEVERITY_LABELS[e.severity] ?? 'INFO'}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium leading-snug" style={{ color: 'var(--text-primary)' }}>
-                      {e.title}
-                    </p>
-                    <div className="mt-1 flex items-center gap-3 text-xs mono" style={{ color: 'var(--text-muted)' }}>
-                      {e.country_code && <span>{e.country_code}</span>}
-                      {e.region && <span>{e.region}</span>}
-                      <span>{e.source?.toUpperCase()}</span>
-                      <span>{timeAgo(e.occurred_at)}</span>
+          <div className="space-y-3">
+            {events.map((e) => {
+              const severityConfig = SEVERITY_COLORS[e.severity] ?? { bg: 'bg-gray-500/10', text: 'text-gray-400' }
+              const severityLabel = SEVERITY_LABELS[e.severity] || 'INFO'
+
+              return (
+                <div
+                  key={e.id}
+                  className="group p-5 rounded-2xl border transition-all duration-200 hover:border-white/10 hover:bg-white/[0.03]"
+                  style={{ borderColor: 'rgba(255, 255, 255, 0.06)', background: 'rgba(255, 255, 255, 0.02)' }}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Severity Badge */}
+                    <div className={`shrink-0 px-3 py-1.5 rounded-lg font-semibold text-xs tracking-wide ${severityConfig.bg} ${severityConfig.text}`}>
+                      {severityLabel}
+                    </div>
+
+                    {/* Event Content */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base font-semibold text-white leading-relaxed mb-2">{e.title}</h3>
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-white/40">
+                        {e.country_code && (
+                          <span className="px-2 py-1 rounded" style={{ background: 'rgba(255, 255, 255, 0.03)' }}>
+                            {e.country_code}
+                          </span>
+                        )}
+                        {e.region && (
+                          <span className="px-2 py-1 rounded" style={{ background: 'rgba(255, 255, 255, 0.03)' }}>
+                            {e.region}
+                          </span>
+                        )}
+                        {e.source && <span>{e.source.toUpperCase()}</span>}
+                        <span className="ml-auto">{timeAgo(e.occurred_at)}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
-        {/* CTA */}
-        <div className="mt-12 p-8 rounded border text-center" style={{ borderColor: 'var(--primary)', backgroundColor: 'rgba(0,255,136,0.03)' }}>
-          <h2 className="text-xl font-bold tracking-widest mono mb-2" style={{ color: 'var(--primary)' }}>
-            FULL INTELLIGENCE ACCESS
-          </h2>
-          <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-            Forecasts, alerts, vessel & flight tracking, AI-powered analysis, and mission workbench.
+        {/* Sign Up CTA Section */}
+        <div className="mt-16 p-8 rounded-2xl border text-center" style={{ borderColor: 'rgba(96, 165, 250, 0.2)', background: 'rgba(96, 165, 250, 0.05)' }}>
+          <h2 className="text-2xl font-bold text-white mb-3 tracking-tight">Unlock Full Intelligence Access</h2>
+          <p className="text-white/60 text-base mb-8 max-w-md mx-auto">
+            Get real-time alerts, predictive forecasts, vessel & flight tracking, AI-powered analysis, and dedicated mission support.
           </p>
-          <a href="/sign-up" className="inline-block px-8 py-3 rounded font-bold mono tracking-widest text-sm"
-            style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
-            START FREE TRIAL
+          <a
+            href="/sign-up"
+            className="inline-block px-8 py-3 rounded-lg font-semibold text-white/90 transition-all duration-200"
+            style={{
+              background: 'rgba(96, 165, 250, 0.2)',
+              border: '1px solid rgba(96, 165, 250, 0.3)',
+            }}
+          >
+            Start Free Trial
           </a>
         </div>
       </div>

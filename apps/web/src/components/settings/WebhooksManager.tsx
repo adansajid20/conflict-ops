@@ -58,8 +58,17 @@ export function WebhooksManager() {
 
   const remove = async (id: string) => {
     if (!confirm('Delete this webhook?')) return
-    await fetch(`/api/v1/webhooks-config?id=${id}`, { method: 'DELETE' })
-    await load()
+    try {
+      const res = await fetch(`/api/v1/webhooks-config?id=${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({ error: 'Failed to delete webhook' })) as { error?: string }
+        setError(json.error ?? 'Failed to delete webhook')
+        return
+      }
+      await load()
+    } catch {
+      setError('Failed to delete webhook')
+    }
   }
 
   return (

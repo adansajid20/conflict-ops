@@ -9,9 +9,8 @@ export const maxDuration = 60
 export async function POST(req: Request) {
   const secret = req.headers.get('x-internal-secret')
   const validSecret = process.env['INTERNAL_SECRET'] ?? ''
-  // 'dev' accepted always (for admin UI), or match configured secret
-  if (secret !== 'dev' && secret !== validSecret) {
-    // Also accept if user is authenticated (admin UI with auth cookie)
+  // Match configured secret, or fall back to Clerk auth for admin UI
+  if (!validSecret || secret !== validSecret) {
     const { auth } = await import('@clerk/nextjs/server')
     const { userId } = await auth()
     if (!userId) return Response.json({ error: 'Forbidden' }, { status: 403 })

@@ -62,8 +62,17 @@ export function APIKeysManager() {
   }
 
   const revoke = async (id: string) => {
-    await fetch(`/api/v1/apikeys?id=${id}`, { method: 'DELETE' })
-    await load()
+    try {
+      const res = await fetch(`/api/v1/apikeys?id=${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({ error: 'Failed to revoke key' })) as { error?: string }
+        setError(json.error ?? 'Failed to revoke key')
+        return
+      }
+      await load()
+    } catch {
+      setError('Failed to revoke key')
+    }
   }
 
   const rotate = async (id: string) => {
@@ -117,9 +126,9 @@ export function APIKeysManager() {
       )}
 
       {/* Error */}
-      {error && (
+      {(error || planError) && (
         <div className="p-3 rounded border mb-4 text-xs mono" style={{ borderColor: '#EF4444', color: '#EF4444' }}>
-          {error}
+          {error || planError}
         </div>
       )}
 

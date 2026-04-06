@@ -24,8 +24,9 @@ export async function POST(req: NextRequest) {
 
   for (const cron of CRONS) {
     try {
-      const res = await fetch(`${BASE}${cron}?token=${SECRET}`, {
+      const res = await fetch(`${BASE}${cron}`, {
         method: 'GET',
+        headers: { 'Authorization': `Bearer ${SECRET}` },
         signal: AbortSignal.timeout(55000),
       })
       results[cron] = { status: res.status, data: await res.json().catch(() => null) }

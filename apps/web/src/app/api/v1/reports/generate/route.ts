@@ -5,12 +5,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
+  // Auth check
+  const { auth } = await import('@clerk/nextjs/server')
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Rate limit: 3 reports per 5 minutes (expensive generation)
+  const { checkRateLimit, REPORT_RATE_LIMIT } = await import('@/lib/rate-limit')
+  const rl = await checkRateLimit(userId, REPORT_RATE_LIMIT.prefix, REPORT_RATE_LIMIT.maxRequests, REPORT_RATE_LIMIT.windowSeconds)
+  if (!rl.allowed) return NextResponse.json({ error: 'Rate limit exceeded. You can generate up to 3 reports every 5 minutes.' }, { status: 429 })
+
   const key = process.env.ANTHROPIC_API_KEY
   if (!key) return NextResponse.json({ error: 'No ANTHROPIC_API_KEY' }, { status: 500 })
 
   const supabase = createServiceClient()
-  const body = await req.json() as { report_type?: string; region?: string; user_id?: string; custom_prompt?: string }
-  const { report_type = 'region_deep_dive', region, user_id, custom_prompt } = body
+  const body = await req.json() as { report_type?: string; region?: string; custom_prompt?: string }
+  const { report_type = 'region_deep_dive', region, custom_prompt } = body
+  const user_id = userId
 
   if (!region && report_type !== 'daily_briefing' && report_type !== 'custom') {
     return NextResponse.json({ error: 'region required for this report type' }, { status: 400 })

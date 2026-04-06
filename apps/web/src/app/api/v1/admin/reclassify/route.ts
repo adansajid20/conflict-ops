@@ -6,8 +6,11 @@ import { createServiceClient } from '@/lib/supabase/server'
 export async function POST(req: Request) {
   const secret = req.headers.get('x-internal-secret') ?? ''
   const validSecret = process.env['INTERNAL_SECRET'] ?? ''
-  if (secret !== 'dev' && secret !== validSecret) {
-    return new Response('Unauthorized', { status: 401 })
+  if (!validSecret || secret !== validSecret) {
+    // Fall back to Clerk auth for admin UI
+    const { auth } = await import('@clerk/nextjs/server')
+    const { userId } = await auth()
+    if (!userId) return new Response('Unauthorized', { status: 401 })
   }
 
   const supabase = createServiceClient()

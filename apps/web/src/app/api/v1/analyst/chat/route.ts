@@ -237,11 +237,22 @@ const SYSTEM_PROMPT = `You are "Radar" — ConflictRadar's AI intelligence analy
 When asked about a region or situation, always check: events, risk scores, predictions, correlations, and relevant tracking data. Be specific — cite event counts, risk scores, probabilities. Respond like a senior analyst giving a briefing: direct, data-backed, no filler. Flag early warnings and anomalies. If uncertain, say so. Never fabricate intelligence.`
 
 export async function POST(req: NextRequest) {
+  // Auth check
+  const { auth } = await import('@clerk/nextjs/server')
+  const { userId: authUserId } = await auth()
+  if (!authUserId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Rate limit: 20 requests per minute per user (tool-use loops are expensive)
+  const { checkRateLimit, AI_RATE_LIMIT } = await import('@/lib/rate-limit')
+  const rl = await checkRateLimit(authUserId, AI_RATE_LIMIT.prefix, AI_RATE_LIMIT.maxRequests, AI_RATE_LIMIT.windowSeconds)
+  if (!rl.allowed) return NextResponse.json({ error: 'Rate limit exceeded. Please wait a moment.' }, { status: 429 })
+
   const supabase = createServiceClient()
   try {
     const body = await req.json() as { message?: string; conversation_id?: string; user_id?: string }
-    const { message, conversation_id, user_id } = body
-    if (!message || !user_id) return NextResponse.json({ error: 'message and user_id required' }, { status: 400 })
+    const { message, conversation_id } = body
+    const user_id = authUserId // Always use authenticated user, ignore body.user_id
+    if (!message) return NextResponse.json({ error: 'message required' }, { status: 400 })
 
     // Load conversation history
     let history: Msg[] = []
