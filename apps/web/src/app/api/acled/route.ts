@@ -210,7 +210,8 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(Number(searchParams.get('limit') ?? 2000), 5000)
   params.set('limit', String(limit))
 
-  const apiUrl = `https://acleddata.com/api/acled/read?${params.toString()}`
+  // ACLED expects %20 for spaces, not + (URLSearchParams uses +)
+  const apiUrl = `https://acleddata.com/api/acled/read?${params.toString().replace(/\+/g, '%20')}`
 
   try {
     const controller = new AbortController()
