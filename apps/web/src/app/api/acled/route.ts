@@ -203,9 +203,10 @@ export async function GET(request: NextRequest) {
     params.set('civilian_targeting', 'Civilian targeting')
   }
 
-  // Limit — fetch more if we'll filter server-side by region
+  // Limit — when filtering by region server-side, always fetch a large batch
+  // since only ~10-15% of events match any given region
   const requestedLimit = Math.min(Number(searchParams.get('limit') ?? 2000), 5000)
-  const fetchLimit = regionName ? Math.min(requestedLimit * 4, 10000) : requestedLimit
+  const fetchLimit = regionName ? 10000 : requestedLimit
   params.set('limit', String(fetchLimit))
 
   // ACLED expects %20 for spaces, not + (URLSearchParams uses +)
