@@ -1,3 +1,4 @@
+// ConflictRadar – CesiumGlobe (managed via Cowork)
 'use client';
 
 import { useRef, useEffect, useState, useCallback } from 'react';
