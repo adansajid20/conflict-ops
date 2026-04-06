@@ -621,6 +621,25 @@ export default function CesiumGlobe() {
 
       // Auto-rotation removed — globe stays still until user interacts
 
+      // ── PINCH-TO-ZOOM on trackpad ──────────────────────────────────
+      // Browsers send trackpad pinch as wheel events with ctrlKey=true.
+      // CesiumJS ignores those, so we intercept and forward as regular
+      // zoom commands to the camera.
+      const canvas = viewer.scene.canvas;
+      canvas.addEventListener('wheel', (e: WheelEvent) => {
+        if (!e.ctrlKey) return; // normal scroll — let Cesium handle it
+        e.preventDefault();
+        const camera = viewer.camera as unknown as {
+          zoomIn: (amount: number) => void;
+          zoomOut: (amount: number) => void;
+          positionCartographic: { height: number };
+        };
+        const height = camera.positionCartographic?.height ?? 10_000_000;
+        const zoomAmount = height * 0.04; // 4% of current altitude per tick
+        if (e.deltaY < 0) camera.zoomIn(zoomAmount);
+        else camera.zoomOut(zoomAmount);
+      }, { passive: false });
+
       viewerRef.current = viewer;
       setIsLoading(false);
       setCesiumReady(true);
