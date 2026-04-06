@@ -135,7 +135,7 @@ export function ErrorState({
 
 // ---------- StatCard ----------
 export function StatCard({
-  label, value, sub, color = 'var(--primary)', icon,
+  label, value, sub, color = '#3b82f6', icon,
 }: {
   label: string
   value: string | number
@@ -149,7 +149,7 @@ export function StatCard({
         <span className="text-[10px] uppercase tracking-[0.15em] text-white/20">{label}</span>
         {icon && <span style={{ color, opacity: 0.7 }}>{icon}</span>}
       </div>
-      <div className="text-xl font-bold text-white" style={{ color: color !== 'var(--primary)' ? color : undefined }}>{value}</div>
+      <div className="text-xl font-bold text-white" style={{ color: color !== '#3b82f6' ? color : undefined }}>{value}</div>
       {sub && <div className="text-[11px] text-white/25">{sub}</div>}
     </div>
   )

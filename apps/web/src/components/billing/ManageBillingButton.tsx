@@ -20,8 +20,7 @@ export function ManageBillingButton() {
     <button
       onClick={openPortal}
       disabled={loading}
-      className="px-4 py-2 rounded text-xs mono border transition-colors hover:bg-white/5 disabled:opacity-50"
-      style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+      className="px-4 py-2 rounded text-xs mono border border-blue-400 text-blue-400 transition-colors hover:bg-white/5 disabled:opacity-50"
     >
       {loading ? 'LOADING...' : 'MANAGE BILLING →'}
     </button>

@@ -134,13 +134,13 @@ function SidebarStatus({ lastIngestAt, liveFeeds, totalFeeds }: { lastIngestAt: 
   const isWarning = ingestAgeMs > 5 * 60 * 1000
   const isStale = ingestAgeMs > 15 * 60 * 1000
   const ingestIcon = isStale ? '✕' : isWarning ? '⚠' : '⟳'
-  const ingestColor = isStale ? 'var(--sev-critical)' : isWarning ? 'var(--sev-medium)' : 'text-white/30'
+  const ingestColor = isStale ? '#f87171' : isWarning ? '#fbbf24' : 'rgba(255,255,255,0.3)'
   const ingestLabel = isStale ? 'STALE' : `INGEST ${safeTimeAgo(lastIngestAt)}`
 
   return (
     <div className="space-y-2 text-[10px] text-white/40">
       <div className="flex items-center gap-1.5 whitespace-nowrap">
-        <span style={{ color: liveFeeds > 0 ? 'var(--sev-low)' : 'var(--sev-medium)' }}>🟢</span>
+        <span style={{ color: liveFeeds > 0 ? '#60a5fa' : '#fbbf24' }}>🟢</span>
         <span>Live</span>
         <span>·</span>
         <span className="mono">{liveFeeds}/{totalFeeds}</span>
@@ -212,7 +212,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const lastIngestAt = health?.ingest?.last_success_at ?? health?.lastIngestAt ?? null
 
   return (
-    <div className="flex h-screen flex-col bg-[#070B11]" style={{ ['--primary' as string]: branding?.primary_color ?? 'var(--primary)', ['--accent' as string]: branding?.accent_color ?? 'var(--accent)' } as React.CSSProperties}>
+    <div className="flex h-screen flex-col bg-[#070B11]" style={{ ['--primary' as string]: branding?.primary_color ?? '#3b82f6', ['--accent' as string]: branding?.accent_color ?? '#60a5fa' } as React.CSSProperties}>
       <CommandPalette />
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-[256px] shrink-0 flex-col border-r border-white/[0.06] bg-[#0B0F18]">

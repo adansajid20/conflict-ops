@@ -6,10 +6,10 @@ import { safeTimeAgo } from '@/types/intel-item'
 export function SidebarStatus() {
   const { health, statusLevel } = useHealthStatus(60_000)
 
-  const color = statusLevel === 'nominal' ? 'var(--alert-green)'
-    : statusLevel === 'degraded' ? 'var(--alert-amber)'
+  const color = statusLevel === 'nominal' ? '#22c55e'
+    : statusLevel === 'degraded' ? '#f59e0b'
     : statusLevel === 'outage' ? '#FF4444'
-    : 'var(--text-disabled)'
+    : 'rgba(255,255,255,0.25)'
 
   const label = statusLevel === 'nominal' ? 'NOMINAL'
     : statusLevel === 'degraded' ? 'DEGRADED'
@@ -39,7 +39,7 @@ export function SidebarStatus() {
         </span>
         {health?.safe_mode && (
           <span className="mono px-1 rounded text-xs"
-            style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: 'var(--alert-amber)', fontSize: 9 }}>
+            style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontSize: 9 }}>
             SAFE
           </span>
         )}
@@ -61,13 +61,13 @@ export function SidebarStatus() {
       <div className="mono flex items-center gap-1" style={{ fontSize: 10 }}>
         INGEST: {health === null ? '...' : safeTimeAgo(lastIngestAt)}
         {ingestAge !== null && ingestAge > 120 && (
-          <span style={{ color: 'var(--alert-amber)' }}>⚠</span>
+          <span style={{ color: '#f59e0b' }}>⚠</span>
         )}
       </div>
 
       {/* Degraded reason */}
       {statusLevel === 'degraded' && health?.degraded_reasons?.[0] && (
-        <div className="mono" style={{ color: 'var(--alert-amber)', fontSize: 9 }}>
+        <div className="mono" style={{ color: '#f59e0b', fontSize: 9 }}>
           {health.degraded_reasons[0].slice(0, 45)}
         </div>
       )}
