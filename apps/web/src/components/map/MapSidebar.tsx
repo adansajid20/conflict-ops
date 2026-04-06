@@ -342,20 +342,20 @@ export default function MapSidebar({
                     className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
                       appearance-none cursor-pointer hover:border-gray-700 focus:border-orange-500/40 focus:outline-none transition">
                     <option value="all">All regions</option>
-                    <option value="1">Western Africa</option>
-                    <option value="2">Middle Africa</option>
-                    <option value="3">Eastern Africa</option>
-                    <option value="4">Southern Africa</option>
-                    <option value="5">Northern Africa</option>
-                    <option value="7">Southern Asia</option>
-                    <option value="9">South-Eastern Asia</option>
                     <option value="10">Middle East</option>
                     <option value="11">Europe</option>
-                    <option value="12">Caucasus and Central Asia</option>
-                    <option value="13">Central America</option>
-                    <option value="14">South America</option>
-                    <option value="15">Caribbean</option>
+                    <option value="3">Eastern Africa</option>
+                    <option value="1">Western Africa</option>
+                    <option value="5">Northern Africa</option>
+                    <option value="2">Middle Africa</option>
+                    <option value="4">Southern Africa</option>
+                    <option value="7">South Asia</option>
+                    <option value="9">Southeast Asia</option>
                     <option value="16">East Asia</option>
+                    <option value="12">Caucasus & Central Asia</option>
+                    <option value="14">South America</option>
+                    <option value="13">Central America</option>
+                    <option value="15">Caribbean</option>
                     <option value="17">North America</option>
                     <option value="18">Oceania</option>
                   </select>

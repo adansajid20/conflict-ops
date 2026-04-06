@@ -163,9 +163,20 @@ export async function GET(request: NextRequest) {
   const country = searchParams.get('country')
   if (country) params.set('country', country)
 
-  // Region filter (ACLED region numbers)
+  // Region filter — map numeric IDs to ACLED region names
+  const ACLED_REGIONS: Record<string, string> = {
+    '1': 'Western Africa', '2': 'Middle Africa', '3': 'Eastern Africa',
+    '4': 'Southern Africa', '5': 'Northern Africa', '7': 'South Asia',
+    '9': 'Southeast Asia', '10': 'Middle East', '11': 'Europe',
+    '12': 'Caucasus and Central Asia', '13': 'Central America',
+    '14': 'South America', '15': 'Caribbean', '16': 'East Asia',
+    '17': 'North America', '18': 'Oceania',
+  }
   const region = searchParams.get('region')
-  if (region) params.set('region', region)
+  if (region) {
+    const regionName = ACLED_REGIONS[region] ?? region
+    params.set('region', regionName)
+  }
 
   // Event type filter
   const eventType = searchParams.get('event_type')
