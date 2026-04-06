@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Clock, Download, Map, Bell, RefreshCw, Activity } from 'lucide-react'
 import { safeRelativeTime } from '@/lib/utils/time'
 import { KpiStrip } from './KpiStrip'
@@ -105,7 +105,7 @@ function TopStoriesList({ events, onSelect }: { events: OverviewEvent[]; onSelec
 
   return (
     <div className="divide-y divide-white/[0.04]">
-      {events.slice(0, 20).map((event) => {
+      {events.slice(0, 20).map((event, idx) => {
         const tier = getSignificanceTier(event.significance_score ?? null, event.severity)
         const showBadge = !['Monitoring', 'Low', 'Routine'].includes(event.significance_tier ?? tier.label)
         const description = event.description ?? getBestDescription(event, 220)
@@ -114,10 +114,13 @@ function TopStoriesList({ events, onSelect }: { events: OverviewEvent[]; onSelec
         const timeText = formatRelativeOccurredTime(event.occurred_at)
 
         return (
-          <button
+          <motion.button
             key={event.id}
             onClick={() => onSelect(event)}
             className="block w-full px-5 py-4 text-left transition-colors duration-150 hover:bg-white/[0.03]"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 24, delay: idx * 0.04 }}
           >
             <div className="mb-2 flex items-center gap-2 text-[11px] text-white/25">
               {showBadge && <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${tier.bgColor} ${tier.color}`}>{event.significance_tier ?? tier.label}</span>}
@@ -134,7 +137,7 @@ function TopStoriesList({ events, onSelect }: { events: OverviewEvent[]; onSelec
                 {description}
               </p>
             )}
-          </button>
+          </motion.button>
         )
       })}
       <div className="px-5 py-4">
@@ -222,18 +225,29 @@ function QuickActions({ data, hasOrg }: { data: OverviewData; hasOrg: boolean })
   return (
     <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] overflow-hidden p-4 space-y-1.5">
       <div className="mb-3 text-[10px] font-medium uppercase tracking-[0.15em] text-white/20">Quick Actions</div>
-      <Link href="/feed?window=24h" className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60">
-        <IconRefresh size={14} className="text-white/25" /> View Intel Feed (24h)
-      </Link>
-      <Link href="/map" className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60">
-        <IconMap size={14} className="text-white/25" /> Open Live Map
-      </Link>
-      <Link href="/alerts" className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60">
-        <IconBell size={14} className="text-white/25" /> Set Up Alert
-      </Link>
-      <button onClick={downloadReport} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60">
+      <motion.div whileHover={{ x: 4 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }}>
+        <Link href="/feed?window=24h" className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60">
+          <IconRefresh size={14} className="text-white/25" /> View Intel Feed (24h)
+        </Link>
+      </motion.div>
+      <motion.div whileHover={{ x: 4 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }}>
+        <Link href="/map" className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60">
+          <IconMap size={14} className="text-white/25" /> Open Live Map
+        </Link>
+      </motion.div>
+      <motion.div whileHover={{ x: 4 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }}>
+        <Link href="/alerts" className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60">
+          <IconBell size={14} className="text-white/25" /> Set Up Alert
+        </Link>
+      </motion.div>
+      <motion.button
+        onClick={downloadReport}
+        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/[0.03] text-white/40 hover:text-white/60"
+        whileHover={{ x: 4 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      >
         <IconDownload size={14} className="text-white/25" /> Download Situation Brief
-      </button>
+      </motion.button>
     </div>
   )
 }
@@ -248,32 +262,55 @@ function RiskScoreWidget({ scores }: { scores: RegionRisk[] }) {
   if (!scores.length) return null
   const top = [...scores].sort((a, b) => b.risk_score - a.risk_score).slice(0, 6)
   return (
-    <section className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.015]">
+    <motion.section
+      className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.015]"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.2 }}
+    >
       <div className="flex items-center justify-between border-b border-white/[0.04] px-4 py-3">
         <h2 className="text-[13px] font-semibold text-white/80">Regional Risk Scores</h2>
         <span className="text-[10px] uppercase tracking-[0.15em] text-white/20">0–10</span>
       </div>
       <div className="divide-y divide-white/[0.04]">
-        {top.map(r => (
-          <div key={r.region} className="flex items-center gap-3 px-4 py-2.5">
+        {top.map((r, idx) => (
+          <motion.div
+            key={r.region}
+            className="flex items-center gap-3 px-4 py-2.5"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: idx * 0.05 }}
+          >
             <div className="min-w-0 flex-1">
               <div className="text-[13px] text-white/60">
                 {r.region.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
               </div>
               <div className="mt-1 h-1 w-full rounded-full overflow-hidden bg-white/[0.04]">
-                <div className="h-full rounded-full transition-all" style={{ width: `${(r.risk_score / 10) * 100}%`, background: RISK_COLOR(r.risk_score) }} />
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: RISK_COLOR(r.risk_score) }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(r.risk_score / 10) * 100}%` }}
+                  transition={{ duration: 0.8, delay: idx * 0.08, ease: 'easeOut' }}
+                />
               </div>
             </div>
             <div className="shrink-0 flex items-center gap-1.5">
               <span className="text-[10px]" style={{ color: RISK_COLOR(r.risk_score) }}>{TREND_ICON(r.trend)}</span>
-              <span className="text-[14px] font-bold tabular-nums" style={{ color: RISK_COLOR(r.risk_score) }}>
+              <motion.span
+                className="text-[14px] font-bold tabular-nums"
+                style={{ color: RISK_COLOR(r.risk_score) }}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: idx * 0.08 }}
+              >
                 {r.risk_score.toFixed(1)}
-              </span>
+              </motion.span>
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
-    </section>
+    </motion.section>
   )
 }
 
@@ -281,26 +318,44 @@ function ActiveSituationsWidget({ situations }: { situations: SituationSummary[]
   if (!situations.length) return null
   const top = situations.slice(0, 5)
   return (
-    <section className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.015]">
+    <motion.section
+      className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.015]"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.3 }}
+    >
       <div className="flex items-center justify-between border-b border-white/[0.04] px-4 py-3">
         <h2 className="text-[13px] font-semibold text-white/80">Active Situations</h2>
         <Link href="/situations" className="text-[10px] uppercase tracking-[0.15em] text-white/20 hover:text-white/40">View all →</Link>
       </div>
       <div className="divide-y divide-white/[0.04]">
-        {top.map(s => (
-          <Link key={s.id} href={`/situations/${s.slug}`}
-            className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.03] block">
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-medium truncate text-white/70">{s.name}</div>
-              <div className="text-[10px] mt-0.5 text-white/25">{s.event_count.toLocaleString()} events · {s.status}</div>
-            </div>
-            <div className="shrink-0 text-[14px] font-bold tabular-nums" style={{ color: RISK_COLOR(s.risk_score) }}>
-              {s.risk_score.toFixed(1)}
-            </div>
-          </Link>
+        {top.map((s, idx) => (
+          <motion.div
+            key={s.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: idx * 0.05 }}
+          >
+            <Link href={`/situations/${s.slug}`}
+              className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.03] block">
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-medium truncate text-white/70">{s.name}</div>
+                <div className="text-[10px] mt-0.5 text-white/25">{s.event_count.toLocaleString()} events · {s.status}</div>
+              </div>
+              <motion.div
+                className="shrink-0 text-[14px] font-bold tabular-nums"
+                style={{ color: RISK_COLOR(s.risk_score) }}
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20, delay: idx * 0.08 }}
+              >
+                {s.risk_score.toFixed(1)}
+              </motion.div>
+            </Link>
+          </motion.div>
         ))}
       </div>
-    </section>
+    </motion.section>
   )
 }
 
@@ -413,7 +468,12 @@ export function OverviewClient() {
   )
 
   return (
-    <div className="mx-auto max-w-[1400px] p-6">
+    <motion.div
+      className="mx-auto max-w-[1400px] p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+    >
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -496,10 +556,12 @@ export function OverviewClient() {
                   <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-red-400">BREAKING</div>
                   <div className="space-y-2.5">
                     {breakingEvents.map((event) => (
-                      <button
+                      <motion.button
                         key={`breaking-${event.id}`}
                         onClick={() => setSelectedEvent(event)}
                         className="flex w-full items-start gap-3 rounded-lg border border-red-500/15 border-l-[3px] border-l-red-500 px-3 py-2.5 text-left transition-colors hover:bg-white/[0.03]"
+                        animate={{ boxShadow: ['0 0 0 0 rgba(239,68,68,0)', '0 0 15px 2px rgba(239,68,68,0.15)', '0 0 0 0 rgba(239,68,68,0)'] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                       >
                         <span className="text-[10px] font-semibold uppercase tracking-[0.2em] animate-pulse text-red-400">●LIVE</span>
                         <div className="min-w-0 flex-1">
@@ -510,7 +572,7 @@ export function OverviewClient() {
                             {[getRegionDisplay(event.region), formatRelativeOccurredTime(event.occurred_at)].filter(Boolean).join(' · ')}
                           </div>
                         </div>
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                 </div>
@@ -520,7 +582,12 @@ export function OverviewClient() {
             </section>
 
             <div className="space-y-4">
-              <section className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.015]">
+              <motion.section
+                className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.015]"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0 }}
+              >
                 <div className="border-b border-white/[0.04] px-5 py-4">
                   <h2 className="text-[13px] font-semibold text-white/80">Hot Regions</h2>
                 </div>
@@ -531,11 +598,17 @@ export function OverviewClient() {
                     <HotRegionsTable regions={data.hotRegions} />
                   )}
                 </div>
-              </section>
+              </motion.section>
 
               <RiskScoreWidget scores={riskScores} />
               <ActiveSituationsWidget situations={activeSituations} />
-              <QuickActions data={data} hasOrg={data.hasOrg} />
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+              >
+                <QuickActions data={data} hasOrg={data.hasOrg} />
+              </motion.div>
             </div>
           </div>
         </>
@@ -552,6 +625,6 @@ export function OverviewClient() {
           />
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   )
 }

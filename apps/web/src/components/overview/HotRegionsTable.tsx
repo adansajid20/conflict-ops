@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import type { HotRegion } from './types'
 
 const RISK_COLORS: Record<HotRegion['riskLevel'], string> = {
@@ -40,7 +41,12 @@ export function HotRegionsTable({ regions }: { regions: HotRegion[] }) {
   }
 
   return (
-    <div className="space-y-2">
+    <motion.div
+      className="space-y-2"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+    >
       <div className="rounded-xl border border-white/[0.05] overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -67,9 +73,12 @@ export function HotRegionsTable({ regions }: { regions: HotRegion[] }) {
               const primaryDriver = row.topDrivers.find((driver) => driver !== 'Intelligence') ?? row.topDrivers[0] ?? '—'
               const width = `${(row.eventCount / maxCount) * 100}%`
               return (
-                <tr
+                <motion.tr
                   key={row.slug}
                   className={i < safeRegions.length - 1 ? 'border-b border-white/[0.04]' : undefined}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: i * 0.06 }}
                 >
                   <td colSpan={4} className="p-0">
                     <Link
@@ -80,7 +89,13 @@ export function HotRegionsTable({ regions }: { regions: HotRegion[] }) {
                       <div className="min-w-0">
                         <div className="text-[13px] font-medium text-white/80">{row.region}</div>
                         <div className="mt-1 h-1 w-full rounded-full bg-white/[0.04]">
-                          <div className="h-1 rounded-full" style={{ width, background: color }} />
+                          <motion.div
+                            className="h-1 rounded-full"
+                            style={{ background: color }}
+                            initial={{ width: 0 }}
+                            animate={{ width }}
+                            transition={{ duration: 0.8, delay: i * 0.08, ease: 'easeOut' }}
+                          />
                         </div>
                       </div>
                       <div className={`max-sm:hidden rounded-md px-2 py-0.5 text-[10px] font-semibold w-fit ${bgOpacity} ${textColor}`}>
@@ -90,17 +105,22 @@ export function HotRegionsTable({ regions }: { regions: HotRegion[] }) {
                       <div className="text-right text-[13px] text-white/60 tabular-nums">{row.eventCount}</div>
                     </Link>
                   </td>
-                </tr>
+                </motion.tr>
               )
             })}
           </tbody>
         </table>
       </div>
       <div className="px-1 text-right">
-        <Link href="/analysis/countries" className="text-[12px] text-white/30 hover:text-white/50 transition-colors duration-150">
-          View all regions →
-        </Link>
+        <motion.div
+          whileHover={{ x: 4 }}
+          transition={{ duration: 0.2 }}
+        >
+          <Link href="/analysis/countries" className="text-[12px] text-white/30 hover:text-white/50 transition-colors duration-150">
+            View all regions →
+          </Link>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   )
 }
