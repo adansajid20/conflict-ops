@@ -108,11 +108,11 @@ export default function MapSidebar({
           </div>
           <div className="flex-1 bg-[#111827]/60 rounded-lg px-2 py-1.5 border border-gray-800/40">
             <p className="text-[8px] text-cyan-500/70 uppercase tracking-wider">Flights</p>
-            <p className="text-sm font-bold text-cyan-400 font-mono">{showFlights ? flightCount.toLocaleString() : '—'}</p>
+            <p className="text-sm font-bold text-cyan-400 font-mono">{showFlights ? flightCount.toLocaleString() : 'OFF'}</p>
           </div>
           <div className="flex-1 bg-[#111827]/60 rounded-lg px-2 py-1.5 border border-gray-800/40">
             <p className="text-[8px] text-emerald-500/70 uppercase tracking-wider">Vessels</p>
-            <p className="text-sm font-bold text-emerald-400 font-mono">{showVessels ? vesselCount.toLocaleString() : '—'}</p>
+            <p className="text-sm font-bold text-emerald-400 font-mono">{showVessels ? vesselCount.toLocaleString() : 'OFF'}</p>
           </div>
         </div>
       </div>

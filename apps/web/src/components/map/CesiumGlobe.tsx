@@ -38,7 +38,7 @@ const SEV_COLORS: Record<string, string> = {
   critical: '#ff2d2d', high: '#ff8c00', medium: '#ffd700', low: '#3b9dff',
 };
 const SEV_SIZE: Record<string, number> = {
-  critical: 16, high: 12, medium: 9, low: 7,
+  critical: 18, high: 14, medium: 11, low: 9,
 };
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -186,8 +186,8 @@ export default function CesiumGlobe() {
           point: {
             pixelSize: size,
             color,
-            outlineColor: Ce.Color.WHITE.withAlpha(0.6),
-            outlineWidth: sevStr === 'critical' ? 3 : 2,
+            outlineColor: Ce.Color.WHITE.withAlpha(0.8),
+            outlineWidth: sevStr === 'critical' ? 4 : 2.5,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
             // No scaleByDistance — causes pins to visually drift as camera moves
           },
@@ -518,27 +518,44 @@ export default function CesiumGlobe() {
         viewer.scene.canvas.style.cursor = (picked as { id?: unknown } | undefined)?.id ? 'pointer' : 'default';
       }, Ce.ScreenSpaceEventType.MOUSE_MOVE);
 
-      // ── CINEMATIC ROTATION ────────────────────────────────────────
-      // Timestamp-based pause (not boolean) to avoid race conditions with zoom/pan
+      // ── CINEMATIC ROTATION (postRender — Cesium-native, no setInterval conflict) ──
       let pauseUntilMs = 0;
+      let lastFrameTime = 0;
       const pauseRotation = (ms: number) => { pauseUntilMs = Math.max(pauseUntilMs, Date.now() + ms); };
 
-      // Expose pause so click handler can call it
+      // Expose so click handler can extend pause
       (viewer as unknown as Record<string, unknown>)._pauseRotation = pauseRotation;
 
-      viewer.scene.canvas.addEventListener('mousedown', () => pauseRotation(200));
-      viewer.scene.canvas.addEventListener('mouseup',   () => pauseRotation(6000));
-      viewer.scene.canvas.addEventListener('wheel',     () => pauseRotation(4000));
-      viewer.scene.canvas.addEventListener('touchstart',() => pauseRotation(200));
-      viewer.scene.canvas.addEventListener('touchend',  () => pauseRotation(6000));
-
-      rotationRef.current = setInterval(() => {
-        if (Date.now() < pauseUntilMs) return;
-        // Only auto-rotate when zoomed out enough (> 8,000 km altitude)
+      const onPostRender = () => {
+        const now = Date.now();
+        if (now < pauseUntilMs) return;
+        // Throttle to ~20fps to save CPU
+        if (now - lastFrameTime < 50) return;
+        lastFrameTime = now;
+        // Only rotate when zoomed far out (> 10,000 km)
         const h = viewer.camera.positionCartographic?.height ?? 0;
-        if (h < 8_000_000) return;
-        viewer.camera.rotate(Ce.Cartesian3.UNIT_Z, -0.00012);
-      }, 32); // 30fps is enough for slow rotation, less CPU
+        if (h < 10_000_000) return;
+        try { viewer.camera.rotate(Ce.Cartesian3.UNIT_Z, -0.00008); } catch { /* ignore during morph */ }
+      };
+
+      (viewer as unknown as { scene: { postRender: { addEventListener: (fn: () => void) => void; removeEventListener: (fn: () => void) => void } } })
+        .scene.postRender.addEventListener(onPostRender);
+
+      // Store cleanup ref (no setInterval needed)
+      rotationRef.current = setInterval(() => {/* postRender handles rotation */}, 9999999);
+      const _origCleanup = onPostRender; // captured for useEffect cleanup below
+      (viewer as unknown as Record<string, unknown>)._rotationCleanup = () => {
+        try {
+          (viewer as unknown as { scene: { postRender: { removeEventListener: (fn: () => void) => void } } })
+            .scene.postRender.removeEventListener(_origCleanup);
+        } catch { /* ignore */ }
+      };
+
+      viewer.scene.canvas.addEventListener('mousedown', () => pauseRotation(300));
+      viewer.scene.canvas.addEventListener('mouseup',   () => pauseRotation(8000));
+      viewer.scene.canvas.addEventListener('wheel',     () => pauseRotation(5000));
+      viewer.scene.canvas.addEventListener('touchstart',() => pauseRotation(300));
+      viewer.scene.canvas.addEventListener('touchend',  () => pauseRotation(8000));
 
       viewerRef.current = viewer;
       setIsLoading(false);
@@ -566,7 +583,12 @@ export default function CesiumGlobe() {
       if (flightIntervalRef.current) clearInterval(flightIntervalRef.current);
       wsRef.current?.close();
       const v = viewerRef.current;
-      if (v && !v.isDestroyed()) v.destroy();
+      if (v) {
+        // Remove postRender rotation listener before destroying
+        const cleanup = (v as unknown as Record<string, unknown>)._rotationCleanup as (() => void) | undefined;
+        cleanup?.();
+        if (!v.isDestroyed()) v.destroy();
+      }
       viewerRef.current = null;
     };
   }, []);
