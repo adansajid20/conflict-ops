@@ -54,6 +54,7 @@ type CesiumViewer = {
     flyTo: (o: unknown) => void;
     setView: (o: unknown) => void;
     rotate: (axis: unknown, angle: number) => void;
+    positionCartographic: { height: number; latitude: number; longitude: number } | undefined;
   };
   scene: {
     canvas: HTMLCanvasElement;
@@ -185,10 +186,10 @@ export default function CesiumGlobe() {
           point: {
             pixelSize: size,
             color,
-            outlineColor: Ce.Color.WHITE.withAlpha(0.5),
+            outlineColor: Ce.Color.WHITE.withAlpha(0.6),
             outlineWidth: sevStr === 'critical' ? 3 : 2,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            scaleByDistance: new Ce.NearFarScalar(1.5e5, 2.0, 2e7, 0.5),
+            // No scaleByDistance — causes pins to visually drift as camera moves
           },
         } as never);
       }
@@ -228,7 +229,7 @@ export default function CesiumGlobe() {
             outlineColor: Ce.Color.fromCssColorString('rgba(0,229,255,0.3)'),
             outlineWidth: 1,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            scaleByDistance: new Ce.NearFarScalar(1e5, 1.5, 5e7, 0.2),
+            // No scaleByDistance — fixed pins stay put
           },
         } as never);
       }
@@ -312,7 +313,7 @@ export default function CesiumGlobe() {
               outlineColor: Ce.Color.fromCssColorString('rgba(52,211,153,0.3)'),
               outlineWidth: 1,
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
-              scaleByDistance: new Ce.NearFarScalar(1e5, 1.2, 5e7, 0.2),
+              // No scaleByDistance — fixed pins stay put
             },
           } as never);
         }
@@ -393,18 +394,29 @@ export default function CesiumGlobe() {
         creditContainer: document.createElement('div'),
       }) as unknown as CesiumViewer;
 
-      // Bing Maps with labels (country names, city names)
-      void (Ce.createWorldImageryAsync as (opts: { style: unknown }) => Promise<unknown>)({
-        style: (Ce as unknown as { IonWorldImageryStyle: Record<string, unknown> }).IonWorldImageryStyle?.AERIAL_WITH_LABELS ?? 3,
-      }).then((provider: unknown) => {
+      // ── IMAGERY: Esri satellite base + Esri labels overlay ───────
+      // Reliable, no API key, always has city/country names
+      try {
+        const esriSat = new (Ce as unknown as {
+          UrlTemplateImageryProvider: new (o: unknown) => unknown
+        }).UrlTemplateImageryProvider({
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          credit: 'Esri',
+          maximumLevel: 19,
+        });
         viewer.imageryLayers.removeAll();
-        viewer.imageryLayers.addImageryProvider(provider);
-      }).catch(() => {
-        void Ce.IonImageryProvider.fromAssetId(2).then((p: unknown) => {
-          viewer.imageryLayers.removeAll();
-          viewer.imageryLayers.addImageryProvider(p);
-        }).catch(() => null);
-      });
+        viewer.imageryLayers.addImageryProvider(esriSat);
+
+        // Labels overlay on top (cities, countries, borders)
+        const esriLabels = new (Ce as unknown as {
+          UrlTemplateImageryProvider: new (o: unknown) => unknown
+        }).UrlTemplateImageryProvider({
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+          credit: 'Esri',
+          maximumLevel: 19,
+        });
+        viewer.imageryLayers.addImageryProvider(esriLabels);
+      } catch { /* keep default */ }
 
       // Terrain
       void Ce.createWorldTerrainAsync().then((t: unknown) => { viewer.terrainProvider = t; }).catch(() => null);
@@ -459,6 +471,10 @@ export default function CesiumGlobe() {
 
         const type = String(getP('_type') ?? '');
 
+        // Pause rotation for 20s after any click (flyTo animation + view time)
+        const pauseFn = (viewer as unknown as Record<string, unknown>)._pauseRotation as ((ms: number) => void) | undefined;
+        pauseFn?.(20_000);
+
         if (type === 'event') {
           const ev: Record<string, unknown> = {
             id: entity.id,
@@ -471,7 +487,7 @@ export default function CesiumGlobe() {
           setSelectedFlight(null);
           setSelectedVessel(null);
           setShowModal(true);
-          flyTo(lng, lat, 600_000, -45);
+          flyTo(lng, lat, 800_000, -50);
         } else if (type === 'flight') {
           const f: Record<string, unknown> = {
             icao24: getP('icao24'), callsign: getP('callsign'),
@@ -502,18 +518,27 @@ export default function CesiumGlobe() {
         viewer.scene.canvas.style.cursor = (picked as { id?: unknown } | undefined)?.id ? 'pointer' : 'default';
       }, Ce.ScreenSpaceEventType.MOUSE_MOVE);
 
-      // Slow cinematic rotation
-      let userInteracting = false;
-      const pause = () => { userInteracting = true; setTimeout(() => { userInteracting = false; }, 4000); };
-      viewer.scene.canvas.addEventListener('mousedown', () => { userInteracting = true; });
-      viewer.scene.canvas.addEventListener('mouseup', pause);
-      viewer.scene.canvas.addEventListener('wheel', pause);
-      viewer.scene.canvas.addEventListener('touchstart', () => { userInteracting = true; });
-      viewer.scene.canvas.addEventListener('touchend', pause);
+      // ── CINEMATIC ROTATION ────────────────────────────────────────
+      // Timestamp-based pause (not boolean) to avoid race conditions with zoom/pan
+      let pauseUntilMs = 0;
+      const pauseRotation = (ms: number) => { pauseUntilMs = Math.max(pauseUntilMs, Date.now() + ms); };
+
+      // Expose pause so click handler can call it
+      (viewer as unknown as Record<string, unknown>)._pauseRotation = pauseRotation;
+
+      viewer.scene.canvas.addEventListener('mousedown', () => pauseRotation(200));
+      viewer.scene.canvas.addEventListener('mouseup',   () => pauseRotation(6000));
+      viewer.scene.canvas.addEventListener('wheel',     () => pauseRotation(4000));
+      viewer.scene.canvas.addEventListener('touchstart',() => pauseRotation(200));
+      viewer.scene.canvas.addEventListener('touchend',  () => pauseRotation(6000));
 
       rotationRef.current = setInterval(() => {
-        if (!userInteracting) viewer.camera.rotate(Ce.Cartesian3.UNIT_Z, -0.00015);
-      }, 16);
+        if (Date.now() < pauseUntilMs) return;
+        // Only auto-rotate when zoomed out enough (> 8,000 km altitude)
+        const h = viewer.camera.positionCartographic?.height ?? 0;
+        if (h < 8_000_000) return;
+        viewer.camera.rotate(Ce.Cartesian3.UNIT_Z, -0.00012);
+      }, 32); // 30fps is enough for slow rotation, less CPU
 
       viewerRef.current = viewer;
       setIsLoading(false);
