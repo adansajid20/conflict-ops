@@ -76,48 +76,46 @@ export function IntelReportBuilder() {
   const filteredEvents = useMemo(() => events.filter((event) => `${event.title} ${event.description ?? ''}`.toLowerCase().includes(query.toLowerCase())), [events, query])
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)_320px]">
-      <aside className="rounded border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+    <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)_320px]">
+      <aside className="rounded-xl border border-white/[0.05] p-4 bg-white/[0.015] hover:bg-white/[0.03] transition-colors">
         <div className="mb-3 flex items-center justify-between">
-          <div className="text-xs mono font-bold" style={{ color: 'var(--text-primary)' }}>REPORTS</div>
-          <button onClick={() => void createReport()} className="text-xs mono" style={{ color: 'var(--primary)' }}>+ NEW</button>
+          <div className="text-xs uppercase tracking-[0.15em] font-bold text-white/25">REPORTS</div>
+          <button onClick={() => void createReport()} className="text-xs uppercase tracking-[0.15em] text-blue-400 hover:text-blue-300">+ NEW</button>
         </div>
         <div className="space-y-2">
           {reports.map((report) => (
-            <button key={report.id} onClick={() => setCurrent(report)} className="block w-full rounded border p-3 text-left"
-              style={{ borderColor: current?.id === report.id ? 'var(--primary)' : 'var(--border)', background: current?.id === report.id ? 'var(--primary-dim)' : 'var(--bg-surface-2)' }}>
-              <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{report.title}</div>
-              <div className="text-[10px] mono" style={{ color: 'var(--text-muted)' }}>{report.classification_banner}</div>
+            <button key={report.id} onClick={() => setCurrent(report)} className={`block w-full rounded-lg border p-3 text-left transition-all ${current?.id === report.id ? 'bg-blue-500/20 border-blue-400 text-white' : 'bg-white/[0.03] border-white/[0.05] text-white hover:bg-white/[0.05]'}`}>
+              <div className="text-sm font-semibold text-white">{report.title}</div>
+              <div className="text-[10px] uppercase tracking-[0.15em] text-white/50 mt-1">{report.classification_banner}</div>
             </button>
           ))}
         </div>
       </aside>
 
-      <section className="rounded border p-6 print-surface" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+      <section className="rounded-xl border border-white/[0.05] p-6 bg-white/[0.015] hover:bg-white/[0.03] transition-colors">
         {!current ? (
-          <div className="text-sm" style={{ color: 'var(--text-muted)' }}>Create a report to begin.</div>
+          <div className="text-sm text-white/50">Create a report to begin.</div>
         ) : (
           <>
             <div className="mb-4 flex flex-wrap items-center gap-3">
               <input value={current.title} onChange={(event) => setCurrent({ ...current, title: event.target.value })}
-                onBlur={() => void save(current)} className="flex-1 rounded border px-3 py-2 text-lg font-semibold"
-                style={{ borderColor: 'var(--border)', background: 'var(--bg-base)', color: 'var(--text-primary)' }} />
+                onBlur={() => void save(current)} className="flex-1 rounded-lg border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-lg font-semibold text-white placeholder:text-white/20 focus:outline-none focus:border-blue-400/50" />
               <select value={current.classification_banner} onChange={(event) => void save({ ...current, classification_banner: event.target.value })}
-                className="rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-base)', color: 'var(--text-primary)' }}>
+                className="rounded-lg border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-400/50">
                 <option>UNCLASSIFIED</option><option>CONFIDENTIAL</option><option>SECRET</option>
               </select>
-              <button onClick={() => window.print()} className="rounded px-3 py-2 text-xs mono" style={{ border: '1px solid var(--border)', color: 'var(--text-primary)' }}>EXPORT PDF</button>
-              <button onClick={() => void share()} className="rounded px-3 py-2 text-xs mono" style={{ background: 'var(--primary)', color: '#fff' }}>SHARE</button>
+              <button onClick={() => window.print()} className="rounded-lg border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-xs uppercase tracking-[0.15em] text-white/60 hover:text-white hover:bg-white/[0.05]">Export PDF</button>
+              <button onClick={() => void share()} className="rounded-lg bg-blue-500 px-3 py-2 text-xs uppercase tracking-[0.15em] text-white hover:bg-blue-600">Share</button>
             </div>
-            <div className="mb-5 rounded border px-4 py-2 text-center text-xs mono font-bold" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }}>
+            <div className="mb-5 rounded-lg border border-white/[0.05] bg-white/[0.03] px-4 py-2 text-center text-xs uppercase tracking-[0.15em] font-bold text-white/25">
               {current.classification_banner}
             </div>
             <div className="space-y-4">
               {current.sections.map((section, index) => (
-                <div key={`${section.type}-${index}`} className="rounded border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
+                <div key={`${section.type}-${index}`} className="rounded-lg border border-white/[0.05] bg-white/[0.015] p-4 hover:bg-white/[0.03] transition-colors">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-[10px] mono" style={{ color: 'var(--text-muted)' }}>{section.type.toUpperCase()}</span>
-                    <button onClick={() => void save({ ...current, sections: current.sections.filter((_, i) => i !== index) })} className="text-[10px] mono" style={{ color: 'var(--sev-critical)' }}>REMOVE</button>
+                    <span className="text-[10px] uppercase tracking-[0.15em] text-white/25">{section.type.replace('_', ' ')}</span>
+                    <button onClick={() => void save({ ...current, sections: current.sections.filter((_, i) => i !== index) })} className="text-[10px] uppercase tracking-[0.15em] text-red-400 hover:text-red-300">Remove</button>
                   </div>
                   {section.type === 'events' ? (
                     <div className="space-y-2">
@@ -126,11 +124,11 @@ export function IntelReportBuilder() {
                         next[index] = { ...section, content: event.target.value }
                         setCurrent({ ...current, sections: next })
                       }} onBlur={() => void save(current)} rows={2}
-                        className="w-full rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-base)', color: 'var(--text-primary)' }} />
+                        className="w-full rounded-lg border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-400/50" />
                       <div className="flex flex-wrap gap-2">
                         {(section.event_ids ?? []).map((eventId) => {
                           const event = events.find((candidate) => candidate.id === eventId)
-                          return <span key={eventId} className="rounded px-2 py-1 text-[11px] mono" style={{ background: 'var(--primary-dim)', color: 'var(--primary)' }}>{event?.title ?? eventId}</span>
+                          return <span key={eventId} className="rounded-lg bg-blue-500/20 px-2 py-1 text-[11px] uppercase tracking-[0.15em] text-blue-400">{event?.title ?? eventId}</span>
                         })}
                       </div>
                     </div>
@@ -139,29 +137,29 @@ export function IntelReportBuilder() {
                       const next = [...current.sections]
                       next[index] = { ...section, content: event.target.value }
                       setCurrent({ ...current, sections: next })
-                    }} onBlur={() => void save(current)} className="w-full rounded border px-3 py-2 text-base font-semibold" style={{ borderColor: 'var(--border)', background: 'var(--bg-base)', color: 'var(--text-primary)' }} />
+                    }} onBlur={() => void save(current)} className="w-full rounded-lg border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-base font-semibold text-white placeholder:text-white/20 focus:outline-none focus:border-blue-400/50" />
                   ) : (
                     <textarea value={section.content} onChange={(event) => {
                       const next = [...current.sections]
                       next[index] = { ...section, content: event.target.value }
                       setCurrent({ ...current, sections: next })
-                    }} onBlur={() => void save(current)} rows={5} className="w-full rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-base)', color: 'var(--text-primary)' }} />
+                    }} onBlur={() => void save(current)} rows={5} className="w-full rounded-lg border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-400/50" />
                   )}
                 </div>
               ))}
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
-              {SECTION_TYPES.map((type) => <button key={type} onClick={() => addSection(type)} className="rounded px-3 py-2 text-xs mono" style={{ border: '1px solid var(--border)', color: 'var(--text-primary)' }}>+ {type}</button>)}
-              <button onClick={() => void generateSummary()} className="rounded px-3 py-2 text-xs mono" style={{ background: 'var(--primary)', color: '#fff' }}>GENERATE AI SUMMARY</button>
+              {SECTION_TYPES.map((type) => <button key={type} onClick={() => addSection(type)} className="rounded-lg border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-xs uppercase tracking-[0.15em] text-white/60 hover:text-white hover:bg-white/[0.05]">+ {type}</button>)}
+              <button onClick={() => void generateSummary()} className="rounded-lg bg-blue-500 px-3 py-2 text-xs uppercase tracking-[0.15em] text-white hover:bg-blue-600">Generate AI Summary</button>
             </div>
           </>
         )}
       </section>
 
-      <aside className="rounded border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-        <div className="mb-3 text-xs mono font-bold" style={{ color: 'var(--text-primary)' }}>RECENT EVENTS</div>
+      <aside className="rounded-xl border border-white/[0.05] p-4 bg-white/[0.015] hover:bg-white/[0.03] transition-colors">
+        <div className="mb-3 text-xs uppercase tracking-[0.15em] font-bold text-white/25">Recent Events</div>
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search events"
-          className="mb-3 w-full rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-base)', color: 'var(--text-primary)' }} />
+          className="mb-3 w-full rounded-lg border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-400/50" />
         <div className="space-y-2 max-h-[720px] overflow-y-auto">
           {filteredEvents.map((event) => (
             <button key={event.id} draggable onDragStart={(dragEvent) => dragEvent.dataTransfer.setData('text/plain', event.id)}
@@ -177,9 +175,9 @@ export function IntelReportBuilder() {
                   void save({ ...current, sections: [...current.sections, { type: 'events', content: 'Referenced events', event_ids: [event.id] }] })
                 }
               }}
-              className="block w-full rounded border p-3 text-left" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)' }}>
-              <div className="text-sm" style={{ color: 'var(--text-primary)' }}>{event.title}</div>
-              <div className="text-[10px] mono" style={{ color: 'var(--text-muted)' }}>{event.country_code ?? '—'} · SEV {event.severity ?? '—'}</div>
+              className="block w-full rounded-lg border border-white/[0.05] bg-white/[0.015] p-3 text-left hover:bg-white/[0.03] transition-colors">
+              <div className="text-sm text-white">{event.title}</div>
+              <div className="text-[10px] uppercase tracking-[0.15em] text-white/50 mt-1">{event.country_code ?? '—'} · SEV {event.severity ?? '—'}</div>
             </button>
           ))}
         </div>

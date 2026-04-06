@@ -36,8 +36,8 @@ export default async function UsagePage() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold mono">USAGE & OVERAGES</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Plan: {usage.plan}. Current overage policy: {usage.overagePolicy}.</p>
+        <h1 className="text-2xl font-bold mono text-white">USAGE & OVERAGES</h1>
+        <p className="text-sm mt-1 text-white/50">Plan: {usage.plan}. Current overage policy: {usage.overagePolicy}.</p>
       </div>
       <UsageMeter items={usage.items} />
       <OveragePolicySelector current={usage.overagePolicy} />
@@ -55,14 +55,14 @@ function OveragePolicySelector({ current }: { current: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ overage_policy }),
       })
-    }} className="p-4 rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-      <div className="text-xs mono font-bold mb-2">OVERAGE POLICY</div>
-      <select name="overage_policy" defaultValue={current} className="rounded border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-base)' }}>
+    }} className="p-4 rounded border bg-white/[0.015] border-white/[0.05]">
+      <div className="text-xs mono font-bold mb-2 text-white/80">OVERAGE POLICY</div>
+      <select name="overage_policy" defaultValue={current} className="rounded border px-3 py-2 text-sm bg-white/[0.03] border-white/[0.06] text-white">
         <option value="allow">allow</option>
         <option value="cap">cap</option>
         <option value="notify">notify</option>
       </select>
-      <button className="ml-3 px-4 py-2 rounded text-xs mono font-bold" style={{ backgroundColor: 'var(--primary)', color: '#000' }}>SAVE</button>
+      <button className="ml-3 px-4 py-2 rounded text-xs mono font-bold bg-blue-500 text-white hover:bg-blue-600">SAVE</button>
     </form>
   )
 }

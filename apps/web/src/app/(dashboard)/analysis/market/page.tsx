@@ -47,19 +47,19 @@ export default function MarketPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Market Impact Tracker</h1>
-          <p className="text-gray-400 text-sm mt-1">Real-time commodity prices correlated with geopolitical events</p>
+          <h1 className="text-2xl font-bold text-white">Market Impact Tracker</h1>
+          <p className="text-white/50 text-sm mt-1">Real-time commodity prices correlated with geopolitical events</p>
         </div>
-        <button onClick={() => void load()} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">
+        <button onClick={() => void load()} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] hover:bg-white/[0.08] rounded-lg text-sm transition-colors text-white/60 border border-white/[0.08]">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </button>
       </div>
 
       {/* Commodity Grid */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Live Commodity Prices</h2>
+        <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3">Live Commodity Prices</h2>
         {commodities.length === 0 && !loading && (
-          <div className="flex items-center gap-2 text-yellow-400 text-sm p-4 bg-yellow-400/10 rounded-lg">
+          <div className="flex items-center gap-2 text-yellow-400 text-sm p-4 bg-yellow-400/10 rounded-lg border border-yellow-400/20">
             <AlertCircle className="w-4 h-4" />
             No commodity data yet. The collect-commodity-prices cron populates this every 30 minutes.
           </div>
@@ -68,18 +68,18 @@ export default function MarketPage() {
           {commodities.map(c => {
             const meta = COMMODITY_META[c.symbol]
             return (
-              <div key={c.symbol} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+              <div key={c.symbol} className="bg-white/[0.015] border border-white/[0.05] rounded-xl p-4 hover:bg-white/[0.03]">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-lg">{meta?.emoji ?? '💹'}</span>
-                  <span className="text-xs text-gray-400 font-mono">{c.symbol}</span>
+                  <span className="text-xs text-white/50 font-mono">{c.symbol}</span>
                 </div>
-                <div className="font-bold text-xl">${fmt(c.price)}</div>
-                <div className="text-xs text-gray-500 mb-2">{c.name}</div>
+                <div className="font-bold text-xl text-white">${fmt(c.price)}</div>
+                <div className="text-xs text-white/50 mb-2">{c.name}</div>
                 <div className={`flex items-center gap-1 text-sm font-medium ${pctColor(c.change_pct_24h)}`}>
                   <PctIcon n={c.change_pct_24h} />
                   {c.change_pct_24h > 0 ? '+' : ''}{fmt(c.change_pct_24h)}% (24h)
                 </div>
-                {meta?.region && <div className="text-xs text-gray-500 mt-1">{meta.region}</div>}
+                {meta?.region && <div className="text-xs text-white/50 mt-1">{meta.region}</div>}
               </div>
             )
           })}
@@ -88,33 +88,33 @@ export default function MarketPage() {
 
       {/* Correlations */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+        <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3">
           Event–Market Correlations
-          <span className="ml-2 text-xs text-gray-500 normal-case font-normal">AI-detected links between geopolitical events and price moves</span>
+          <span className="ml-2 text-xs text-white/50 normal-case font-normal">AI-detected links between geopolitical events and price moves</span>
         </h2>
         {correlations.length === 0 ? (
-          <div className="text-gray-500 text-sm p-4 bg-gray-900 rounded-xl border border-gray-800">
+          <div className="text-white/50 text-sm p-4 bg-white/[0.015] rounded-xl border border-white/[0.05]">
             No correlations detected yet. The detect-market-correlations cron runs hourly and populates this when commodity prices move {'>'} 1.5% following critical events.
           </div>
         ) : (
           <div className="space-y-3">
             {correlations.map((c, i) => (
-              <div key={i} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+              <div key={i} className="bg-white/[0.015] border border-white/[0.05] rounded-xl p-4 hover:bg-white/[0.03]">
                 <div className="flex items-center gap-3 mb-2">
                   <span className="font-mono text-sm font-bold text-blue-400">{c.commodity_symbol}</span>
                   <span className={`text-sm font-semibold ${pctColor(c.price_change_pct)}`}>
                     {c.price_change_pct > 0 ? '+' : ''}{fmt(c.price_change_pct)}%
                   </span>
                   <div className="ml-auto flex items-center gap-2">
-                    <div className="text-xs text-gray-400">Confidence</div>
-                    <div className="w-20 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                    <div className="text-xs text-white/50">Confidence</div>
+                    <div className="w-20 h-1.5 bg-white/[0.1] rounded-full overflow-hidden">
                       <div className="h-full bg-blue-400 rounded-full" style={{ width: `${c.correlation_strength * 100}%` }} />
                     </div>
-                    <div className="text-xs text-gray-300">{Math.round(c.correlation_strength * 100)}%</div>
+                    <div className="text-xs text-white/80">{Math.round(c.correlation_strength * 100)}%</div>
                   </div>
                 </div>
-                {c.ai_explanation && <p className="text-sm text-gray-300">{c.ai_explanation}</p>}
-                <div className="text-xs text-gray-500 mt-2">{new Date(c.detected_at).toLocaleString()}</div>
+                {c.ai_explanation && <p className="text-sm text-white/80">{c.ai_explanation}</p>}
+                <div className="text-xs text-white/30 mt-2">{new Date(c.detected_at).toLocaleString()}</div>
               </div>
             ))}
           </div>
@@ -123,8 +123,8 @@ export default function MarketPage() {
 
       {/* Region-commodity map */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Region → Commodity Impact Map</h2>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3">Region → Commodity Impact Map</h2>
+        <div className="bg-white/[0.015] border border-white/[0.05] rounded-xl p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
             {[
               { region: 'Middle East', impact: 'Oil (CL=F, BZ=F), Natural Gas (NG=F)', color: 'text-red-400' },
@@ -134,9 +134,9 @@ export default function MarketPage() {
               { region: 'East Asia / Taiwan', impact: 'Copper (HG=F), Silver — semiconductor supply', color: 'text-purple-400' },
               { region: 'Sub-Saharan Africa', impact: 'Copper (DRC), Gold — mining disruption', color: 'text-green-400' },
             ].map(r => (
-              <div key={r.region} className="flex gap-3 p-3 bg-gray-800 rounded-lg">
+              <div key={r.region} className="flex gap-3 p-3 bg-white/[0.05] rounded-lg">
                 <div className={`font-semibold ${r.color} shrink-0`}>{r.region}</div>
-                <div className="text-gray-400">→ {r.impact}</div>
+                <div className="text-white/50">→ {r.impact}</div>
               </div>
             ))}
           </div>

@@ -184,32 +184,32 @@ export function AlertsManager() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+      <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4 hover:bg-white/[0.03]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <div className="flex items-center gap-2 text-sm font-semibold text-white">
               <BellIcon size={16} /> Email Alerts
             </div>
-            <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-1 text-sm text-white/80">
               {activeCount} active alert{activeCount === 1 ? '' : 's'} watching the board for matching events.
             </p>
           </div>
           {editingId ? (
-            <button onClick={resetForm} className="rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+            <button onClick={resetForm} className="rounded-lg border border-white/[0.08] bg-white/[0.05] px-3 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.08]">
               Cancel edit
             </button>
           ) : null}
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-2">
-          <input value={form.name} onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))} placeholder="Alert name" className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }} />
-          <input value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} placeholder="operator@company.com" className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }} />
-          <select value={form.severity_min} onChange={(e) => setForm((current) => ({ ...current, severity_min: e.target.value as FormState['severity_min'] }))} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }}>
+          <input value={form.name} onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))} placeholder="Alert name" className="rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/20" />
+          <input value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} placeholder="operator@company.com" className="rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/20" />
+          <select value={form.severity_min} onChange={(e) => setForm((current) => ({ ...current, severity_min: e.target.value as FormState['severity_min'] }))} className="rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-sm text-white">
             <option value="">Any severity</option>
             <option value="3">High+</option>
             <option value="4">Critical only</option>
           </select>
-          <select value={form.frequency} onChange={(e) => setForm((current) => ({ ...current, frequency: e.target.value as FormState['frequency'] }))} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }}>
+          <select value={form.frequency} onChange={(e) => setForm((current) => ({ ...current, frequency: e.target.value as FormState['frequency'] }))} className="rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-sm text-white">
             <option value="realtime">Real-time</option>
             <option value="hourly">Hourly digest</option>
             <option value="daily">Daily digest</option>
@@ -217,7 +217,7 @@ export function AlertsManager() {
         </div>
 
         <div className="mt-3">
-          <div className="mb-2 text-xs uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>Regions</div>
+          <div className="mb-2 text-[10px] uppercase tracking-[0.15em] text-white/25">Regions</div>
           <div className="flex flex-wrap gap-2">
             {REGION_OPTIONS.map((region) => {
               const selected = form.regions.includes(region.value)
@@ -229,12 +229,7 @@ export function AlertsManager() {
                     ...current,
                     regions: selected ? current.regions.filter((item) => item !== region.value) : [...current.regions, region.value],
                   }))}
-                  className="rounded-full border px-3 py-1.5 text-xs"
-                  style={{
-                    borderColor: selected ? 'var(--primary)' : 'var(--border)',
-                    background: selected ? 'color-mix(in srgb, var(--primary) 14%, transparent)' : 'var(--bg-surface-2)',
-                    color: selected ? 'var(--text-primary)' : 'var(--text-muted)',
-                  }}
+                  className={`rounded-full border px-3 py-1.5 text-xs ${selected ? 'border-blue-400 bg-blue-500/20 text-blue-400' : 'border-white/[0.08] bg-white/[0.05] text-white/60 hover:bg-white/[0.08]'}`}
                 >
                   {region.label}
                 </button>
@@ -244,59 +239,59 @@ export function AlertsManager() {
         </div>
 
         <div className="mt-3">
-          <textarea value={form.keywords} onChange={(e) => setForm((current) => ({ ...current, keywords: e.target.value }))} placeholder="Keywords, comma separated. Example: iran, drone, ceasefire" rows={3} className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface-2)', color: 'var(--text-primary)' }} />
+          <textarea value={form.keywords} onChange={(e) => setForm((current) => ({ ...current, keywords: e.target.value }))} placeholder="Keywords, comma separated. Example: iran, drone, ceasefire" rows={3} className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/20" />
         </div>
 
         <div className="mt-4 flex items-center gap-3">
-          <button onClick={() => void submitForm()} disabled={saving} className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium" style={{ background: 'var(--primary)', color: '#fff', opacity: saving ? 0.7 : 1 }}>
+          <button onClick={() => void submitForm()} disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50">
             {editingId ? <SaveIcon size={14} /> : <PlusIcon size={14} />}
             {saving ? 'Saving…' : editingId ? 'Update alert' : 'Create alert'}
           </button>
-          {message ? <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{message}</span> : null}
+          {message ? <span className="text-sm text-white/80">{message}</span> : null}
         </div>
       </div>
 
-      <div className="rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-        <div className="border-b px-4 py-3 text-sm font-semibold" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+      <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] hover:bg-white/[0.03]">
+        <div className="border-b border-white/[0.05] px-4 py-3 text-sm font-semibold text-white">
           Existing alerts
         </div>
-        <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+        <div className="divide-y divide-white/[0.05]">
           {loading ? (
-            <div className="px-4 py-6 text-sm" style={{ color: 'var(--text-muted)' }}>Loading alerts…</div>
+            <div className="px-4 py-6 text-sm text-white/80">Loading alerts…</div>
           ) : alerts.length === 0 ? (
-            <div className="px-4 py-6 text-sm" style={{ color: 'var(--text-muted)' }}>No alerts yet. Set one up and let the machine nag you only when it matters.</div>
+            <div className="px-4 py-6 text-sm text-white/80">No alerts yet. Set one up and let the machine nag you only when it matters.</div>
           ) : alerts.map((alert) => (
             <div key={alert.id} className="px-4 py-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{alert.name || 'My Alert'}</div>
-                    <span className="rounded-full px-2 py-0.5 text-[11px]" style={{ background: alert.is_active ? 'var(--sev-low-dim)' : 'var(--bg-surface-2)', color: alert.is_active ? 'var(--sev-low)' : 'var(--text-muted)' }}>
+                    <div className="text-sm font-semibold text-white">{alert.name || 'My Alert'}</div>
+                    <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-[11px] text-green-400">
                       {alert.is_active ? 'Active' : 'Paused'}
                     </span>
-                    <span className="rounded-full px-2 py-0.5 text-[11px]" style={{ background: 'var(--bg-surface-2)', color: 'var(--text-muted)' }}>
+                    <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[11px] text-white/50">
                       {alert.frequency}
                     </span>
                   </div>
-                  <div className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>{alert.email}</div>
-                  <div className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <div className="mt-1 text-sm text-white/80">{alert.email}</div>
+                  <div className="mt-2 text-xs text-white/50">
                     Severity: {alert.conditions?.severity_min === 4 ? 'Critical only' : alert.conditions?.severity_min === 3 ? 'High+' : 'Any'}
                     {' · '}
                     Regions: {alert.conditions?.regions?.length ? alert.conditions.regions.join(', ') : 'Any'}
                     {' · '}
                     Keywords: {alert.conditions?.keywords?.length ? alert.conditions.keywords.join(', ') : 'None'}
                   </div>
-                  <div className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>Last sent: {formatTime(alert.last_sent_at)}</div>
+                  <div className="mt-2 text-xs text-white/50">Last sent: {formatTime(alert.last_sent_at)}</div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={() => void toggleAlert(alert)} className="rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                  <button onClick={() => void toggleAlert(alert)} className="rounded-lg border border-white/[0.08] bg-white/[0.05] px-3 py-2 text-xs font-medium text-white hover:bg-white/[0.08]">
                     {alert.is_active ? 'Turn off' : 'Turn on'}
                   </button>
-                  <button onClick={() => startEdit(alert)} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                  <button onClick={() => startEdit(alert)} className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.05] px-3 py-2 text-xs font-medium text-white hover:bg-white/[0.08]">
                     <PencilIcon size={13} /> Edit
                   </button>
-                  <button onClick={() => void deleteAlert(alert.id)} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: 'rgba(239,68,68,0.35)', color: 'var(--sev-critical)' }}>
+                  <button onClick={() => void deleteAlert(alert.id)} className="inline-flex items-center gap-1 rounded-lg border border-red-400/35 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20">
                     <Trash2Icon size={13} /> Delete
                   </button>
                 </div>

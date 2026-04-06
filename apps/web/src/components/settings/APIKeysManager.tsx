@@ -109,17 +109,16 @@ export function APIKeysManager() {
     <div>
       {/* New key created banner */}
       {newKey && (
-        <div className="p-4 rounded border mb-6" style={{ borderColor: '#10B981', backgroundColor: '#10B98120' }}>
-          <div className="text-xs mono font-bold mb-2" style={{ color: '#10B981' }}>✓ API KEY CREATED — COPY NOW</div>
-          <code className="text-xs mono break-all block mb-2 p-2 rounded" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
+        <div className="mb-6 rounded border border-green-400/35 bg-green-500/10 p-4">
+          <div className="mb-2 text-xs font-bold text-green-400">✓ API KEY CREATED — COPY NOW</div>
+          <code className="mb-2 block break-all rounded bg-white/[0.05] p-2 text-xs text-white">
             {newKey}
           </code>
-          <p className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs text-white/50">
             This key will not be shown again. Store it securely.
           </p>
           <button onClick={() => void navigator.clipboard.writeText(newKey)}
-            className="mt-2 px-4 py-1 text-xs mono rounded border"
-            style={{ borderColor: '#10B981', color: '#10B981' }}>
+            className="mt-2 rounded border border-green-400/35 bg-green-500/10 px-4 py-1 text-xs font-medium text-green-400 hover:bg-green-500/20">
             COPY TO CLIPBOARD
           </button>
         </div>
@@ -127,21 +126,19 @@ export function APIKeysManager() {
 
       {/* Error */}
       {(error || planError) && (
-        <div className="p-3 rounded border mb-4 text-xs mono" style={{ borderColor: '#EF4444', color: '#EF4444' }}>
+        <div className="mb-4 rounded border border-red-400/35 bg-red-500/10 p-3 text-xs text-red-400">
           {error || planError}
         </div>
       )}
 
       {/* Create form */}
-      <div className="p-4 rounded border mb-6" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-        <div className="text-xs mono font-bold mb-2" style={{ color: 'var(--text-muted)' }}>CREATE NEW API KEY</div>
+      <div className="mb-6 rounded border border-white/[0.05] bg-white/[0.015] p-4 hover:bg-white/[0.03]">
+        <div className="mb-2 text-[10px] uppercase tracking-[0.15em] text-white/25">CREATE NEW API KEY</div>
         <div className="flex gap-2">
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Key name (e.g. Production)"
-            className="flex-1 px-3 py-2 text-xs mono rounded border"
-            style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+            className="flex-1 rounded border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs text-white placeholder:text-white/20" />
           <button onClick={() => void create()} disabled={creating || !name.trim()}
-            className="px-4 py-2 text-xs mono rounded font-bold"
-            style={{ backgroundColor: 'var(--primary)', color: '#fff' }}>
+            className="rounded bg-blue-500 px-4 py-2 text-xs font-bold text-white hover:bg-blue-600 disabled:opacity-50">
             {creating ? '...' : 'CREATE'}
           </button>
         </div>
@@ -149,18 +146,17 @@ export function APIKeysManager() {
 
       {/* Key list */}
       {loading ? (
-        <p className="text-xs mono text-center py-8" style={{ color: 'var(--text-muted)' }}>LOADING...</p>
+        <p className="py-8 text-center text-xs text-white/50">LOADING...</p>
       ) : keys.length === 0 ? (
-        <p className="text-xs mono text-center py-8" style={{ color: 'var(--text-muted)' }}>NO API KEYS YET</p>
+        <p className="py-8 text-center text-xs text-white/50">NO API KEYS YET</p>
       ) : (
         <div>
-          <div className="text-xs mono font-bold mb-2" style={{ color: 'var(--text-muted)' }}>ACTIVE KEYS</div>
+          <div className="mb-2 text-[10px] uppercase tracking-[0.15em] text-white/25">ACTIVE KEYS</div>
           {keys.map(k => (
-            <div key={k.id} className="p-3 rounded border mb-2 flex items-center justify-between"
-              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+            <div key={k.id} className="mb-2 flex items-center justify-between rounded border border-white/[0.05] bg-white/[0.015] p-3 hover:bg-white/[0.03]">
               <div>
-                <div className="text-xs mono font-bold" style={{ color: 'var(--text-primary)' }}>{k.name}</div>
-                <div className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
+                <div className="text-xs font-bold text-white">{k.name}</div>
+                <div className="text-xs text-white/50">
                   {k.key_prefix} · Created {new Date(k.created_at).toLocaleDateString()}
                   {k.last_used && ` · Last used ${new Date(k.last_used).toLocaleDateString()}`}
                 </div>
@@ -168,13 +164,11 @@ export function APIKeysManager() {
               <div className="flex gap-2">
                 <button onClick={() => void rotate(k.id)}
                   disabled={rotatingId === k.id}
-                  className="px-3 py-1 text-xs mono rounded border"
-                  style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
+                  className="rounded border border-blue-400/35 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-400 hover:bg-blue-500/20 disabled:opacity-50">
                   {rotatingId === k.id ? 'ROTATING...' : 'ROTATE'}
                 </button>
                 <button onClick={() => { if (confirm('Revoke this key?')) void revoke(k.id) }}
-                  className="px-3 py-1 text-xs mono rounded border"
-                  style={{ borderColor: '#EF4444', color: '#EF4444' }}>
+                  className="rounded border border-red-400/35 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/20">
                   REVOKE
                 </button>
               </div>
@@ -184,14 +178,14 @@ export function APIKeysManager() {
       )}
 
       {/* API docs */}
-      <div className="mt-6 p-4 rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-        <div className="text-xs mono font-bold mb-2" style={{ color: 'var(--text-muted)' }}>QUICK START</div>
-        <code className="text-xs mono block" style={{ color: 'var(--text-primary)' }}>
+      <div className="mt-6 rounded border border-white/[0.05] bg-white/[0.015] p-4 hover:bg-white/[0.03]">
+        <div className="mb-2 text-[10px] uppercase tracking-[0.15em] text-white/25">QUICK START</div>
+        <code className="block text-xs text-white">
           {`curl https://conflictradar.co/api/public/v1/events \\
   -H "Authorization: Bearer cok_live_..." \\
   -d "limit=50&severity_gte=3"`}
         </code>
-        <div className="text-xs mono mt-2" style={{ color: 'var(--text-muted)' }}>
+        <div className="mt-2 text-xs text-white/50">
           Rate limit: 1,000 req/hr (Business) · Docs: /api/public/v1
         </div>
       </div>

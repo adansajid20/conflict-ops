@@ -11,7 +11,6 @@ type Prediction = {
 
 type PredMeta = { total: number; accuracy_30d: number | null; confirmed_30d: number; total_evaluated_30d: number }
 
-const S = { background: '#080c12', card: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)', text: '#e2e8f0', muted: '#64748b', accent: '#3b82f6' }
 const TYPE_COLORS: Record<string, string> = { escalation: '#ef4444', attack: '#f97316', diplomatic: '#3b82f6', humanitarian: '#a78bfa', economic: '#22c55e' }
 const TYPE_ICONS: Record<string, string> = { escalation: '⚡', attack: '💥', diplomatic: '🤝', humanitarian: '🏥', economic: '📊' }
 const SEV_COLORS: Record<string, string> = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e' }
@@ -42,44 +41,44 @@ function PredCard({ pred, expanded, onToggle }: { pred: Prediction; expanded: bo
   const indicators = (pred.evidence?.key_indicators as string[]) ?? []
 
   return (
-    <div style={{ background: S.card, border: `1px solid ${expanded ? color + '40' : S.border}`, borderRadius: 12, overflow: 'hidden', transition: 'border-color 0.2s' }}>
-      <div onClick={onToggle} style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+    <div className={`bg-white/[0.015] border rounded-xl overflow-hidden transition-all hover:bg-white/[0.03] ${expanded ? 'border-white/[0.15]' : 'border-white/[0.05]'}`} style={{ borderColor: expanded ? color + '40' : undefined }}>
+      <div onClick={onToggle} className="p-4 cursor-pointer flex gap-4 items-start">
         <ProbabilityRing prob={pred.probability} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color, background: color + '20', padding: '2px 8px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-[0.05em] px-2 py-1 rounded" style={{ color, background: color + '20' }}>
               {icon} {pred.prediction_type}
             </span>
-            <span style={{ fontSize: 10, color: sevColor, background: sevColor + '15', padding: '2px 8px', borderRadius: 4, textTransform: 'uppercase' }}>
+            <span className="text-[10px] px-2 py-1 rounded uppercase" style={{ color: sevColor, background: sevColor + '15' }}>
               if true: {pred.severity_if_true}
             </span>
-            <span style={{ fontSize: 10, color: S.muted }}>⏱ {hoursLeft}h window</span>
+            <span className="text-[10px] text-white/50">⏱ {hoursLeft}h window</span>
           </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: S.text, lineHeight: 1.3, marginBottom: 4 }}>{pred.title}</div>
-          <div style={{ fontSize: 12, color: S.muted }}>{pred.region.replace(/_/g, ' ')}</div>
+          <div className="text-sm font-semibold text-white leading-tight mb-1">{pred.title}</div>
+          <div className="text-xs text-white/50">{pred.region.replace(/_/g, ' ')}</div>
         </div>
-        <div style={{ fontSize: 18, color: S.muted, flexShrink: 0 }}>{expanded ? '▲' : '▼'}</div>
+        <div className="text-base text-white/50 flex-shrink-0">{expanded ? '▲' : '▼'}</div>
       </div>
 
       {expanded && (
-        <div style={{ padding: '0 20px 20px', borderTop: `1px solid ${S.border}` }}>
-          <div style={{ paddingTop: 16, fontSize: 13, color: '#94a3b8', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+        <div className="px-5 pb-5 border-t border-white/[0.05]">
+          <div className="pt-4 text-xs text-white/70 leading-relaxed whitespace-pre-wrap">
             {pred.description}
           </div>
           {indicators.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Watch For</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div className="mt-4">
+              <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/25 mb-2">Watch For</div>
+              <div className="flex flex-col gap-1.5">
                 {indicators.map((ind, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#94a3b8' }}>
-                    <span style={{ color: color, flexShrink: 0 }}>→</span>
+                  <div key={i} className="flex items-start gap-2 text-xs text-white/70">
+                    <span className="flex-shrink-0" style={{ color }}>→</span>
                     <span>{ind}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
-          <div style={{ marginTop: 12, fontSize: 11, color: S.muted }}>
+          <div className="mt-3 text-[10px] text-white/50">
             Generated {new Date(pred.created_at).toLocaleString()} · Expires {new Date(pred.expires_at).toLocaleString()}
           </div>
         </div>
@@ -111,48 +110,47 @@ export function PredictionsClient() {
   const types = ['all', 'escalation', 'attack', 'diplomatic', 'humanitarian', 'economic']
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: S.background, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: S.muted, fontSize: 14 }}>Loading predictions…</div>
+    <div className="min-h-screen bg-[#070B11] flex items-center justify-center">
+      <div className="text-white/50 text-sm">Loading predictions…</div>
     </div>
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: S.background, padding: '32px 28px', fontFamily: '-apple-system,sans-serif' }}>
+    <div className="min-h-screen bg-[#070B11] px-7 py-8">
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: S.text, margin: 0 }}>Prediction Engine</h1>
-        <div style={{ fontSize: 13, color: S.muted, marginTop: 4 }}>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white m-0">Prediction Engine</h1>
+        <div className="text-sm text-white/50 mt-1">
           {predictions.length} active predictions
-          {meta?.accuracy_30d != null && <span style={{ marginLeft: 12, color: '#a78bfa' }}>30d accuracy: {meta.accuracy_30d}%</span>}
+          {meta?.accuracy_30d != null && <span className="ml-3 text-purple-400">30d accuracy: {meta.accuracy_30d}%</span>}
         </div>
       </div>
 
       {/* Stats strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div className="grid grid-cols-4 gap-3 mb-6">
         {[
-          { label: 'Active', value: predictions.length, color: '#f97316' },
-          { label: 'High Probability (>65%)', value: predictions.filter(p => p.probability > 0.65).length, color: '#ef4444' },
-          { label: 'Confirmed (30d)', value: meta?.confirmed_30d ?? 0, color: '#22c55e' },
-          { label: 'Accuracy (30d)', value: meta?.accuracy_30d != null ? `${meta.accuracy_30d}%` : '—', color: '#a78bfa' },
+          { label: 'Active', value: predictions.length, color: 'text-orange-400' },
+          { label: 'High Probability (>65%)', value: predictions.filter(p => p.probability > 0.65).length, color: 'text-red-400' },
+          { label: 'Confirmed (30d)', value: meta?.confirmed_30d ?? 0, color: 'text-blue-400' },
+          { label: 'Accuracy (30d)', value: meta?.accuracy_30d != null ? `${meta.accuracy_30d}%` : '—', color: 'text-purple-400' },
         ].map(kpi => (
-          <div key={kpi.label} style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: '16px 18px' }}>
-            <div style={{ fontSize: 11, color: S.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: kpi.color }}>{kpi.value}</div>
+          <div key={kpi.label} className="bg-white/[0.015] border border-white/[0.05] rounded-xl p-4 hover:bg-white/[0.03] transition-colors">
+            <div className="text-[10px] uppercase tracking-[0.15em] text-white/25 mb-2">{kpi.label}</div>
+            <div className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</div>
           </div>
         ))}
       </div>
 
       {/* Type filter */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div className="flex gap-2 mb-5 flex-wrap">
         {types.map(t => {
-          const color = TYPE_COLORS[t] ?? S.accent
+          const color = TYPE_COLORS[t] ?? '#3b82f6'
           const active = filter === t
           return (
-            <button key={t} onClick={() => setFilter(t)} style={{
-              padding: '5px 14px', borderRadius: 20, fontSize: 12,
-              border: `1px solid ${active ? color : S.border}`,
+            <button key={t} onClick={() => setFilter(t)} className={`px-4 py-1.5 rounded-full text-xs cursor-pointer transition-all ${active ? 'border' : 'border'}`} style={{
               background: active ? color + '20' : 'transparent',
-              color: active ? color : S.muted, cursor: 'pointer',
+              borderColor: active ? color : 'rgba(255,255,255,0.05)',
+              color: active ? color : 'rgba(255,255,255,0.5)',
               textTransform: 'capitalize',
             }}>
               {TYPE_ICONS[t] ? `${TYPE_ICONS[t]} ` : ''}{t}
@@ -163,11 +161,11 @@ export function PredictionsClient() {
 
       {/* Prediction list */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: S.muted, fontSize: 14 }}>
+        <div className="text-center py-12 text-white/50 text-sm">
           No active predictions yet. The engine runs hourly once data flows in.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="flex flex-col gap-2.5">
           {filtered.map(pred => (
             <PredCard key={pred.id} pred={pred} expanded={expanded === pred.id} onToggle={() => setExpanded(expanded === pred.id ? null : pred.id)} />
           ))}

@@ -30,26 +30,26 @@ const WIDGET_TYPES = [
 function WidgetCard({ widget, onRemove, onConfig }: { widget: Widget; onRemove: () => void; onConfig: () => void }) {
   const meta = WIDGET_TYPES.find(t => t.type === widget.type)
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3 min-h-[160px]">
+    <div className="bg-white/[0.015] border border-white/[0.05] rounded-xl p-4 flex flex-col gap-3 min-h-[160px] hover:bg-white/[0.03]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-lg">{meta?.icon ?? '📊'}</span>
-          <span className="font-semibold text-sm">{widget.title || meta?.label}</span>
+          <span className="font-semibold text-sm text-white">{widget.title || meta?.label}</span>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={onConfig} className="p-1 text-gray-500 hover:text-gray-300 transition-colors">
+          <button onClick={onConfig} className="p-1 text-white/50 hover:text-white/80 transition-colors">
             <Settings className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onRemove} className="p-1 text-gray-500 hover:text-red-400 transition-colors">
+          <button onClick={onRemove} className="p-1 text-white/50 hover:text-red-400 transition-colors">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
-      <div className="flex-1 flex items-center justify-center text-gray-600 text-xs text-center">
+      <div className="flex-1 flex items-center justify-center text-white/30 text-xs text-center">
         <div>
           <div className="text-2xl mb-1">{meta?.icon}</div>
           <div>{meta?.desc}</div>
-          <div className="mt-1 text-gray-700">Live data loads at runtime</div>
+          <div className="mt-1 text-white/20">Live data loads at runtime</div>
         </div>
       </div>
     </div>
@@ -134,14 +134,14 @@ export default function CustomDashboardPage() {
   return (
     <div className="flex h-full">
       {/* Sidebar */}
-      <div className="w-56 bg-gray-950 border-r border-gray-800 flex flex-col">
-        <div className="p-4 border-b border-gray-800">
+      <div className="w-56 bg-white/[0.015] border-r border-white/[0.05] flex flex-col">
+        <div className="p-4 border-b border-white/[0.05]">
           <div className="flex items-center gap-2 mb-3">
             <LayoutDashboard className="w-4 h-4 text-blue-400" />
-            <span className="font-semibold text-sm">My Dashboards</span>
+            <span className="font-semibold text-sm text-white">My Dashboards</span>
           </div>
           {!showAdd ? (
-            <button onClick={() => setShowAdd(true)} className="w-full flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-lg text-xs transition-colors border border-blue-600/30">
+            <button onClick={() => setShowAdd(true)} className="w-full flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 rounded-lg text-xs transition-colors border border-blue-500/30">
               <Plus className="w-3.5 h-3.5" /> New Dashboard
             </button>
           ) : (
@@ -151,12 +151,12 @@ export default function CustomDashboardPage() {
                 onChange={e => setNewName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') void createDashboard() }}
                 placeholder="Dashboard name..."
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+                className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-blue-500 text-white placeholder:text-white/20"
                 autoFocus
               />
               <div className="flex gap-1">
-                <button onClick={() => void createDashboard()} className="flex-1 px-2 py-1 bg-blue-600 text-xs rounded-lg">Create</button>
-                <button onClick={() => setShowAdd(false)} className="px-2 py-1 bg-gray-700 text-xs rounded-lg">Cancel</button>
+                <button onClick={() => void createDashboard()} className="flex-1 px-2 py-1 bg-blue-600 text-xs rounded-lg text-white hover:bg-blue-700">Create</button>
+                <button onClick={() => setShowAdd(false)} className="px-2 py-1 bg-white/[0.05] text-xs rounded-lg text-white/60 hover:bg-white/[0.1]">Cancel</button>
               </div>
             </div>
           )}
@@ -166,10 +166,10 @@ export default function CustomDashboardPage() {
             <button
               key={d.id}
               onClick={() => setActive(d)}
-              className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs text-left transition-colors ${active?.id === d.id ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-900'}`}
+              className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs text-left transition-colors ${active?.id === d.id ? 'bg-white/[0.1] text-white' : 'text-white/50 hover:bg-white/[0.05]'}`}
             >
-              <span className="truncate">{d.name} {d.is_default && <span className="text-blue-400">★</span>}</span>
-              <button onClick={e => { e.stopPropagation(); void deleteDashboard(d.id) }} className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 ml-1">
+              <span className="truncate text-white">{d.name} {d.is_default && <span className="text-blue-400">★</span>}</span>
+              <button onClick={e => { e.stopPropagation(); void deleteDashboard(d.id) }} className="opacity-0 group-hover:opacity-100 text-white/50 hover:text-red-400 ml-1">
                 <Trash2 className="w-3 h-3" />
               </button>
             </button>
@@ -180,42 +180,42 @@ export default function CustomDashboardPage() {
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {!active ? (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
+          <div className="flex-1 flex items-center justify-center text-white/50">
             <div className="text-center">
-              <LayoutDashboard className="w-12 h-12 mx-auto mb-3 text-gray-700" />
-              <p className="text-sm">Create a dashboard to get started</p>
-              <p className="text-xs mt-2 text-gray-600">Add widgets to monitor the intelligence streams you care about</p>
+              <LayoutDashboard className="w-12 h-12 mx-auto mb-3 text-white/20" />
+              <p className="text-sm text-white">Create a dashboard to get started</p>
+              <p className="text-xs mt-2 text-white/50">Add widgets to monitor the intelligence streams you care about</p>
             </div>
           </div>
         ) : (
           <>
             {/* Toolbar */}
-            <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-800 bg-gray-950">
+            <div className="flex items-center gap-3 px-5 py-3 border-b border-white/[0.05] bg-white/[0.015]">
               <input
                 value={active.name}
                 onChange={e => setActive({ ...active, name: e.target.value })}
-                className="font-semibold bg-transparent border-b border-transparent hover:border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+                className="font-semibold bg-transparent border-b border-transparent hover:border-white/[0.1] focus:border-blue-500 focus:outline-none text-sm text-white"
               />
               <div className="ml-auto flex items-center gap-2">
                 <div className="relative">
                   <button
                     onClick={() => setShowWidgetPicker(v => !v)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.05] hover:bg-white/[0.08] rounded-lg text-xs transition-colors text-white/60 border border-white/[0.08]"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add Widget <ChevronDown className="w-3 h-3" />
                   </button>
                   {showWidgetPicker && (
-                    <div className="absolute right-0 top-full mt-1 w-56 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 p-1">
+                    <div className="absolute right-0 top-full mt-1 w-56 bg-white/[0.015] border border-white/[0.1] rounded-xl shadow-2xl z-50 p-1">
                       {WIDGET_TYPES.map(w => (
                         <button
                           key={w.type}
                           onClick={() => addWidget(w.type)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-800 rounded-lg text-left text-xs transition-colors"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/[0.08] rounded-lg text-left text-xs transition-colors"
                         >
                           <span className="text-base">{w.icon}</span>
                           <div>
-                            <div className="font-medium text-gray-200">{w.label}</div>
-                            <div className="text-gray-500">{w.desc}</div>
+                            <div className="font-medium text-white/80">{w.label}</div>
+                            <div className="text-white/50">{w.desc}</div>
                           </div>
                         </button>
                       ))}
@@ -225,7 +225,7 @@ export default function CustomDashboardPage() {
                 <button
                   onClick={() => void saveDashboard()}
                   disabled={saving}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-xs transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-xs transition-colors text-white"
                 >
                   <Save className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Save'}
                 </button>
@@ -235,10 +235,10 @@ export default function CustomDashboardPage() {
             {/* Widget grid */}
             <div className="flex-1 overflow-y-auto p-5">
               {active.widgets.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-gray-500 border-2 border-dashed border-gray-800 rounded-2xl">
-                  <Plus className="w-10 h-10 mb-2 text-gray-700" />
-                  <p className="text-sm">Click &quot;Add Widget&quot; to build your dashboard</p>
-                  <p className="text-xs mt-1 text-gray-600">Mix and match data streams for your intelligence focus</p>
+                <div className="flex flex-col items-center justify-center h-64 text-white/50 border-2 border-dashed border-white/[0.1] rounded-2xl">
+                  <Plus className="w-10 h-10 mb-2 text-white/20" />
+                  <p className="text-sm text-white">Click &quot;Add Widget&quot; to build your dashboard</p>
+                  <p className="text-xs mt-1 text-white/50">Mix and match data streams for your intelligence focus</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">

@@ -81,27 +81,25 @@ export function TravelRiskWidget() {
   const riskColor = risk ? RISK_COLORS[risk.risk_level] : 'var(--text-muted)'
 
   return (
-    <div className="rounded border p-4" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-      <h3 className="text-sm font-bold mono tracking-widest mb-3" style={{ color: 'var(--text-primary)' }}>
+    <div className="rounded border border-white/[0.05] bg-white/[0.015] p-4 hover:bg-white/[0.03]">
+      <h3 className="mb-3 text-sm font-bold tracking-widest text-white">
         TRAVEL RISK ASSESSMENT — ISO 31030
       </h3>
 
       {/* Lookup */}
-      <div className="flex gap-2 mb-4">
+      <div className="mb-4 flex gap-2">
         <input
           value={country}
           onChange={e => setCountry(e.target.value.toUpperCase())}
           onKeyDown={e => e.key === 'Enter' && void lookup()}
           placeholder="COUNTRY CODE (e.g. UA, SY, YE)"
           maxLength={2}
-          className="flex-1 px-3 py-2 text-xs mono rounded border"
-          style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+          className="flex-1 rounded border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs text-white placeholder:text-white/20"
         />
         <button
           onClick={() => void lookup()}
           disabled={loading}
-          className="px-4 py-2 text-xs mono rounded font-bold"
-          style={{ backgroundColor: 'var(--primary)', color: '#fff' }}
+          className="rounded bg-blue-500 px-4 py-2 text-xs font-bold text-white hover:bg-blue-600 disabled:opacity-50"
         >
           {loading ? '...' : 'ASSESS'}
         </button>
@@ -110,13 +108,13 @@ export function TravelRiskWidget() {
       {/* Risk result */}
       {risk && (
         <div className="mb-4">
-          <div className="flex items-center gap-3 mb-3">
+          <div className="mb-3 flex items-center gap-3">
             <span className="text-2xl" style={{ color: riskColor }}>{RISK_ICONS[risk.risk_level]}</span>
             <div>
-              <div className="text-lg font-bold mono" style={{ color: riskColor }}>
+              <div className="text-lg font-bold" style={{ color: riskColor }}>
                 {risk.risk_label}
               </div>
-              <div className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
+              <div className="text-xs text-white/50">
                 {risk.country_code} · Score: {risk.risk_score}/100
               </div>
             </div>
@@ -124,25 +122,24 @@ export function TravelRiskWidget() {
 
           {risk.key_threats.length > 0 && (
             <div className="mb-3">
-              <div className="text-xs mono font-bold mb-1" style={{ color: 'var(--text-muted)' }}>KEY THREATS</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.15em] text-white/25">KEY THREATS</div>
               {risk.key_threats.map((t, i) => (
-                <div key={i} className="text-xs mono flex gap-2 mb-1">
+                <div key={i} className="mb-1 flex gap-2 text-xs">
                   <span style={{ color: riskColor }}>›</span>
-                  <span style={{ color: 'var(--text-primary)' }}>{t}</span>
+                  <span className="text-white">{t}</span>
                 </div>
               ))}
             </div>
           )}
 
           {risk.note && (
-            <p className="text-xs mono italic" style={{ color: 'var(--text-muted)' }}>{risk.note}</p>
+            <p className="text-xs italic text-white/50">{risk.note}</p>
           )}
 
           {!showBriefForm && !brief && (
             <button
               onClick={() => setShowBriefForm(true)}
-              className="mt-2 w-full py-2 text-xs mono rounded border font-bold"
-              style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+              className="mt-2 w-full rounded border border-blue-400 bg-blue-500/20 py-2 text-xs font-bold text-blue-400 hover:bg-blue-500/30"
             >
               GENERATE TRAVEL BRIEF
             </button>
@@ -152,27 +149,25 @@ export function TravelRiskWidget() {
 
       {/* Brief form */}
       {showBriefForm && (
-        <div className="border rounded p-3 mb-4" style={{ borderColor: 'var(--border)' }}>
-          <div className="text-xs mono font-bold mb-2" style={{ color: 'var(--text-muted)' }}>BRIEF PARAMETERS</div>
+        <div className="mb-4 rounded border border-white/[0.05] bg-white/[0.015] p-3">
+          <div className="mb-2 text-[10px] uppercase tracking-[0.15em] text-white/25">BRIEF PARAMETERS</div>
           {[
             { label: 'Traveler Name (optional)', val: travelerName, set: setTravelerName, placeholder: 'John Smith' },
             { label: 'Departure Date', val: departure, set: setDeparture, placeholder: 'YYYY-MM-DD' },
             { label: 'Return Date', val: returnDate, set: setReturnDate, placeholder: 'YYYY-MM-DD' },
           ].map(f => (
             <div key={f.label} className="mb-2">
-              <div className="text-xs mono mb-1" style={{ color: 'var(--text-muted)' }}>{f.label}</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.15em] text-white/25">{f.label}</div>
               <input
                 value={f.val}
                 onChange={e => f.set(e.target.value)}
                 placeholder={f.placeholder}
-                className="w-full px-3 py-2 text-xs mono rounded border"
-                style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                className="w-full rounded border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs text-white placeholder:text-white/20"
               />
             </div>
           ))}
           <button onClick={() => void generateBrief()} disabled={briefing}
-            className="w-full py-2 text-xs mono rounded font-bold"
-            style={{ backgroundColor: 'var(--primary)', color: '#fff' }}>
+            className="w-full rounded bg-blue-500 py-2 text-xs font-bold text-white hover:bg-blue-600 disabled:opacity-50">
             {briefing ? 'GENERATING...' : 'GENERATE'}
           </button>
         </div>
@@ -180,30 +175,30 @@ export function TravelRiskWidget() {
 
       {/* Generated brief */}
       {brief && (
-        <div className="border rounded p-3" style={{ borderColor: riskColor }}>
-          <div className="text-xs mono font-bold mb-2" style={{ color: riskColor }}>
+        <div className="rounded border p-3" style={{ borderColor: riskColor }}>
+          <div className="mb-2 text-xs font-bold" style={{ color: riskColor }}>
             PRE-DEPARTURE BRIEF — {brief.destination}
           </div>
           <div className="mb-2">
-            <div className="text-xs mono font-bold mb-1" style={{ color: 'var(--text-muted)' }}>CHECKLIST</div>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.15em] text-white/25">CHECKLIST</div>
             {brief.pre_departure_checklist.map((item, i) => (
-              <div key={i} className="text-xs mono flex gap-2 mb-1">
-                <span style={{ color: 'var(--text-muted)' }}>□</span>
-                <span style={{ color: 'var(--text-primary)' }}>{item}</span>
+              <div key={i} className="mb-1 flex gap-2 text-xs">
+                <span className="text-white/50">□</span>
+                <span className="text-white">{item}</span>
               </div>
             ))}
           </div>
           <div className="mb-2">
-            <div className="text-xs mono font-bold mb-1" style={{ color: 'var(--text-muted)' }}>CHECK-IN SCHEDULE</div>
-            <p className="text-xs mono" style={{ color: 'var(--text-primary)' }}>{brief.check_in_schedule}</p>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.15em] text-white/25">CHECK-IN SCHEDULE</div>
+            <p className="text-xs text-white">{brief.check_in_schedule}</p>
           </div>
           <div>
-            <div className="text-xs mono font-bold mb-1" style={{ color: 'var(--text-muted)' }}>EMERGENCY CONTACTS</div>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.15em] text-white/25">EMERGENCY CONTACTS</div>
             {brief.emergency_contacts.map((c, i) => (
-              <div key={i} className="text-xs mono" style={{ color: 'var(--text-primary)' }}>› {c}</div>
+              <div key={i} className="text-xs text-white">› {c}</div>
             ))}
           </div>
-          <div className="mt-2 text-xs mono" style={{ color: 'var(--text-muted)' }}>
+          <div className="mt-2 text-xs text-white/50">
             Generated {new Date(brief.generated_at).toLocaleString()}
           </div>
         </div>

@@ -95,28 +95,18 @@ export function PricingTable({ currentPlan }: { currentPlan?: string }) {
   return (
     <div>
       {/* Billing toggle */}
-      <div className="flex items-center justify-center gap-3 mb-8">
+      <div className="mb-8 flex items-center justify-center gap-3">
         <button
           onClick={() => setBilling('monthly')}
-          className="px-4 py-2 rounded text-xs mono border transition-colors"
-          style={{
-            borderColor: billing === 'monthly' ? 'var(--primary)' : 'var(--border)',
-            color: billing === 'monthly' ? 'var(--primary)' : 'var(--text-muted)',
-            backgroundColor: billing === 'monthly' ? 'var(--primary-10)' : 'transparent',
-          }}
+          className={`rounded border px-4 py-2 text-xs font-medium transition-colors ${billing === 'monthly' ? 'border-blue-400 bg-blue-500/20 text-blue-400' : 'border-white/[0.08] bg-white/[0.05] text-white/60 hover:bg-white/[0.08]'}`}
         >
           MONTHLY
         </button>
         <button
           onClick={() => setBilling('annual')}
-          className="px-4 py-2 rounded text-xs mono border transition-colors"
-          style={{
-            borderColor: billing === 'annual' ? 'var(--primary)' : 'var(--border)',
-            color: billing === 'annual' ? 'var(--primary)' : 'var(--text-muted)',
-            backgroundColor: billing === 'annual' ? 'var(--primary-10)' : 'transparent',
-          }}
+          className={`rounded border px-4 py-2 text-xs font-medium transition-colors ${billing === 'annual' ? 'border-blue-400 bg-blue-500/20 text-blue-400' : 'border-white/[0.08] bg-white/[0.05] text-white/60 hover:bg-white/[0.08]'}`}
         >
-          ANNUAL <span style={{ color: 'var(--alert-green)' }}>(-20%)</span>
+          ANNUAL <span className="text-green-400">(-20%)</span>
         </button>
       </div>
 
@@ -132,43 +122,39 @@ export function PricingTable({ currentPlan }: { currentPlan?: string }) {
           return (
             <div
               key={plan.id}
-              className="rounded border p-6 flex flex-col"
-              style={{
-                backgroundColor: plan.highlighted ? 'var(--bg-surface-2)' : 'var(--bg-surface)',
-                borderColor: plan.highlighted ? 'var(--primary)' : 'var(--border)',
-              }}
+              className={`flex flex-col rounded border p-6 ${plan.highlighted ? 'border-blue-400 bg-white/[0.03] hover:bg-white/[0.05]' : 'border-white/[0.05] bg-white/[0.015] hover:bg-white/[0.03]'}`}
             >
               {plan.highlighted && (
-                <div className="text-xs mono text-center mb-3 px-2 py-1 rounded" style={{ backgroundColor: 'var(--primary)', color: 'var(--bg-base)' }}>
+                <div className="mb-3 rounded bg-blue-500 px-2 py-1 text-center text-xs font-medium text-white">
                   MOST POPULAR
                 </div>
               )}
 
-              <div className="text-sm font-bold mono tracking-widest mb-1" style={{ color: 'var(--text-primary)' }}>
+              <div className="mb-1 text-sm font-bold tracking-widest text-white">
                 {plan.name}
               </div>
-              <div className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+              <div className="mb-4 text-xs text-white/80">
                 {plan.description}
               </div>
 
               <div className="mb-6">
-                <span className="text-3xl font-bold mono" style={{ color: 'var(--primary)' }}>
+                <span className="text-3xl font-bold text-blue-400">
                   ${displayPrice}
                 </span>
-                <span className="text-xs mono ml-1" style={{ color: 'var(--text-muted)' }}>
+                <span className="ml-1 text-xs text-white/50">
                   /mo
                 </span>
                 {billing === 'annual' && (
-                  <div className="text-xs mono mt-1" style={{ color: 'var(--text-muted)' }}>
+                  <div className="mt-1 text-xs text-white/50">
                     ${price}/yr · save ${plan.price * 12 - plan.annualPrice}
                   </div>
                 )}
               </div>
 
-              <ul className="flex-1 mb-6 space-y-2">
+              <ul className="mb-6 flex-1 space-y-2">
                 {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2 text-xs mono" style={{ color: 'var(--text-muted)' }}>
-                    <span style={{ color: 'var(--alert-green)', flexShrink: 0 }}>✓</span>
+                  <li key={feature} className="flex items-start gap-2 text-xs text-white/80">
+                    <span className="shrink-0 text-green-400">✓</span>
                     {feature}
                   </li>
                 ))}
@@ -176,8 +162,7 @@ export function PricingTable({ currentPlan }: { currentPlan?: string }) {
 
               {isCurrent ? (
                 <div
-                  className="text-center py-2 rounded text-xs mono border"
-                  style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+                  className="rounded border border-white/[0.08] bg-white/[0.05] py-2 text-center text-xs font-medium text-white/60"
                 >
                   CURRENT PLAN
                 </div>
@@ -189,11 +174,7 @@ export function PricingTable({ currentPlan }: { currentPlan?: string }) {
                     setLoading(null)
                   }}
                   disabled={loading !== null}
-                  className="py-2 rounded text-xs mono font-bold tracking-wider border transition-colors hover:bg-white/5 disabled:opacity-50"
-                  style={{
-                    borderColor: plan.highlighted ? 'var(--primary)' : 'var(--border)',
-                    color: plan.highlighted ? 'var(--primary)' : 'var(--text-muted)',
-                  }}
+                  className={`rounded border py-2 text-xs font-bold tracking-wider transition-colors disabled:opacity-50 ${plan.highlighted ? 'border-blue-400 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' : 'border-white/[0.08] bg-white/[0.05] text-white/60 hover:bg-white/[0.08]'}`}
                 >
                   {loading === plan.id ? 'REDIRECTING...' : plan.cta}
                 </button>
@@ -205,23 +186,21 @@ export function PricingTable({ currentPlan }: { currentPlan?: string }) {
 
       {/* Enterprise */}
       <div
-        className="mt-6 rounded border p-6 flex items-center justify-between"
-        style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
+        className="mt-6 flex items-center justify-between rounded border border-white/[0.05] bg-white/[0.015] p-6 hover:bg-white/[0.03]"
       >
         <div>
-          <div className="text-sm font-bold mono tracking-widest mb-1" style={{ color: 'var(--text-primary)' }}>
+          <div className="mb-1 text-sm font-bold tracking-widest text-white">
             ENTERPRISE
           </div>
-          <div className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-xs text-white/80">
             SSO/SAML · Custom SLA · Dedicated tenant · Gov/defense procurement · White-label
           </div>
         </div>
-        <div className="text-right shrink-0 ml-4">
-          <div className="text-lg font-bold mono" style={{ color: 'var(--text-primary)' }}>$2,000+/mo</div>
+        <div className="ml-4 shrink-0 text-right">
+          <div className="text-lg font-bold text-white">$2,000+/mo</div>
           <a
             href="mailto:enterprise@conflictradar.co"
-            className="text-xs mono"
-            style={{ color: 'var(--primary)' }}
+            className="text-xs text-blue-400 hover:text-blue-300"
           >
             CONTACT SALES →
           </a>

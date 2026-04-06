@@ -29,8 +29,8 @@ const ALERT_TYPE_ICONS: Record<string, string> = {
 
 function AlertSkeleton() {
   return (
-    <div className="p-3 rounded mb-2 border-l-2" style={{ borderLeftColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
-      <div className="skeleton h-3 rounded mb-2" style={{ width: '70%' }} />
+    <div className="mb-2 rounded border-l-2 border-white/[0.05] bg-white/[0.015] p-3">
+      <div className="skeleton mb-2 h-3 rounded" style={{ width: '70%' }} />
       <div className="skeleton h-3 rounded" style={{ width: '50%' }} />
     </div>
   )
@@ -92,12 +92,11 @@ export function AlertPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 py-3 border-b flex items-center justify-between shrink-0"
-        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+      <div className="flex items-center justify-between shrink-0 border-b border-white/[0.05] bg-white/[0.015] px-4 py-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-sm font-bold mono tracking-widest" style={{ color: 'var(--text-primary)' }}>ALERTS</h2>
+          <h2 className="text-sm font-bold tracking-widest text-white">ALERTS</h2>
           {unreadCount > 0 && (
-            <span className="text-xs mono px-2 py-0.5 rounded" style={{ backgroundColor: 'var(--alert-red)', color: '#fff' }}>
+            <span className="rounded bg-red-500 px-2 py-0.5 text-xs font-medium text-white">
               {unreadCount}
             </span>
           )}
@@ -105,17 +104,13 @@ export function AlertPanel() {
         <div className="flex items-center gap-2">
           {(['all', 'unread'] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
-              className="text-xs mono px-2 py-1 rounded border"
-              style={{
-                borderColor: filter === f ? 'var(--primary)' : 'var(--border)',
-                color: filter === f ? 'var(--primary)' : 'var(--text-muted)',
-              }}>
+              className={`rounded border px-2 py-1 text-xs font-medium ${filter === f ? 'border-blue-400 bg-blue-500/20 text-blue-400' : 'border-white/[0.08] text-white/50 hover:bg-white/[0.05]'}`}>
               {f.toUpperCase()}
             </button>
           ))}
           {unreadCount > 0 && (
             <button onClick={() => void markRead(alerts.filter(a => !a.read).map(a => a.id))}
-              className="text-xs mono" style={{ color: 'var(--text-muted)' }}>
+              className="text-xs text-white/50 hover:text-white/80">
               MARK ALL READ
             </button>
           )}
@@ -128,31 +123,29 @@ export function AlertPanel() {
           <div className="p-3">{Array.from({ length: 4 }).map((_, i) => <AlertSkeleton key={i} />)}</div>
         ) : error ? (
           <div className="p-8 text-center">
-            <p className="text-xs mono mb-3" style={{ color: '#FF4444' }}>⚠ {error}</p>
+            <p className="mb-3 text-xs text-red-400">⚠ {error}</p>
             <button onClick={() => void fetchAlerts()}
-              className="px-4 py-2 rounded text-xs mono border"
-              style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+              className="rounded border border-white/[0.08] bg-white/[0.05] px-4 py-2 text-xs text-white/60 hover:bg-white/[0.08]">
               RETRY
             </button>
           </div>
         ) : personalMode && alerts.length === 0 ? (
           <div className="p-8 text-center">
-            <div className="text-3xl mb-4">⊕</div>
-            <p className="text-sm mono mb-2" style={{ color: 'var(--text-muted)' }}>CREATE AN ORG TO ENABLE ALERTS</p>
-            <p className="text-xs mb-4" style={{ color: 'var(--text-disabled)' }}>
+            <div className="mb-4 text-3xl">⊕</div>
+            <p className="mb-2 text-sm text-white/50">CREATE AN ORG TO ENABLE ALERTS</p>
+            <p className="mb-4 text-xs text-white/30">
               Alert rules (PIRs) are scoped to organizations. Complete onboarding to set one up.
             </p>
-            <a href="/onboarding" className="inline-block px-6 py-2 rounded text-xs mono font-bold"
-              style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
+            <a href="/onboarding" className="inline-block rounded bg-blue-500 px-6 py-2 text-xs font-bold text-white hover:bg-blue-600">
               COMPLETE ONBOARDING
             </a>
           </div>
         ) : alerts.length === 0 ? (
-          <div className="p-8 text-center text-xs mono" style={{ color: 'var(--text-muted)' }}>
+          <div className="p-8 text-center text-xs text-white/50">
             {filter === 'unread' ? 'NO UNREAD ALERTS' : 'NO ALERTS — SET UP PIRs TO MONITOR'}
           </div>
         ) : (
-          <div className="p-3 flex flex-col gap-2">
+          <div className="flex flex-col gap-2 p-3">
             {alerts.map(alert => {
               const color = SEVERITY_COLORS[alert.severity] ?? SEVERITY_COLORS[2]
               const icon = ALERT_TYPE_ICONS[alert.alert_type] ?? '●'
@@ -161,7 +154,7 @@ export function AlertPanel() {
               })
               return (
                 <div key={alert.id}
-                  className="p-3 rounded border-l-2 cursor-pointer hover:bg-white/5 transition-colors feed-item-enter"
+                  className="feed-item-enter cursor-pointer rounded border-l-2 p-3 transition-colors hover:bg-white/[0.03]"
                   style={{
                     backgroundColor: alert.read ? 'var(--bg-surface)' : 'var(--bg-surface-2)',
                     borderLeftColor: color,
@@ -171,12 +164,12 @@ export function AlertPanel() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span style={{ color }}>{icon}</span>
-                      <span className="text-xs mono font-bold" style={{ color: 'var(--text-primary)' }}>{alert.title}</span>
+                      <span className="text-xs font-bold text-white">{alert.title}</span>
                     </div>
-                    <span className="text-xs mono shrink-0" style={{ color: 'var(--text-muted)' }}>{time}</span>
+                    <span className="shrink-0 text-xs text-white/50">{time}</span>
                   </div>
-                  <p className="text-xs mt-1 truncate-2" style={{ color: 'var(--text-muted)' }}>{alert.body}</p>
-                  {!alert.read && <span className="text-xs mono mt-1 block" style={{ color: 'var(--accent-blue)' }}>● UNREAD</span>}
+                  <p className="mt-1 truncate-2 text-xs text-white/50">{alert.body}</p>
+                  {!alert.read && <span className="mt-1 block text-xs text-blue-400">● UNREAD</span>}
                 </div>
               )
             })}

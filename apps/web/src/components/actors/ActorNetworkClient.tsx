@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from 'react'
 type Actor = { id: string; name: string; actor_type: string; region: string | null; threat_level: string | null; description: string | null }
 type Relationship = { actor_id: string; related_actor_id: string; relationship_type: string; strength: number }
 
-const S = { background: '#080c12', card: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)', text: '#e2e8f0', muted: '#64748b' }
 const TYPE_COLORS: Record<string, string> = { state: '#3b82f6', non_state: '#ef4444', terrorist: '#dc2626', militia: '#f97316', political: '#a78bfa', international: '#22c55e', criminal: '#ec4899' }
 const THREAT_COLORS: Record<string, string> = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e', unknown: '#64748b' }
 
@@ -91,33 +90,33 @@ export function ActorNetworkClient() {
   const positions = useForceLayout(actors, rels, W, H)
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: S.background, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: S.muted, fontSize: 14 }}>Loading actor network…</div>
+    <div className="min-h-screen bg-[#070B11] flex items-center justify-center">
+      <div className="text-white/50 text-sm">Loading actor network…</div>
     </div>
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: S.background, padding: '28px', fontFamily: '-apple-system,sans-serif' }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: S.text, margin: 0 }}>Actor Network</h1>
-        <div style={{ fontSize: 13, color: S.muted, marginTop: 4 }}>{actors.length} actors · {rels.length} relationships</div>
+    <div className="min-h-screen bg-[#070B11] p-7">
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold text-white m-0">Actor Network</h1>
+        <div className="text-sm text-white/50 mt-1">{actors.length} actors · {rels.length} relationships</div>
       </div>
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div className="flex gap-4 mb-4 flex-wrap">
         {Object.entries(TYPE_COLORS).map(([type, color]) => (
-          <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
-            <span style={{ fontSize: 11, color: S.muted, textTransform: 'capitalize' }}>{type.replace('_', ' ')}</span>
+          <div key={type} className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
+            <span className="text-xs text-white/50 capitalize">{type.replace('_', ' ')}</span>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 280px' : '1fr', gap: 16 }}>
+      <div className={selected ? 'grid grid-cols-[1fr_280px] gap-4' : 'grid grid-cols-1'}>
         {/* Graph */}
-        <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
+        <div className="bg-white/[0.015] border border-white/[0.05] rounded-xl overflow-hidden relative hover:bg-white/[0.03] transition-colors">
           {actors.length === 0 ? (
-            <div style={{ padding: '80px 0', textAlign: 'center', color: S.muted, fontSize: 14 }}>
+            <div className="py-20 text-center text-white/50 text-sm">
               No actors tracked yet. They populate automatically as events are processed.
             </div>
           ) : (
@@ -154,38 +153,38 @@ export function ActorNetworkClient() {
 
         {/* Detail panel */}
         {selected && (
-          <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <div className="bg-white/[0.015] border border-white/[0.05] rounded-xl p-5 hover:bg-white/[0.03] transition-colors">
+            <div className="flex justify-between items-start mb-4">
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: S.text }}>{selected.name}</div>
-                <div style={{ fontSize: 11, color: TYPE_COLORS[selected.actor_type] ?? '#64748b', marginTop: 3, textTransform: 'uppercase' }}>{selected.actor_type.replace('_', ' ')}</div>
+                <div className="text-base font-bold text-white">{selected.name}</div>
+                <div className="text-xs uppercase mt-0.5" style={{ color: TYPE_COLORS[selected.actor_type] ?? '#64748b' }}>{selected.actor_type.replace('_', ' ')}</div>
               </div>
-              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', color: S.muted, cursor: 'pointer', fontSize: 16 }}>✕</button>
+              <button onClick={() => setSelected(null)} className="bg-none border-none text-white/50 cursor-pointer text-base hover:text-white/70">✕</button>
             </div>
-            {selected.region && <div style={{ fontSize: 12, color: S.muted, marginBottom: 10 }}>📍 {selected.region}</div>}
+            {selected.region && <div className="text-xs text-white/50 mb-2.5">📍 {selected.region}</div>}
             {selected.threat_level && (
-              <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 4, background: (THREAT_COLORS[selected.threat_level] ?? '#64748b') + '20', color: THREAT_COLORS[selected.threat_level] ?? '#64748b', marginBottom: 12, textTransform: 'uppercase' }}>
+              <div className="inline-block text-xs font-semibold px-2.5 py-1 rounded mb-3 uppercase" style={{ background: (THREAT_COLORS[selected.threat_level] ?? '#64748b') + '20', color: THREAT_COLORS[selected.threat_level] ?? '#64748b' }}>
                 Threat: {selected.threat_level}
               </div>
             )}
-            {selected.description && <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>{selected.description}</div>}
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 11, color: S.muted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Relationships</div>
+            {selected.description && <div className="text-xs text-white/70 leading-relaxed">{selected.description}</div>}
+            <div className="mt-4">
+              <div className="text-[10px] uppercase tracking-[0.15em] text-white/25 mb-2">Relationships</div>
               {rels.filter(r => r.actor_id === selected.id || r.related_actor_id === selected.id).slice(0, 8).map((rel, i) => {
                 const otherId = rel.actor_id === selected.id ? rel.related_actor_id : rel.actor_id
                 const other = actors.find(a => a.id === otherId)
                 const relColors: Record<string, string> = { allied: '#22c55e', enemy: '#ef4444', neutral: '#475569', proxy: '#f97316', sponsor: '#a78bfa' }
                 return (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 12, color: '#94a3b8', cursor: 'pointer' }}
+                  <div key={i} className="flex items-center gap-2 mb-1.5 text-xs text-white/70 cursor-pointer hover:text-white/90"
                     onClick={() => other && setSelected(other)}>
                     <span style={{ color: relColors[rel.relationship_type] ?? '#64748b' }}>→</span>
                     <span>{other?.name ?? otherId.slice(0, 8)}</span>
-                    <span style={{ color: S.muted, marginLeft: 'auto' }}>{rel.relationship_type}</span>
+                    <span className="text-white/50 ml-auto">{rel.relationship_type}</span>
                   </div>
                 )
               })}
               {rels.filter(r => r.actor_id === selected.id || r.related_actor_id === selected.id).length === 0 && (
-                <div style={{ fontSize: 12, color: S.muted }}>No relationships mapped yet</div>
+                <div className="text-xs text-white/50">No relationships mapped yet</div>
               )}
             </div>
           </div>
