@@ -20,6 +20,14 @@ export interface MapSidebarProps {
   severity: string; onSeverityChange: (v: string) => void;
   category: string; onCategoryChange: (v: string) => void;
   region: string; onRegionChange: (v: string) => void;
+  // ACLED-specific filters
+  acledEventType: string; onAcledEventTypeChange: (v: string) => void;
+  acledDisorderType: string; onAcledDisorderTypeChange: (v: string) => void;
+  acledCountry: string; onAcledCountryChange: (v: string) => void;
+  acledRegion: string; onAcledRegionChange: (v: string) => void;
+  acledActor: string; onAcledActorChange: (v: string) => void;
+  acledFatalities: string; onAcledFatalitiesChange: (v: string) => void;
+  acledCivilianOnly: boolean; onAcledCivilianOnlyChange: () => void;
   viewMode: 'globe' | 'map'; onViewModeChange: (v: 'globe' | 'map') => void;
   selectedEvent: Record<string, unknown> | null;
   selectedFlight: Record<string, unknown> | null;
@@ -81,6 +89,13 @@ export default function MapSidebar({
   severity, onSeverityChange,
   category, onCategoryChange,
   region, onRegionChange,
+  acledEventType, onAcledEventTypeChange,
+  acledDisorderType, onAcledDisorderTypeChange,
+  acledCountry, onAcledCountryChange,
+  acledRegion, onAcledRegionChange,
+  acledActor, onAcledActorChange,
+  acledFatalities, onAcledFatalitiesChange,
+  acledCivilianOnly, onAcledCivilianOnlyChange,
   selectedEvent, selectedFlight, selectedVessel,
 }: MapSidebarProps) {
 
@@ -264,6 +279,142 @@ export default function MapSidebar({
 
           </div>
         </Section>
+
+        {/* ── ACLED FILTERS (only visible when ACLED layer is on) ── */}
+        {showACLED && (
+          <Section title="ACLED Filters" badge={acledCount} defaultOpen>
+            <div className="flex flex-col gap-4">
+
+              {/* Event Type */}
+              <div>
+                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Event Type</p>
+                <div className="relative">
+                  <select value={acledEventType} onChange={(e) => onAcledEventTypeChange(e.target.value)}
+                    className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
+                      appearance-none cursor-pointer hover:border-gray-700 focus:border-orange-500/40 focus:outline-none transition">
+                    <option value="all">All event types</option>
+                    <option value="Battles">Battles</option>
+                    <option value="Violence against civilians">Violence against civilians</option>
+                    <option value="Explosions/Remote violence">Explosions / Remote violence</option>
+                    <option value="Riots">Riots</option>
+                    <option value="Protests">Protests</option>
+                    <option value="Strategic developments">Strategic developments</option>
+                  </select>
+                  <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-600 pointer-events-none"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Disorder Type */}
+              <div>
+                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Disorder Type</p>
+                <div className="relative">
+                  <select value={acledDisorderType} onChange={(e) => onAcledDisorderTypeChange(e.target.value)}
+                    className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
+                      appearance-none cursor-pointer hover:border-gray-700 focus:border-orange-500/40 focus:outline-none transition">
+                    <option value="all">All disorder types</option>
+                    <option value="Political violence">Political violence</option>
+                    <option value="Political violence; Demonstrations">Political violence & Demonstrations</option>
+                    <option value="Demonstrations">Demonstrations</option>
+                    <option value="Strategic developments">Strategic developments</option>
+                  </select>
+                  <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-600 pointer-events-none"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* ACLED Region */}
+              <div>
+                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">ACLED Region</p>
+                <div className="relative">
+                  <select value={acledRegion} onChange={(e) => onAcledRegionChange(e.target.value)}
+                    className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
+                      appearance-none cursor-pointer hover:border-gray-700 focus:border-orange-500/40 focus:outline-none transition">
+                    <option value="all">All regions</option>
+                    <option value="1">Western Africa</option>
+                    <option value="2">Middle Africa</option>
+                    <option value="3">Eastern Africa</option>
+                    <option value="4">Southern Africa</option>
+                    <option value="5">Northern Africa</option>
+                    <option value="7">Southern Asia</option>
+                    <option value="9">South-Eastern Asia</option>
+                    <option value="10">Middle East</option>
+                    <option value="11">Europe</option>
+                    <option value="12">Caucasus and Central Asia</option>
+                    <option value="13">Central America</option>
+                    <option value="14">South America</option>
+                    <option value="15">Caribbean</option>
+                    <option value="16">East Asia</option>
+                    <option value="17">North America</option>
+                    <option value="18">Oceania</option>
+                  </select>
+                  <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-600 pointer-events-none"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Country */}
+              <div>
+                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Country</p>
+                <input type="text" value={acledCountry} onChange={(e) => onAcledCountryChange(e.target.value)}
+                  placeholder="e.g. Ukraine, Syria, Sudan..."
+                  className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
+                    placeholder:text-gray-600 hover:border-gray-700 focus:border-orange-500/40 focus:outline-none transition" />
+              </div>
+
+              {/* Actor search */}
+              <div>
+                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Actor (search)</p>
+                <input type="text" value={acledActor} onChange={(e) => onAcledActorChange(e.target.value)}
+                  placeholder="e.g. Wagner, Houthis, ISIS..."
+                  className="w-full bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 text-[11px] text-gray-300
+                    placeholder:text-gray-600 hover:border-gray-700 focus:border-orange-500/40 focus:outline-none transition" />
+              </div>
+
+              {/* Minimum fatalities */}
+              <div>
+                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Min. Fatalities</p>
+                <div className="flex gap-1.5">
+                  {[
+                    { v: '0', l: 'Any' },
+                    { v: '1', l: '1+' },
+                    { v: '5', l: '5+' },
+                    { v: '10', l: '10+' },
+                    { v: '50', l: '50+' },
+                  ].map(f => (
+                    <button key={f.v} onClick={() => onAcledFatalitiesChange(f.v)}
+                      className={`flex-1 py-1.5 text-[10px] font-medium uppercase tracking-wider rounded-lg border transition
+                        ${acledFatalities === f.v
+                          ? 'bg-red-500/15 border-red-500/30 text-red-400'
+                          : 'bg-transparent border-gray-800 text-gray-500 hover:border-gray-700 hover:text-gray-400'
+                        }`}>
+                      {f.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Civilian targeting toggle */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px]">⚠️</span>
+                  <div>
+                    <p className="text-[11px] text-white font-medium">Civilian targeting only</p>
+                    <p className="text-[9px] text-gray-500">Filter to events targeting civilians</p>
+                  </div>
+                </div>
+                <Toggle on={acledCivilianOnly} onChange={onAcledCivilianOnlyChange} color="bg-red-500" />
+              </div>
+
+            </div>
+          </Section>
+        )}
 
         {/* ── SELECTED ITEM ── */}
         {(selectedEvent ?? selectedFlight ?? selectedVessel) && (

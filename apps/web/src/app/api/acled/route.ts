@@ -138,6 +138,30 @@ export async function GET(request: NextRequest) {
   const eventType = searchParams.get('event_type')
   if (eventType) params.set('event_type', eventType)
 
+  // Disorder type filter
+  const disorderType = searchParams.get('disorder_type')
+  if (disorderType) params.set('disorder_type', disorderType)
+
+  // Actor filter (LIKE search on actor1 or actor2)
+  const actor = searchParams.get('actor')
+  if (actor) {
+    params.set('actor1', actor)
+    params.set('actor1_where', 'LIKE')
+  }
+
+  // Fatalities minimum
+  const fatalities = searchParams.get('fatalities')
+  if (fatalities && fatalities !== '0') {
+    params.set('fatalities', fatalities)
+    params.set('fatalities_where', '>=')
+  }
+
+  // Civilian targeting filter
+  const civilianTargeting = searchParams.get('civilian_targeting')
+  if (civilianTargeting === 'true') {
+    params.set('civilian_targeting', 'Civilian targeting')
+  }
+
   // Limit — cap at 5000 to avoid huge payloads
   const limit = Math.min(Number(searchParams.get('limit') ?? 2000), 5000)
   params.set('limit', String(limit))

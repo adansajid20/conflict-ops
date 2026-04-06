@@ -153,6 +153,13 @@ export default function CesiumGlobe() {
 
   // ACLED
   const [acledCount, setAcledCount] = useState(0);
+  const [acledEventType, setAcledEventType] = useState('all');
+  const [acledDisorderType, setAcledDisorderType] = useState('all');
+  const [acledCountry, setAcledCountry] = useState('');
+  const [acledRegion, setAcledRegion] = useState('all');
+  const [acledActor, setAcledActor] = useState('');
+  const [acledFatalities, setAcledFatalities] = useState('0');
+  const [acledCivilianOnly, setAcledCivilianOnly] = useState(false);
 
   // Filters
   const [timeWindow, setTimeWindow] = useState('7d');
@@ -285,13 +292,28 @@ export default function CesiumGlobe() {
   }, [cesiumReady, showEvents, timeWindow, severity, category, region]);
 
   // ── ACLED DATA LAYER ─────────────────────────────────────────────
-  const plotACLED = useCallback(async (tw: string) => {
+  const plotACLED = useCallback(async (
+    tw: string,
+    filters: {
+      eventType: string; disorderType: string; country: string;
+      region: string; actor: string; fatalities: string; civilianOnly: boolean;
+    },
+  ) => {
     const Ce = getCe(); const v = getViewer();
     if (!Ce || !v) return;
 
     const windowParam = tw === 'all' ? '90d' : tw;
+    const params = new URLSearchParams({ window: windowParam, limit: '3000' });
+    if (filters.eventType !== 'all') params.set('event_type', filters.eventType);
+    if (filters.disorderType !== 'all') params.set('disorder_type', filters.disorderType);
+    if (filters.country.trim()) params.set('country', filters.country.trim());
+    if (filters.region !== 'all') params.set('region', filters.region);
+    if (filters.actor.trim()) params.set('actor', filters.actor.trim());
+    if (filters.fatalities !== '0') params.set('fatalities', filters.fatalities);
+    if (filters.civilianOnly) params.set('civilian_targeting', 'true');
+
     try {
-      const res = await fetch(`/api/acled?window=${windowParam}&limit=3000`, {
+      const res = await fetch(`/api/acled?${params.toString()}`, {
         signal: AbortSignal.timeout(15_000),
       });
       if (!res.ok) { console.warn('[ACLED] API returned', res.status); return; }
@@ -342,10 +364,26 @@ export default function CesiumGlobe() {
 
   useEffect(() => {
     if (!cesiumReady) return;
-    if (showACLED) void plotACLED(timeWindow);
-    else { removeEntitiesByPrefix('acl-'); setAcledCount(0); }
+    if (showACLED) {
+      // Debounce text input filters (country, actor) by 500ms
+      const t = setTimeout(() => {
+        void plotACLED(timeWindow, {
+          eventType: acledEventType,
+          disorderType: acledDisorderType,
+          country: acledCountry,
+          region: acledRegion,
+          actor: acledActor,
+          fatalities: acledFatalities,
+          civilianOnly: acledCivilianOnly,
+        });
+      }, acledCountry || acledActor ? 500 : 0);
+      return () => clearTimeout(t);
+    } else {
+      removeEntitiesByPrefix('acl-');
+      setAcledCount(0);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cesiumReady, showACLED, timeWindow]);
+  }, [cesiumReady, showACLED, timeWindow, acledEventType, acledDisorderType, acledCountry, acledRegion, acledActor, acledFatalities, acledCivilianOnly]);
 
   // ── FLIGHTS ───────────────────────────────────────────────────────
   const fetchFlights = useCallback(async () => {
@@ -989,6 +1027,13 @@ export default function CesiumGlobe() {
         severity={severity} onSeverityChange={setSeverity}
         category={category} onCategoryChange={setCategory}
         region={region} onRegionChange={setRegion}
+        acledEventType={acledEventType} onAcledEventTypeChange={setAcledEventType}
+        acledDisorderType={acledDisorderType} onAcledDisorderTypeChange={setAcledDisorderType}
+        acledCountry={acledCountry} onAcledCountryChange={setAcledCountry}
+        acledRegion={acledRegion} onAcledRegionChange={setAcledRegion}
+        acledActor={acledActor} onAcledActorChange={setAcledActor}
+        acledFatalities={acledFatalities} onAcledFatalitiesChange={setAcledFatalities}
+        acledCivilianOnly={acledCivilianOnly} onAcledCivilianOnlyChange={() => setAcledCivilianOnly(p => !p)}
         viewMode={mapMode} onViewModeChange={setMapMode}
         selectedEvent={selectedEvent} selectedFlight={selectedFlight} selectedVessel={selectedVessel}
       />
