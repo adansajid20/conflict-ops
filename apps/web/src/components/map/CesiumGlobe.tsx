@@ -22,7 +22,7 @@ interface Flight {
   icao24: string; callsign: string; originCountry: string;
   latitude: number; longitude: number; altitude: number;
   onGround: boolean; velocity: number; heading: number;
-  verticalRate: number; squawk?: string;
+  verticalRate: number; squawk?: string; corridor?: string;
 }
 interface Vessel {
   mmsi: string; name: string; latitude: number; longitude: number;
@@ -670,6 +670,8 @@ export default function CesiumGlobe() {
             icao24: getP('icao24'), callsign: getP('callsign'),
             originCountry: getP('originCountry'), altitude: getP('altitude'),
             velocity: getP('velocity'), heading: getP('heading'), squawk: getP('squawk'),
+            verticalRate: getP('verticalRate'), corridor: getP('corridor'),
+            latitude: lat, longitude: lng,
           };
           setSelectedFlight(f);
           setSelectedEvent(null);
@@ -861,35 +863,142 @@ export default function CesiumGlobe() {
         </div>
 
         {/* Flight info card */}
-        {selectedFlight && !showModal && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#111827]/95 backdrop-blur-xl border border-cyan-500/20 rounded-2xl p-4 shadow-2xl shadow-black/40 w-80 animate-slide-up pointer-events-auto">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-base">✈️</span>
-                <div>
-                  <p className="text-white font-bold text-sm tracking-wider">{String(selectedFlight.callsign ?? selectedFlight.icao24 ?? '')}</p>
-                  <p className="text-[9px] text-gray-500">{String(selectedFlight.originCountry ?? '')}</p>
+        {selectedFlight && !showModal && (() => {
+          const fCallsign = String(selectedFlight.callsign ?? '').trim();
+          const fIcao = String(selectedFlight.icao24 ?? '');
+          const fCountry = String(selectedFlight.originCountry ?? '');
+          const fAlt = Math.round(Number(selectedFlight.altitude ?? 0));
+          const fVel = Number(selectedFlight.velocity ?? 0);
+          const fSpeedKmh = Math.round(fVel * 3.6);
+          const fSpeedKts = Math.round(fVel * 1.944);
+          const fHeading = Math.round(Number(selectedFlight.heading ?? 0));
+          const fVert = Number(selectedFlight.verticalRate ?? 0);
+          const fSquawk = String(selectedFlight.squawk ?? '');
+          const fCorridor = String(selectedFlight.corridor ?? '');
+          const fLat = Number(selectedFlight.latitude ?? 0);
+          const fLng = Number(selectedFlight.longitude ?? 0);
+
+          // Heading compass
+          const hLabels = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+          const hLabel = hLabels[Math.round(fHeading / 22.5) % 16];
+
+          // Flight level (altitude in hundreds of feet)
+          const fAltFt = Math.round(fAlt * 3.281);
+          const flightLevel = `FL${Math.round(fAltFt / 100)}`;
+
+          // Vertical status
+          const vertStatus = fVert > 2 ? 'Climbing' : fVert < -2 ? 'Descending' : 'Cruising';
+          const vertColor = fVert > 2 ? '#34d399' : fVert < -2 ? '#f59e0b' : '#06b6d4';
+          const vertIcon = fVert > 2 ? '↗' : fVert < -2 ? '↘' : '→';
+
+          // Squawk special codes
+          const squawkAlert = fSquawk === '7500' ? 'HIJACK' : fSquawk === '7600' ? 'RADIO FAIL' : fSquawk === '7700' ? 'EMERGENCY' : '';
+
+          return (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#0B1120]/95 backdrop-blur-xl border border-cyan-500/20 rounded-2xl shadow-2xl shadow-black/50 w-[400px] animate-slide-up pointer-events-auto overflow-hidden">
+
+            {/* Top accent bar */}
+            <div className="h-1 w-full bg-gradient-to-r from-cyan-600 via-cyan-400 to-blue-500" />
+
+            <div className="p-4">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-lg flex-shrink-0">
+                    ✈️
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-white font-bold text-[14px] tracking-wider font-mono">{fCallsign || fIcao}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[9px] text-gray-500">{fCountry}</span>
+                      {fCorridor && (
+                        <span className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/15">
+                          {fCorridor}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedFlight(null)}
+                  className="text-gray-500 hover:text-white text-xs w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/5 transition flex-shrink-0">✕</button>
+              </div>
+
+              {/* Status pill row */}
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border" style={{ backgroundColor: `${vertColor}10`, borderColor: `${vertColor}25` }}>
+                  <span className="text-xs" style={{ color: vertColor }}>{vertIcon}</span>
+                  <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: vertColor }}>{vertStatus}</span>
+                </div>
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
+                  <span className="text-[9px] text-cyan-400 font-mono font-semibold">{flightLevel}</span>
+                </div>
+                {squawkAlert && (
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-500/15 border border-red-500/25 animate-pulse">
+                    <span className="text-[9px] text-red-400 font-bold uppercase tracking-wider">⚠ {squawkAlert}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Stats grid — 2 rows */}
+              <div className="grid grid-cols-4 gap-1.5 mb-2">
+                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Altitude</p>
+                  <p className="text-white font-mono text-sm font-bold">{fAltFt.toLocaleString()}</p>
+                  <p className="text-gray-600 text-[8px]">ft</p>
+                </div>
+                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Speed</p>
+                  <p className="text-white font-mono text-sm font-bold">{fSpeedKts}</p>
+                  <p className="text-gray-600 text-[8px]">kts</p>
+                </div>
+                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Heading</p>
+                  <p className="text-white font-mono text-sm font-bold">{fHeading}°</p>
+                  <p className="text-gray-600 text-[8px]">{hLabel}</p>
+                </div>
+                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">V/S</p>
+                  <p className="text-white font-mono text-sm font-bold" style={{ color: fVert !== 0 ? vertColor : undefined }}>
+                    {fVert > 0 ? '+' : ''}{Math.round(fVert * 196.85)}
+                  </p>
+                  <p className="text-gray-600 text-[8px]">ft/min</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedFlight(null)} className="text-gray-500 hover:text-white text-xs w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/5">✕</button>
+              <div className="grid grid-cols-4 gap-1.5 mb-3">
+                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">GS</p>
+                  <p className="text-white font-mono text-[11px] font-bold">{fSpeedKmh}</p>
+                  <p className="text-gray-600 text-[8px]">km/h</p>
+                </div>
+                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Alt (m)</p>
+                  <p className="text-white font-mono text-[11px] font-bold">{fAlt.toLocaleString()}</p>
+                  <p className="text-gray-600 text-[8px]">meters</p>
+                </div>
+                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Lat</p>
+                  <p className="text-white font-mono text-[11px] font-bold">{fLat.toFixed(2)}</p>
+                  <p className="text-gray-600 text-[8px]">{fLat >= 0 ? 'N' : 'S'}</p>
+                </div>
+                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Lon</p>
+                  <p className="text-white font-mono text-[11px] font-bold">{fLng.toFixed(2)}</p>
+                  <p className="text-gray-600 text-[8px]">{fLng >= 0 ? 'E' : 'W'}</p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between pt-2 border-t border-white/[0.04]">
+                <div className="flex items-center gap-3 text-[9px] text-gray-600 font-mono">
+                  <span>ICAO <span className="text-gray-400">{fIcao}</span></span>
+                  <span>SQK <span className="text-gray-400">{fSquawk || '—'}</span></span>
+                </div>
+                <span className="text-[8px] text-gray-600 uppercase tracking-wider">Live ADS-B</span>
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-black/30 rounded-lg p-2 text-center">
-                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Alt</p>
-                <p className="text-white font-mono text-xs">{Math.round(Number(selectedFlight.altitude ?? 0)).toLocaleString()}m</p>
-              </div>
-              <div className="bg-black/30 rounded-lg p-2 text-center">
-                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Speed</p>
-                <p className="text-white font-mono text-xs">{Math.round(Number(selectedFlight.velocity ?? 0) * 3.6)}km/h</p>
-              </div>
-              <div className="bg-black/30 rounded-lg p-2 text-center">
-                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Heading</p>
-                <p className="text-white font-mono text-xs">{Math.round(Number(selectedFlight.heading ?? 0))}°</p>
-              </div>
-            </div>
-            <p className="text-[9px] text-gray-600 mt-2 font-mono">ICAO {String(selectedFlight.icao24 ?? '')} · SQK {String(selectedFlight.squawk ?? '—')}</p>
           </div>
-        )}
+          );
+        })()}
 
         {/* Vessel info card */}
         {selectedVessel && !showModal && (() => {

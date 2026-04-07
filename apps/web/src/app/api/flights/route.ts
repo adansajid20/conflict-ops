@@ -42,30 +42,51 @@ async function setCachedFlights(data: unknown) {
 // ── Simulated flight data as fallback ──────────────────────────────
 // Major air corridors with realistic flight density
 const AIR_CORRIDORS = [
-  // Transatlantic
-  { name: 'North Atlantic', latRange: [42, 58], lonRange: [-60, -10], count: 120, alt: [9000, 12000], countries: ['United States', 'United Kingdom', 'Germany', 'France', 'Canada'] },
-  // Europe
-  { name: 'European', latRange: [36, 60], lonRange: [-10, 30], count: 200, alt: [8000, 12000], countries: ['Germany', 'France', 'United Kingdom', 'Spain', 'Italy', 'Netherlands', 'Turkey'] },
-  // Middle East hub
-  { name: 'Middle East', latRange: [20, 38], lonRange: [30, 60], count: 80, alt: [9000, 12000], countries: ['United Arab Emirates', 'Qatar', 'Saudi Arabia', 'Turkey', 'Iran'] },
-  // South Asia
-  { name: 'South Asia', latRange: [8, 35], lonRange: [60, 90], count: 70, alt: [9000, 12000], countries: ['India', 'Pakistan', 'Sri Lanka', 'Bangladesh'] },
-  // East Asia
-  { name: 'East Asia', latRange: [20, 45], lonRange: [100, 145], count: 150, alt: [9000, 12000], countries: ['China', 'Japan', 'South Korea', 'Taiwan', 'Hong Kong'] },
-  // Southeast Asia
-  { name: 'Southeast Asia', latRange: [-8, 20], lonRange: [95, 125], count: 80, alt: [8000, 12000], countries: ['Singapore', 'Thailand', 'Indonesia', 'Malaysia', 'Vietnam', 'Philippines'] },
-  // North America domestic
-  { name: 'US Domestic', latRange: [25, 50], lonRange: [-125, -70], count: 250, alt: [7000, 12000], countries: ['United States'] },
-  // Africa
-  { name: 'Africa', latRange: [-30, 15], lonRange: [-15, 50], count: 40, alt: [9000, 12000], countries: ['South Africa', 'Kenya', 'Ethiopia', 'Nigeria', 'Egypt'] },
-  // South America
-  { name: 'South America', latRange: [-40, 10], lonRange: [-80, -35], count: 50, alt: [8000, 12000], countries: ['Brazil', 'Argentina', 'Colombia', 'Chile', 'Peru'] },
-  // Australia
-  { name: 'Oceania', latRange: [-45, -10], lonRange: [110, 180], count: 30, alt: [9000, 12000], countries: ['Australia', 'New Zealand'] },
-  // Transpacific
-  { name: 'Transpacific', latRange: [30, 55], lonRange: [145, 210], count: 40, alt: [10000, 12000], countries: ['Japan', 'United States', 'South Korea', 'Canada'] },
-  // Russia / Central Asia
-  { name: 'Russia', latRange: [45, 65], lonRange: [30, 140], count: 35, alt: [9000, 12000], countries: ['Russia'] },
+  // ── NORTH AMERICA ──
+  { name: 'US East Coast', latRange: [25, 48], lonRange: [-90, -70], count: 140, alt: [7000, 12000], countries: ['United States'] },
+  { name: 'US West Coast', latRange: [30, 50], lonRange: [-125, -105], count: 100, alt: [7000, 12000], countries: ['United States'] },
+  { name: 'US Central', latRange: [28, 48], lonRange: [-105, -85], count: 110, alt: [7000, 12000], countries: ['United States'] },
+  { name: 'Canada', latRange: [43, 62], lonRange: [-130, -60], count: 55, alt: [8000, 12000], countries: ['Canada'] },
+  { name: 'Mexico & Central America', latRange: [14, 32], lonRange: [-110, -85], count: 45, alt: [8000, 12000], countries: ['Mexico', 'Guatemala', 'Panama', 'Costa Rica'] },
+  { name: 'Caribbean', latRange: [15, 27], lonRange: [-85, -60], count: 35, alt: [8000, 11000], countries: ['Cuba', 'Dominican Republic', 'Jamaica', 'Puerto Rico'] },
+  // ── TRANSATLANTIC ──
+  { name: 'North Atlantic Track', latRange: [42, 58], lonRange: [-60, -10], count: 90, alt: [10000, 12500], countries: ['United States', 'United Kingdom', 'Ireland', 'Canada', 'Germany'] },
+  // ── EUROPE ──
+  { name: 'Western Europe', latRange: [36, 52], lonRange: [-10, 10], count: 120, alt: [8000, 12000], countries: ['France', 'United Kingdom', 'Spain', 'Portugal', 'Belgium', 'Netherlands'] },
+  { name: 'Central Europe', latRange: [44, 56], lonRange: [5, 25], count: 110, alt: [8000, 12000], countries: ['Germany', 'Austria', 'Poland', 'Czech Republic', 'Switzerland', 'Italy'] },
+  { name: 'Eastern Europe', latRange: [40, 58], lonRange: [20, 45], count: 60, alt: [9000, 12000], countries: ['Romania', 'Ukraine', 'Greece', 'Bulgaria', 'Hungary'] },
+  { name: 'Scandinavia', latRange: [55, 70], lonRange: [5, 30], count: 40, alt: [9000, 12000], countries: ['Norway', 'Sweden', 'Finland', 'Denmark'] },
+  { name: 'Mediterranean', latRange: [32, 44], lonRange: [-5, 35], count: 70, alt: [8000, 12000], countries: ['Italy', 'Spain', 'Greece', 'Turkey', 'Egypt', 'Morocco'] },
+  // ── MIDDLE EAST ──
+  { name: 'Gulf States Hub', latRange: [22, 32], lonRange: [44, 58], count: 80, alt: [9000, 12000], countries: ['United Arab Emirates', 'Qatar', 'Saudi Arabia', 'Bahrain', 'Kuwait', 'Oman'] },
+  { name: 'Levant & Turkey', latRange: [30, 42], lonRange: [28, 48], count: 50, alt: [9000, 12000], countries: ['Turkey', 'Israel', 'Jordan', 'Lebanon', 'Iraq'] },
+  // ── AFRICA ──
+  { name: 'North Africa', latRange: [18, 36], lonRange: [-15, 35], count: 45, alt: [9000, 12000], countries: ['Egypt', 'Morocco', 'Algeria', 'Tunisia', 'Libya'] },
+  { name: 'West Africa', latRange: [4, 18], lonRange: [-18, 10], count: 30, alt: [9000, 12000], countries: ['Nigeria', 'Ghana', 'Senegal', 'Ivory Coast', 'Mali'] },
+  { name: 'East Africa', latRange: [-12, 12], lonRange: [28, 50], count: 35, alt: [9000, 12000], countries: ['Kenya', 'Ethiopia', 'Tanzania', 'Uganda', 'Rwanda'] },
+  { name: 'Southern Africa', latRange: [-35, -15], lonRange: [15, 40], count: 25, alt: [9000, 12000], countries: ['South Africa', 'Mozambique', 'Zimbabwe', 'Zambia', 'Botswana'] },
+  // ── SOUTH ASIA ──
+  { name: 'Indian Subcontinent', latRange: [8, 35], lonRange: [68, 92], count: 85, alt: [9000, 12000], countries: ['India', 'Pakistan', 'Sri Lanka', 'Bangladesh', 'Nepal'] },
+  // ── EAST ASIA ──
+  { name: 'China Domestic', latRange: [20, 45], lonRange: [100, 125], count: 160, alt: [8000, 12000], countries: ['China'] },
+  { name: 'Japan & Korea', latRange: [30, 45], lonRange: [125, 145], count: 80, alt: [8000, 12000], countries: ['Japan', 'South Korea'] },
+  { name: 'Taiwan & HK', latRange: [20, 28], lonRange: [112, 125], count: 40, alt: [8000, 12000], countries: ['Taiwan', 'Hong Kong', 'Macau'] },
+  // ── SOUTHEAST ASIA ──
+  { name: 'SE Asia North', latRange: [10, 25], lonRange: [95, 115], count: 55, alt: [8000, 12000], countries: ['Thailand', 'Vietnam', 'Myanmar', 'Cambodia', 'Laos'] },
+  { name: 'SE Asia South', latRange: [-8, 10], lonRange: [95, 130], count: 60, alt: [8000, 12000], countries: ['Indonesia', 'Malaysia', 'Singapore', 'Philippines', 'Brunei'] },
+  // ── SOUTH AMERICA ──
+  { name: 'Brazil Domestic', latRange: [-30, 0], lonRange: [-55, -35], count: 60, alt: [8000, 12000], countries: ['Brazil'] },
+  { name: 'Andes Region', latRange: [-40, 5], lonRange: [-80, -60], count: 40, alt: [8000, 12000], countries: ['Argentina', 'Chile', 'Colombia', 'Peru', 'Ecuador', 'Bolivia'] },
+  // ── OCEANIA ──
+  { name: 'Australia East', latRange: [-40, -12], lonRange: [140, 155], count: 35, alt: [9000, 12000], countries: ['Australia'] },
+  { name: 'Australia West', latRange: [-35, -15], lonRange: [110, 140], count: 20, alt: [9000, 12000], countries: ['Australia'] },
+  { name: 'New Zealand', latRange: [-48, -34], lonRange: [165, 180], count: 15, alt: [9000, 12000], countries: ['New Zealand'] },
+  { name: 'Pacific Islands', latRange: [-20, 10], lonRange: [160, 200], count: 15, alt: [10000, 12000], countries: ['Fiji', 'Papua New Guinea', 'Samoa', 'Tonga'] },
+  // ── TRANSOCEANIC ──
+  { name: 'North Pacific Track', latRange: [30, 55], lonRange: [145, 210], count: 45, alt: [10000, 12500], countries: ['Japan', 'United States', 'South Korea', 'Canada'] },
+  { name: 'Europe-Asia', latRange: [40, 62], lonRange: [30, 100], count: 50, alt: [10000, 12500], countries: ['Russia', 'Kazakhstan', 'Uzbekistan'] },
+  { name: 'South Atlantic', latRange: [-15, 10], lonRange: [-40, 5], count: 20, alt: [10000, 12000], countries: ['Brazil', 'Angola', 'Cape Verde'] },
+  { name: 'Indian Ocean', latRange: [-15, 15], lonRange: [50, 90], count: 30, alt: [10000, 12000], countries: ['India', 'Maldives', 'Mauritius', 'Madagascar'] },
 ]
 
 const AIRLINE_PREFIXES = ['UAL', 'DAL', 'AAL', 'BAW', 'DLH', 'AFR', 'KLM', 'SIA', 'CPA', 'QFA', 'UAE', 'QTR', 'THY', 'ANA', 'JAL', 'KAL', 'CCA', 'CSN', 'CES', 'RYR', 'EZY', 'SWR', 'AUA', 'TAP', 'IBE', 'ETH', 'SAA', 'RAM', 'SVA', 'GIA']
@@ -81,7 +102,7 @@ function generateSimulatedFlights() {
     icao24: string; callsign: string; originCountry: string;
     longitude: number; latitude: number; altitude: number;
     onGround: boolean; velocity: number; heading: number;
-    verticalRate: number; squawk?: string;
+    verticalRate: number; squawk?: string; corridor?: string;
   }> = []
 
   let globalIdx = 0
@@ -107,6 +128,9 @@ function generateSimulatedFlights() {
       const flightNum = Math.floor(r2 * 9000 + 100)
       const country = corridor.countries[Math.floor(r3 * corridor.countries.length)]!
 
+      // Simulate vertical rates for some flights (climbing/descending near airports)
+      const vertRate = r5 < 0.15 ? Math.round((r4 - 0.5) * 30) : 0
+
       flights.push({
         icao24: `${Math.floor(r1 * 16777215).toString(16).padStart(6, '0')}`,
         callsign: `${airline}${flightNum}`,
@@ -117,7 +141,8 @@ function generateSimulatedFlights() {
         onGround: false,
         velocity: Math.round(velocity),
         heading: Math.round(heading),
-        verticalRate: 0,
+        verticalRate: vertRate,
+        corridor: corridor.name,
       })
       globalIdx++
     }
