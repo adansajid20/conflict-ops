@@ -240,7 +240,7 @@ export default function MapSidebar({
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center text-sm">🔥</div>
                 <div>
-                  <p className="text-[11px] text-white font-medium">ACLED Conflicts</p>
+                  <p className="text-[11px] text-white font-medium">Global Incidents</p>
                   <p className="text-[9px] text-white/40">
                     {showACLED ? <><span className="text-orange-400 font-medium">{acledCount.toLocaleString()}</span> incidents</> : 'Disabled'}
                   </p>
@@ -321,12 +321,12 @@ export default function MapSidebar({
 
         {/* ── ACLED FILTERS ── */}
         {showACLED && (
-          <Section title="ACLED Filters" badge={acledCount} defaultOpen accentColor="#f97316">
+          <Section title="Incident Filters" badge={acledCount} defaultOpen accentColor="#f97316">
             <div className="flex flex-col gap-4 px-2">
 
               <div className="rounded-lg border border-orange-500/15 bg-orange-500/[0.04] px-3 py-2.5">
                 <p className="text-[9px] text-orange-400/70 leading-relaxed">
-                  Research-tier: showing data from ~13 months ago. Time window controls span relative to that date.
+                  Global incident data aggregated from multiple open sources. Time window controls span relative to latest data.
                 </p>
               </div>
 
@@ -365,7 +365,7 @@ export default function MapSidebar({
               </div>
 
               <div>
-                <p className="text-[9px] text-white/35 uppercase tracking-wider mb-2 font-semibold">ACLED Region</p>
+                <p className="text-[9px] text-white/35 uppercase tracking-wider mb-2 font-semibold">Region</p>
                 <div className="relative">
                   <select value={acledRegion} onChange={(e) => onAcledRegionChange(e.target.value)}
                     className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2.5 text-[11px] text-white/80

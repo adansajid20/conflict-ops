@@ -131,7 +131,7 @@ export default function CesiumGlobe() {
   const viewerRef = useRef<CesiumViewer | null>(null);
   const issIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const flightIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+  // wsRef removed — vessels now use polling instead of WebSocket
 
   // State
   const [cesiumReady, setCesiumReady] = useState(false);
@@ -430,80 +430,46 @@ export default function CesiumGlobe() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cesiumReady, showFlights]);
 
-  // ── VESSELS (AIS WebSocket) ────────────────────────────────────────
+  // ── VESSELS (polling /api/vessels) ──────────────────────────────────
+  const vesselIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchVessels = useCallback(async () => {
+    const Ce = getCe(); const v = getViewer();
+    if (!Ce || !v) return;
+    try {
+      const res = await fetch('/api/vessels');
+      if (!res.ok) return;
+      const data = await res.json() as { count: number; vessels: Vessel[] };
+      const vessels = data.vessels ?? [];
+      setVesselCount(vessels.length);
+      removeEntitiesByPrefix('vsl-');
+      for (const vsl of vessels) {
+        v.entities.add({
+          id: `vsl-${vsl.mmsi}`,
+          position: Ce.Cartesian3.fromDegrees(vsl.longitude, vsl.latitude, 0),
+          properties: { _type: 'vessel', ...vsl },
+          point: {
+            pixelSize: 5,
+            color: Ce.Color.fromCssColorString('#34d399'),
+            outlineColor: Ce.Color.fromCssColorString('rgba(52,211,153,0.3)'),
+            outlineWidth: 1,
+          },
+        } as never);
+      }
+    } catch { /* silent */ }
+  }, []);
+
   useEffect(() => {
     if (!cesiumReady) return;
     if (!showVessels) {
-      wsRef.current?.close();
-      wsRef.current = null;
       removeEntitiesByPrefix('vsl-');
       setVesselCount(0);
+      if (vesselIntervalRef.current) clearInterval(vesselIntervalRef.current);
       return;
     }
-    const key = process.env.NEXT_PUBLIC_AISSTREAM_API_KEY;
-    if (!key) return;
-
-    const Ce = getCe(); const v = getViewer();
-    if (!Ce || !v) return;
-
-    const vesselMap = new Map<string, Vessel>();
-    try {
-      const ws = new WebSocket('wss://stream.aisstream.io/v0/stream');
-      wsRef.current = ws;
-      ws.onopen = () => {
-        ws.send(JSON.stringify({
-          Apikey: key,
-          BoundingBoxes: [[[-90, -180], [90, 180]]],
-          FilterMessageTypes: ['PositionReport'],
-        }));
-      };
-      ws.onmessage = (msg) => {
-        try {
-          const d = JSON.parse(String(msg.data)) as {
-            MessageType: string;
-            Message?: { PositionReport?: { Latitude: number; Longitude: number; Sog: number; Cog: number } };
-            MetaData?: { MMSI: number; ShipName: string; ShipType: number; Destination: string };
-          };
-          if (d.MessageType === 'PositionReport' && d.Message?.PositionReport && d.MetaData) {
-            const p = d.Message.PositionReport;
-            const m = d.MetaData;
-            vesselMap.set(String(m.MMSI), {
-              mmsi: String(m.MMSI), name: (m.ShipName ?? '').trim() || 'Unknown',
-              latitude: p.Latitude, longitude: p.Longitude,
-              speed: p.Sog ?? 0, course: p.Cog ?? 0,
-              type: m.ShipType ?? 0, destination: (m.Destination ?? '').trim(),
-            });
-          }
-        } catch { /* ignore */ }
-      };
-
-      // Replot vessels every 5s
-      const plotInterval = setInterval(() => {
-        const vessels = Array.from(vesselMap.values()).slice(0, 2000);
-        setVesselCount(vessels.length);
-        removeEntitiesByPrefix('vsl-');
-        for (const vsl of vessels) {
-          v.entities.add({
-            id: `vsl-${vsl.mmsi}`,
-            position: Ce.Cartesian3.fromDegrees(vsl.longitude, vsl.latitude, 0),
-            properties: { _type: 'vessel', ...vsl },
-            point: {
-              pixelSize: 5,
-              color: Ce.Color.fromCssColorString('#34d399'),
-              outlineColor: Ce.Color.fromCssColorString('rgba(52,211,153,0.3)'),
-              outlineWidth: 1,
-            },
-          } as never);
-        }
-      }, 5000);
-
-      return () => {
-        clearInterval(plotInterval);
-        ws.close();
-        wsRef.current = null;
-        removeEntitiesByPrefix('vsl-');
-      };
-    } catch { /* silent */ }
+    void fetchVessels();
+    vesselIntervalRef.current = setInterval(() => void fetchVessels(), 30000);
+    return () => { if (vesselIntervalRef.current) clearInterval(vesselIntervalRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cesiumReady, showVessels]);
 
@@ -784,7 +750,7 @@ export default function CesiumGlobe() {
     return () => {
       if (issIntervalRef.current) clearInterval(issIntervalRef.current);
       if (flightIntervalRef.current) clearInterval(flightIntervalRef.current);
-      wsRef.current?.close();
+      if (vesselIntervalRef.current) clearInterval(vesselIntervalRef.current);
       const v = viewerRef.current;
       if (v) {
         // Disconnect resize observer
