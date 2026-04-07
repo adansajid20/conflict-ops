@@ -13,14 +13,21 @@ type AlertConditions = {
 type AlertSubscription = {
   id: string
   user_id: string
-  email: string
   name: string | null
-  conditions: AlertConditions
-  frequency: 'realtime' | 'hourly' | 'daily'
-  is_active: boolean
-  last_sent_at: string | null
+  alert_type: string
+  config: AlertConditions
+  channels?: string[]
+  cooldown_minutes?: number
+  active: boolean
+  last_triggered?: string | null
+  trigger_count?: number
   created_at: string
-  updated_at: string
+  // Legacy fields for backward compat
+  email?: string
+  conditions?: AlertConditions
+  frequency?: 'realtime' | 'hourly' | 'daily'
+  is_active?: boolean
+  last_sent_at?: string | null
 }
 
 type FormState = {
@@ -60,27 +67,39 @@ function formatTime(input?: string | null) {
 
 function buildPayload(form: FormState) {
   const keywords = form.keywords.split(',').map((item) => item.trim()).filter(Boolean)
-  const conditions: AlertConditions = {}
-  if (form.severity_min) conditions.severity_min = Number(form.severity_min)
-  if (form.regions.length) conditions.regions = form.regions
-  if (keywords.length) conditions.keywords = keywords
+  const config: Record<string, unknown> = {}
+  if (form.severity_min) config.min_severity = Number(form.severity_min)
+  if (form.regions.length) config.regions = form.regions
+  if (keywords.length) config.keywords = keywords
+
+  // Determine alert_type from what the user filled in
+  let alert_type = 'custom'
+  if (config.regions && !config.keywords && !config.min_severity) alert_type = 'region'
+  else if (config.min_severity && !config.regions && !config.keywords) alert_type = 'severity'
+  else if (config.keywords && !config.regions && !config.min_severity) alert_type = 'keyword'
 
   return {
-    email: form.email.trim(),
     name: form.name.trim() || 'My Alert',
-    conditions,
-    frequency: form.frequency,
+    alert_type,
+    config,
+    channels: form.email.trim() ? ['email', 'in_app'] : ['in_app'],
+    cooldown_minutes: form.frequency === 'realtime' ? 5 : form.frequency === 'hourly' ? 60 : 1440,
   }
 }
 
 function formFromAlert(alert: AlertSubscription): FormState {
+  const cfg = alert.config ?? alert.conditions ?? {}
+  const minSev = (cfg as Record<string, unknown>).min_severity ?? cfg.severity_min
+  const cooldown = alert.cooldown_minutes ?? 5
+  const freq = alert.frequency ?? (cooldown <= 10 ? 'realtime' : cooldown <= 120 ? 'hourly' : 'daily')
+  const emailChannel = (alert.channels ?? []).includes('email')
   return {
-    email: alert.email,
+    email: alert.email ?? (emailChannel ? 'alert@' : ''),
     name: alert.name ?? '',
-    severity_min: alert.conditions?.severity_min === 3 || alert.conditions?.severity_min === 4 ? String(alert.conditions.severity_min) as '3' | '4' : '',
-    regions: alert.conditions?.regions ?? [],
-    keywords: (alert.conditions?.keywords ?? []).join(', '),
-    frequency: alert.frequency,
+    severity_min: minSev === 3 || minSev === 4 ? String(minSev) as '3' | '4' : '',
+    regions: cfg.regions ?? [],
+    keywords: (cfg.keywords ?? []).join(', '),
+    frequency: freq as FormState['frequency'],
   }
 }
 
@@ -100,9 +119,9 @@ export function AlertsManager() {
   async function loadAlerts() {
     setLoading(true)
     try {
-      const res = await fetch('/api/v1/alerts', { cache: 'no-store' })
-      const json = await res.json() as { alerts?: AlertSubscription[]; note?: string; error?: string }
-      setAlerts(json.alerts ?? [])
+      const res = await fetch('/api/v1/alerts?type=rules', { cache: 'no-store' })
+      const json = await res.json() as { data?: AlertSubscription[]; alerts?: AlertSubscription[]; note?: string; error?: string }
+      setAlerts(json.data ?? json.alerts ?? [])
       setMessage(json.note ?? json.error ?? null)
     } catch {
       setMessage('Failed to load alerts')
@@ -113,7 +132,7 @@ export function AlertsManager() {
 
   useEffect(() => { void loadAlerts() }, [])
 
-  const activeCount = useMemo(() => alerts.filter((alert) => alert.is_active).length, [alerts])
+  const activeCount = useMemo(() => alerts.filter((alert) => alert.active !== false && alert.is_active !== false).length, [alerts])
 
   async function submitForm() {
     setSaving(true)
@@ -145,7 +164,7 @@ export function AlertsManager() {
     const res = await fetch(`/api/v1/alerts/${alert.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: !alert.is_active }),
+      body: JSON.stringify({ active: !(alert.active !== false) }),
     })
     const json = await res.json() as { error?: string }
     if (!res.ok) {
@@ -266,27 +285,37 @@ export function AlertsManager() {
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="text-sm font-semibold text-white">{alert.name || 'My Alert'}</div>
-                    <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-[11px] text-green-400">
-                      {alert.is_active ? 'Active' : 'Paused'}
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] ${alert.active !== false ? 'bg-green-500/20 text-green-400' : 'bg-white/[0.05] text-white/40'}`}>
+                      {alert.active !== false ? 'Active' : 'Paused'}
                     </span>
                     <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[11px] text-white/50">
-                      {alert.frequency}
+                      {alert.alert_type ?? alert.frequency ?? 'custom'}
                     </span>
                   </div>
-                  <div className="mt-1 text-sm text-white/80">{alert.email}</div>
+                  {alert.channels?.includes('email') && alert.email && (
+                    <div className="mt-1 text-sm text-white/80">{alert.email}</div>
+                  )}
                   <div className="mt-2 text-xs text-white/50">
-                    Severity: {alert.conditions?.severity_min === 4 ? 'Critical only' : alert.conditions?.severity_min === 3 ? 'High+' : 'Any'}
-                    {' · '}
-                    Regions: {alert.conditions?.regions?.length ? alert.conditions.regions.join(', ') : 'Any'}
-                    {' · '}
-                    Keywords: {alert.conditions?.keywords?.length ? alert.conditions.keywords.join(', ') : 'None'}
+                    {(() => {
+                      const cfg = alert.config ?? alert.conditions ?? {}
+                      const minSev = (cfg as Record<string, unknown>).min_severity ?? cfg.severity_min
+                      return <>
+                        Severity: {minSev === 4 ? 'Critical only' : minSev === 3 ? 'High+' : 'Any'}
+                        {' · '}
+                        Regions: {cfg.regions?.length ? cfg.regions.join(', ') : 'Any'}
+                        {' · '}
+                        Keywords: {cfg.keywords?.length ? cfg.keywords.join(', ') : 'None'}
+                      </>
+                    })()}
                   </div>
-                  <div className="mt-2 text-xs text-white/50">Last sent: {formatTime(alert.last_sent_at)}</div>
+                  <div className="mt-2 text-xs text-white/50">
+                    Triggered {alert.trigger_count ?? 0}× · Last: {formatTime(alert.last_triggered ?? alert.last_sent_at)}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
                   <button onClick={() => void toggleAlert(alert)} className="rounded-lg border border-white/[0.08] bg-white/[0.05] px-3 py-2 text-xs font-medium text-white hover:bg-white/[0.08]">
-                    {alert.is_active ? 'Turn off' : 'Turn on'}
+                    {alert.active !== false ? 'Turn off' : 'Turn on'}
                   </button>
                   <button onClick={() => startEdit(alert)} className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.05] px-3 py-2 text-xs font-medium text-white hover:bg-white/[0.08]">
                     <PencilIcon size={13} /> Edit

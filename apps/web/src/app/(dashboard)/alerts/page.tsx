@@ -40,7 +40,7 @@ interface UserRule {
 }
 
 type Filter = 'all' | 'critical' | 'high' | 'medium' | 'unread'
-type Condition = { keyword: string; region: string; severity: string }
+// Condition type removed — PIR creation moved to Settings
 
 // ═══════════════════════════════════════════════════════════════
 // HELPERS
@@ -83,10 +83,7 @@ export default function AlertsPage() {
   const [sidebarTab, setSidebarTab] = useState<'pir' | 'rules'>('pir')
   const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // PIR form
-  const [pirName, setPirName] = useState('')
-  const [pirConditions, setPirConditions] = useState<Condition[]>([{ keyword: '', region: '', severity: 'all' }])
-  const [pirSaving, setPirSaving] = useState(false)
+  // PIR form removed — creation is in Settings only
 
   // ── Data Loading ──
   const load = useCallback(async () => {
@@ -147,23 +144,6 @@ export default function AlertsPage() {
   const dismissAlert = async (id: string) => {
     setAlerts(prev => prev.filter(a => a.id !== id))
     await fetch(`/api/v1/alerts?id=${id}`, { method: 'DELETE' })
-  }
-
-  const savePir = async () => {
-    if (!pirName.trim()) return
-    setPirSaving(true)
-    const conditions = pirConditions.flatMap((c) => {
-      const rows: Array<{ type: string; value: string | number }> = []
-      if (c.keyword.trim()) rows.push({ type: 'keyword', value: c.keyword.trim() })
-      if (c.region) rows.push({ type: 'country', value: c.region })
-      if (c.severity !== 'all') rows.push({ type: 'severity_gte', value: c.severity === 'critical' ? 4 : c.severity === 'high' ? 3 : 2 })
-      return rows
-    })
-    await fetch('/api/v1/pir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: pirName, conditions, alert_channels: ['in_app'], priority: 2 }) })
-    setPirName('')
-    setPirConditions([{ keyword: '', region: '', severity: 'all' }])
-    setPirSaving(false)
-    await load()
   }
 
   const deletePir = async (id: string) => {
@@ -353,95 +333,63 @@ export default function AlertsPage() {
       {/* ════════════ RIGHT — CONFIGURATION SIDEBAR ════════════ */}
       <div className="w-[380px] flex-shrink-0 flex flex-col h-full bg-[#060A10]">
 
+        {/* Configure Alerts CTA */}
+        <div className="px-5 pt-5 pb-4">
+          <a href="/settings"
+            className="group flex items-center gap-3 w-full p-4 rounded-xl transition-all
+              bg-gradient-to-r from-blue-600/10 to-indigo-600/10
+              border border-blue-500/20 hover:border-blue-500/40
+              hover:from-blue-600/15 hover:to-indigo-600/15">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center flex-shrink-0
+              group-hover:bg-blue-500/25 transition-all">
+              <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-semibold text-white group-hover:text-blue-300 transition">Configure Alerts</p>
+              <p className="text-[10px] text-white/35 mt-0.5">Create and manage alert rules in Settings</p>
+            </div>
+            <svg className="w-4 h-4 text-white/20 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+          </a>
+        </div>
+
+        <div className="h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+
         {/* Sidebar header with tabs */}
-        <div className="px-5 pt-5 pb-3">
+        <div className="px-5 pt-4 pb-3">
           <div className="flex items-center gap-1 p-0.5 rounded-lg bg-white/[0.03] border border-white/[0.05]">
             {(['pir', 'rules'] as const).map(tab => (
               <button key={tab} onClick={() => setSidebarTab(tab)}
                 className={`flex-1 py-2 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all
                   ${sidebarTab === tab ? 'bg-white/[0.06] text-white shadow-sm' : 'text-white/30 hover:text-white/50'}`}>
-                {tab === 'pir' ? 'Intelligence Requirements' : 'Alert Rules'}
+                {tab === 'pir' ? 'Intel Requirements' : 'Alert Rules'}
               </button>
             ))}
           </div>
         </div>
-
-        <div className="h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
 
         <div className="flex-1 overflow-y-auto cr-scrollbar p-5">
 
           {/* ── PIR TAB ── */}
           {sidebarTab === 'pir' && (
             <>
-              {/* Create PIR form */}
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] p-4 mb-5">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-3">New PIR</p>
-
-                <input value={pirName} onChange={(e) => setPirName(e.target.value)}
-                  placeholder="e.g. Iran Nuclear Escalation"
-                  className="w-full mb-3 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 text-[11px] text-white
-                    placeholder:text-white/20 focus:outline-none focus:border-blue-500/30 transition" />
-
-                {pirConditions.map((cond, idx) => (
-                  <div key={idx} className="mb-2 flex gap-1.5">
-                    <input value={cond.keyword}
-                      onChange={(e) => setPirConditions(prev => prev.map((c, i) => i === idx ? { ...c, keyword: e.target.value } : c))}
-                      placeholder="keyword"
-                      className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-2 text-[11px] text-white
-                        placeholder:text-white/20 focus:outline-none focus:border-blue-500/30 transition" />
-                    <select value={cond.region}
-                      onChange={(e) => setPirConditions(prev => prev.map((c, i) => i === idx ? { ...c, region: e.target.value } : c))}
-                      className="w-[100px] rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-2 text-[10px] text-white
-                        focus:outline-none focus:border-blue-500/30 transition appearance-none">
-                      <option value="">Region</option>
-                      <option value="SY">Syria</option><option value="IQ">Iraq</option>
-                      <option value="YE">Yemen</option><option value="IL">Israel/Gaza</option>
-                      <option value="IR">Iran</option><option value="UA">Ukraine</option>
-                      <option value="RU">Russia</option><option value="SD">Sudan</option>
-                      <option value="ET">Ethiopia</option><option value="AF">Afghanistan</option>
-                      <option value="MM">Myanmar</option><option value="TW">Taiwan</option>
-                      <option value="KP">North Korea</option><option value="CD">DR Congo</option>
-                      <option value="LY">Libya</option><option value="SO">Somalia</option>
-                    </select>
-                    <select value={cond.severity}
-                      onChange={(e) => setPirConditions(prev => prev.map((c, i) => i === idx ? { ...c, severity: e.target.value } : c))}
-                      className="w-[80px] rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-2 text-[10px] text-white
-                        focus:outline-none focus:border-blue-500/30 transition appearance-none">
-                      <option value="all">Any</option>
-                      <option value="critical">Critical</option>
-                      <option value="high">High+</option>
-                      <option value="medium">Med+</option>
-                    </select>
-                    {pirConditions.length > 1 && (
-                      <button onClick={() => setPirConditions(prev => prev.filter((_, i) => i !== idx))}
-                        className="w-8 rounded-lg border border-white/[0.06] bg-white/[0.03] text-white/30 hover:text-white/60 hover:bg-red-500/10 transition flex items-center justify-center">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
+              {pirs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-white/15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
                   </div>
-                ))}
-
-                <div className="flex items-center gap-2 mt-3">
-                  <button onClick={() => setPirConditions(prev => [...prev, { keyword: '', region: '', severity: 'all' }])}
-                    className="text-[9px] text-white/30 hover:text-white/50 transition flex items-center gap-1">
-                    <span className="text-xs">+</span> Add condition
-                  </button>
+                  <p className="text-[11px] text-white/40 mb-1">No PIRs configured</p>
+                  <p className="text-[9px] text-white/20 max-w-[200px]">
+                    Priority Intelligence Requirements help focus your alert pipeline on what matters most.
+                  </p>
                 </div>
-
-                <button onClick={() => void savePir()} disabled={pirSaving || !pirName.trim()}
-                  className="w-full mt-4 py-2.5 rounded-xl text-[11px] font-bold tracking-wider uppercase transition-all
-                    bg-gradient-to-r from-blue-600 to-indigo-600 text-white
-                    hover:from-blue-500 hover:to-indigo-500
-                    disabled:opacity-40 disabled:cursor-not-allowed
-                    shadow-lg shadow-blue-600/20 border border-blue-500/20">
-                  {pirSaving ? 'Saving...' : 'Create PIR'}
-                </button>
-              </div>
-
-              {/* Existing PIRs */}
-              {pirs.length > 0 && (
+              ) : (
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">Active PIRs ({pirs.length})</p>
                   <div className="flex flex-col gap-2">
@@ -492,12 +440,28 @@ export default function AlertsPage() {
                   </div>
                   <p className="text-[11px] text-white/40 mb-1">No alert rules configured</p>
                   <p className="text-[9px] text-white/20 max-w-[200px]">
-                    Alert rules are created via the Settings page. They auto-match against incoming events.
+                    Head to Settings to create alert rules that auto-match against incoming events.
                   </p>
+                  <a href="/settings"
+                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/15 transition">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    Create Rule
+                  </a>
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-2">Active Rules ({rules.length})</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Active Rules ({rules.length})</p>
+                    <a href="/settings"
+                      className="text-[9px] text-blue-400/60 hover:text-blue-400 transition flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                      </svg>
+                      Add Rule
+                    </a>
+                  </div>
                   {rules.map((rule) => (
                     <div key={rule.id} className="rounded-xl border border-cyan-500/10 bg-cyan-500/[0.03] p-3.5 group">
                       <div className="flex items-start justify-between gap-2">
