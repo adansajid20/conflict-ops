@@ -91,9 +91,12 @@ const AIR_CORRIDORS = [
 
 const AIRLINE_PREFIXES = ['UAL', 'DAL', 'AAL', 'BAW', 'DLH', 'AFR', 'KLM', 'SIA', 'CPA', 'QFA', 'UAE', 'QTR', 'THY', 'ANA', 'JAL', 'KAL', 'CCA', 'CSN', 'CES', 'RYR', 'EZY', 'SWR', 'AUA', 'TAP', 'IBE', 'ETH', 'SAA', 'RAM', 'SVA', 'GIA']
 
+// Mulberry32-based PRNG — works reliably at any seed magnitude
 function seededRandom(seed: number): number {
-  const x = Math.sin(seed) * 10000
-  return x - Math.floor(x)
+  let t = (seed + 0x6D2B79F5) | 0
+  t = Math.imul(t ^ (t >>> 15), t | 1)
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296
 }
 
 function generateSimulatedFlights() {
@@ -108,12 +111,12 @@ function generateSimulatedFlights() {
   let globalIdx = 0
   for (const corridor of AIR_CORRIDORS) {
     for (let i = 0; i < corridor.count; i++) {
-      const seed = epoch * 1000 + globalIdx * 7 + i * 13
+      const seed = epoch * 7919 + globalIdx * 104729 + i * 15487
       const r1 = seededRandom(seed)
-      const r2 = seededRandom(seed + 1)
-      const r3 = seededRandom(seed + 2)
-      const r4 = seededRandom(seed + 3)
-      const r5 = seededRandom(seed + 4)
+      const r2 = seededRandom(seed + 31)
+      const r3 = seededRandom(seed + 67)
+      const r4 = seededRandom(seed + 127)
+      const r5 = seededRandom(seed + 211)
 
       const lat = corridor.latRange[0]! + r1 * (corridor.latRange[1]! - corridor.latRange[0]!)
       let lon = corridor.lonRange[0]! + r2 * (corridor.lonRange[1]! - corridor.lonRange[0]!)
