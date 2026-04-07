@@ -1,56 +1,545 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { CheckCircle2, ChevronDown, ChevronUp, Plus, ShieldCheck, Trash2, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-type AlertItem = { id: string; title: string; description?: string | null; severity?: number | string | null; created_at: string; read?: boolean | null }
-type PIR = { id: string; name: string; conditions?: Array<Record<string, unknown>>; active?: boolean; last_triggered_at?: string | null; priority?: number }
+// ═══════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════
+interface AlertItem {
+  id: string
+  title: string
+  body?: string | null
+  description?: string | null
+  severity?: number | string | null
+  channel?: string | null
+  event_id?: string | null
+  created_at: string
+  read?: boolean | null
+}
+
+interface PIR {
+  id: string
+  name: string
+  conditions?: Array<{ type: string; value: string | number }>
+  active?: boolean
+  last_triggered_at?: string | null
+  priority?: number
+  created_at?: string
+}
+
+interface UserRule {
+  id: string
+  name: string
+  alert_type: string
+  config: Record<string, unknown>
+  channels?: string[]
+  active?: boolean
+  last_triggered?: string | null
+  trigger_count?: number
+  created_at?: string
+}
+
+type Filter = 'all' | 'critical' | 'high' | 'medium' | 'unread'
 type Condition = { keyword: string; region: string; severity: string }
 
-function timeAgo(input?: string | null) { if (!input) return 'unknown'; const diff = Math.max(0, Date.now() - new Date(input).getTime()); const mins = Math.floor(diff / 60000); if (mins < 60) return `${mins}m ago`; const hours = Math.floor(mins / 60); if (hours < 24) return `${hours}h ago`; return `${Math.floor(hours / 24)}d ago` }
-function severityUi(value?: number | string | null) { const sev = Number(value ?? 0); if (sev >= 4) return { label: 'Critical', color: 'rgb(248, 113, 113)' }; if (sev >= 3) return { label: 'High', color: 'rgb(251, 146, 60)' }; if (sev >= 2) return { label: 'Medium', color: 'rgb(251, 191, 36)' }; return { label: 'Low', color: 'rgb(96, 165, 250)' } }
-function SeverityBadge({ severity, unread }: { severity?: number | string | null; unread?: boolean | null }) { const ui = severityUi(severity); return <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${unread && ui.label === 'Critical' ? 'animate-livePulse' : ''}`} style={{ background: `${ui.color}22`, color: ui.color }}>{ui.label}</span> }
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function timeAgo(input?: string | null): string {
+  if (!input) return '—'
+  const diff = Math.max(0, Date.now() - new Date(input).getTime())
+  const s = Math.floor(diff / 1000)
+  if (s < 60) return 'just now'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  return `${d}d ago`
+}
 
+const SEV_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  '4': { label: 'Critical', color: '#ef4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)' },
+  '3': { label: 'High', color: '#f97316', bg: 'rgba(249,115,22,0.08)', border: 'rgba(249,115,22,0.2)' },
+  '2': { label: 'Medium', color: '#eab308', bg: 'rgba(234,179,8,0.08)', border: 'rgba(234,179,8,0.2)' },
+  '1': { label: 'Low', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.2)' },
+}
+function getSev(value?: number | string | null) {
+  const n = String(Math.min(4, Math.max(1, Number(value ?? 1))))
+  return SEV_CONFIG[n] ?? SEV_CONFIG['1']!
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN PAGE
+// ═══════════════════════════════════════════════════════════════
 export default function AlertsPage() {
-  const ShieldCheckIcon = ShieldCheck as any
-  const CheckCircle2Icon = CheckCircle2 as any
-  const XIcon = X as any
-  const ChevronUpIcon = ChevronUp as any
-  const ChevronDownIcon = ChevronDown as any
-  const Trash2Icon = Trash2 as any
-  const PlusIcon = Plus as any
+  // ── State ──
   const [alerts, setAlerts] = useState<AlertItem[]>([])
   const [pirs, setPirs] = useState<PIR[]>([])
-  const [activeFilter, setActiveFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'unread'>('all')
+  const [rules, setRules] = useState<UserRule[]>([])
+  const [filter, setFilter] = useState<Filter>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [pirForm, setPirForm] = useState<{ name: string; conditions: Condition[] }>({ name: '', conditions: [{ keyword: '', region: '', severity: 'all' }] })
-  const load = useCallback(async () => { const [alertsRes, pirRes] = await Promise.all([fetch('/api/v1/alerts?limit=100', { cache: 'no-store' }), fetch('/api/v1/pir', { cache: 'no-store' })]); const alertsJson = await alertsRes.json() as { data?: AlertItem[] }; const pirJson = await pirRes.json() as { data?: PIR[] }; setAlerts(alertsJson.data ?? []); setPirs(pirJson.data ?? []) }, [])
-  useEffect(() => { void load() }, [load])
-  const filteredAlerts = useMemo(() => {
-    const severityMap: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }
+  const [loading, setLoading] = useState(true)
+  const [sidebarTab, setSidebarTab] = useState<'pir' | 'rules'>('pir')
+  const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // PIR form
+  const [pirName, setPirName] = useState('')
+  const [pirConditions, setPirConditions] = useState<Condition[]>([{ keyword: '', region: '', severity: 'all' }])
+  const [pirSaving, setPirSaving] = useState(false)
+
+  // ── Data Loading ──
+  const load = useCallback(async () => {
+    try {
+      const [alertsRes, pirRes, rulesRes] = await Promise.all([
+        fetch('/api/v1/alerts?limit=200', { cache: 'no-store' }),
+        fetch('/api/v1/pir', { cache: 'no-store' }),
+        fetch('/api/v1/alerts?type=rules', { cache: 'no-store' }),
+      ])
+      const alertsJson = await alertsRes.json() as { data?: AlertItem[] }
+      const pirJson = await pirRes.json() as { data?: PIR[] }
+      const rulesJson = await rulesRes.json() as { data?: UserRule[] }
+      setAlerts(alertsJson.data ?? [])
+      setPirs(pirJson.data ?? [])
+      setRules(rulesJson.data ?? [])
+    } catch { /* silent */ }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    void load()
+    refreshRef.current = setInterval(() => void load(), 30000)
+    return () => { if (refreshRef.current) clearInterval(refreshRef.current) }
+  }, [load])
+
+  // ── Filtering ──
+  const filtered = useMemo(() => {
     return alerts.filter((a) => {
-      if (activeFilter === 'all') return true
-      if (activeFilter === 'unread') return !a.read
-      const targetSev = severityMap[activeFilter]
-      return a.severity === targetSev || a.severity === activeFilter || severityUi(a.severity).label.toLowerCase() === activeFilter
+      if (filter === 'all') return true
+      if (filter === 'unread') return !a.read
+      const sev = Number(a.severity ?? 1)
+      if (filter === 'critical') return sev >= 4
+      if (filter === 'high') return sev >= 3
+      if (filter === 'medium') return sev >= 2
+      return true
     })
-  }, [activeFilter, alerts])
-  const unreadCount = alerts.filter((a) => !a.read).length
-  const markRead = async (id: string) => { await fetch('/api/v1/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertIds: [id], read: true }) }); await load() }
-  const markAllRead = async () => { await fetch('/api/v1/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertIds: alerts.filter((a) => !a.read).map((a) => a.id), read: true }) }); await load() }
-  const dismiss = async (id: string) => { await fetch(`/api/v1/alerts/${id}`, { method: 'DELETE' }).catch(() => null); setAlerts((prev) => prev.filter((a) => a.id !== id)) }
-  const addCondition = () => setPirForm((prev) => ({ ...prev, conditions: [...prev.conditions, { keyword: '', region: '', severity: 'all' }] }))
-  const savePir = async () => { const conditions = pirForm.conditions.flatMap((condition) => { const rows: Array<{ type: 'keyword' | 'country' | 'severity_gte'; value: string | number }> = []; if (condition.keyword) rows.push({ type: 'keyword', value: condition.keyword }); if (condition.region) rows.push({ type: 'country', value: condition.region }); if (condition.severity !== 'all') rows.push({ type: 'severity_gte', value: condition.severity === 'critical' ? 4 : condition.severity === 'high' ? 3 : 2 }); return rows }); await fetch('/api/v1/pir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: pirForm.name, conditions, alert_channels: ['in_app'], priority: 2 }) }); setPirForm({ name: '', conditions: [{ keyword: '', region: '', severity: 'all' }] }); await load() }
-  const deletePir = async (id: string) => { await fetch(`/api/v1/pir?id=${id}`, { method: 'DELETE' }); await load() }
+  }, [alerts, filter])
 
-  return <div className="flex h-full flex-col lg:flex-row"><div className="flex min-h-0 flex-1 flex-col border-r border-white/[0.05]"><div className="border-b border-white/[0.05] px-4 py-4"><div className="mb-4 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><h1 className="text-xl font-semibold text-white">Active Alerts</h1><span className={`rounded-full px-2 py-0.5 text-xs ${unreadCount > 0 ? 'animate-livePulse' : ''}`} style={{ background: 'rgba(248, 113, 113, 0.15)', color: 'rgb(248, 113, 113)' }}>{unreadCount} unread</span></div><button onClick={markAllRead} className="text-xs text-white/50 hover:text-white/70">Mark all read</button></div><div className="flex gap-4 text-sm">{(['all', 'critical', 'high', 'medium', 'unread'] as const).map((tab) => <button key={tab} onClick={() => setActiveFilter(tab)} className={`border-b-2 pb-2 capitalize transition-colors ${activeFilter === tab ? 'border-blue-500 text-white' : 'border-transparent text-white/30 hover:text-white/50'}`}>{tab}</button>)}</div></div><div className="flex-1 overflow-y-auto">{filteredAlerts.length === 0 ? <div className="flex h-full flex-col items-center justify-center px-8 text-center"><ShieldCheckIcon size={48} className="text-white/30" /><div className="mt-4 text-base font-medium text-white">No active alerts</div><div className="mt-1 text-sm text-white/30">Quiet board. Either you&apos;re safe or the filters are too picky.</div></div> : <AnimatePresence initial={false}>{filteredAlerts.map((a) => {
-    const severity = Number(a.severity ?? 0)
-    let borderColor = 'rgb(96, 165, 250)'
-    if (severity >= 4) borderColor = 'rgb(248, 113, 113)'
-    else if (severity >= 3) borderColor = 'rgb(251, 146, 60)'
-    else if (severity >= 2) borderColor = 'rgb(251, 191, 36)'
+  const counts = useMemo(() => ({
+    all: alerts.length,
+    unread: alerts.filter(a => !a.read).length,
+    critical: alerts.filter(a => Number(a.severity ?? 0) >= 4).length,
+    high: alerts.filter(a => Number(a.severity ?? 0) >= 3).length,
+    medium: alerts.filter(a => Number(a.severity ?? 0) >= 2).length,
+  }), [alerts])
 
-    return <motion.div key={a.id} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="cursor-pointer border-b border-white/[0.05] px-4 py-3 hover:bg-white/[0.03] transition-colors" style={{ borderLeftWidth: '3px', borderLeftColor: borderColor }} onClick={() => setExpandedId((prev) => prev === a.id ? null : a.id)}><div className="flex items-center gap-3"><SeverityBadge severity={a.severity} unread={!a.read} /><span className="flex-1 text-sm font-medium text-white/80">{a.title}</span><span className="text-xs text-white/20 font-mono">{timeAgo(a.created_at)}</span><button onClick={(e) => { e.stopPropagation(); void markRead(a.id) }} className="text-white/50 hover:text-white/70 transition-colors"><CheckCircle2Icon size={14} /></button><button onClick={(e) => { e.stopPropagation(); void dismiss(a.id) }} className="text-white/50 hover:text-white/70 transition-colors"><XIcon size={14} /></button>{expandedId === a.id ? <ChevronUpIcon size={14} className="text-white/50" /> : <ChevronDownIcon size={14} className="text-white/50" />}</div><AnimatePresence>{expandedId === a.id && <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="mt-2 pl-2 text-sm text-white/30">{a.description || 'No analyst note attached.'}</motion.div>}</AnimatePresence></motion.div>
-  })}</AnimatePresence>}</div></div><div className="w-full shrink-0 overflow-y-auto p-4 lg:w-96"><div className="mb-4"><div className="mb-3 text-sm font-semibold text-white">Intelligence Requirements</div><div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4"><input value={pirForm.name} onChange={(e) => setPirForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="PIR name" className="mb-3 w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />{pirForm.conditions.map((condition, index) => <div key={index} className="mb-3 grid grid-cols-[1fr_110px_110px_36px] gap-2"><input value={condition.keyword} onChange={(e) => setPirForm((prev) => ({ ...prev, conditions: prev.conditions.map((item, i) => i === index ? { ...item, keyword: e.target.value } : item) }))} placeholder="keyword" className="rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50" /><select value={condition.region} onChange={(e) => setPirForm((prev) => ({ ...prev, conditions: prev.conditions.map((item, i) => i === index ? { ...item, region: e.target.value } : item) }))} className="rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"><option value="">Any Region</option><optgroup label="Middle East"><option value="SY">Syria</option><option value="IQ">Iraq</option><option value="YE">Yemen</option><option value="IL">Israel / Gaza</option><option value="LB">Lebanon</option><option value="IR">Iran</option></optgroup><optgroup label="Europe"><option value="UA">Ukraine</option><option value="RU">Russia</option></optgroup><optgroup label="Africa"><option value="SD">Sudan</option><option value="SS">South Sudan</option><option value="ET">Ethiopia</option><option value="SO">Somalia</option><option value="CD">DR Congo</option><option value="ML">Mali</option><option value="BF">Burkina Faso</option><option value="NE">Niger</option><option value="NG">Nigeria</option><option value="LY">Libya</option><option value="CF">Central African Republic</option><option value="MZ">Mozambique</option></optgroup><optgroup label="Asia"><option value="AF">Afghanistan</option><option value="PK">Pakistan</option><option value="MM">Myanmar</option><option value="KP">North Korea</option><option value="TW">Taiwan</option></optgroup><optgroup label="Americas"><option value="MX">Mexico</option><option value="CO">Colombia</option><option value="VE">Venezuela</option><option value="HT">Haiti</option></optgroup></select><select value={condition.severity} onChange={(e) => setPirForm((prev) => ({ ...prev, conditions: prev.conditions.map((item, i) => i === index ? { ...item, severity: e.target.value } : item) }))} className="rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"><option value="all">Severity</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option></select><button onClick={() => setPirForm((prev) => ({ ...prev, conditions: prev.conditions.filter((_, i) => i !== index) }))} className="rounded-lg border border-white/[0.06] bg-white/[0.03] text-white/50 hover:text-white/70 hover:bg-white/[0.05] transition-colors"><Trash2Icon size={14} className="mx-auto" /></button></div>)}<button onClick={addCondition} className="mb-3 inline-flex items-center gap-2 text-sm text-white/50 hover:text-white/70 transition-colors"><PlusIcon size={14} /> Add condition</button><button onClick={() => void savePir()} className="w-full rounded-lg bg-blue-500 hover:bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors">Save PIR</button></div></div><div>{pirs.map((pir) => <div key={pir.id} className="mb-3 rounded-xl border border-white/[0.05] bg-white/[0.015] p-4"><div className="mb-1 flex items-start justify-between gap-3"><div><div className="text-sm font-semibold text-white">{pir.name}</div><div className="mt-1 text-xs text-white/30">{(pir.conditions ?? []).map((c) => `${String(c.type)}:${String(c.value)}`).join(' · ') || 'No conditions summary'}</div></div><button onClick={() => void deletePir(pir.id)} className="text-white/50 hover:text-white/70 transition-colors"><Trash2Icon size={14} /></button></div><div className="mt-3 flex items-center justify-between text-xs"><span className="rounded-lg bg-white/[0.03] border border-white/[0.06] px-2 py-1 text-white/20">Last triggered {pir.last_triggered_at ? timeAgo(pir.last_triggered_at) : 'never'}</span><span className={pir.active ? 'text-blue-400' : 'text-white/30'}>{pir.active ? 'Enabled' : 'Disabled'}</span></div></div>)}</div></div></div>
+  // ── Actions ──
+  const markRead = async (id: string) => {
+    setAlerts(prev => prev.map(a => a.id === id ? { ...a, read: true } : a))
+    await fetch('/api/v1/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertIds: [id], read: true }) })
+  }
+
+  const markAllRead = async () => {
+    setAlerts(prev => prev.map(a => ({ ...a, read: true })))
+    await fetch('/api/v1/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true, read: true }) })
+  }
+
+  const dismissAlert = async (id: string) => {
+    setAlerts(prev => prev.filter(a => a.id !== id))
+    await fetch(`/api/v1/alerts?id=${id}`, { method: 'DELETE' })
+  }
+
+  const savePir = async () => {
+    if (!pirName.trim()) return
+    setPirSaving(true)
+    const conditions = pirConditions.flatMap((c) => {
+      const rows: Array<{ type: string; value: string | number }> = []
+      if (c.keyword.trim()) rows.push({ type: 'keyword', value: c.keyword.trim() })
+      if (c.region) rows.push({ type: 'country', value: c.region })
+      if (c.severity !== 'all') rows.push({ type: 'severity_gte', value: c.severity === 'critical' ? 4 : c.severity === 'high' ? 3 : 2 })
+      return rows
+    })
+    await fetch('/api/v1/pir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: pirName, conditions, alert_channels: ['in_app'], priority: 2 }) })
+    setPirName('')
+    setPirConditions([{ keyword: '', region: '', severity: 'all' }])
+    setPirSaving(false)
+    await load()
+  }
+
+  const deletePir = async (id: string) => {
+    setPirs(prev => prev.filter(p => p.id !== id))
+    await fetch(`/api/v1/pir?id=${id}`, { method: 'DELETE' })
+  }
+
+  const deleteRule = async (id: string) => {
+    setRules(prev => prev.filter(r => r.id !== id))
+    await fetch(`/api/v1/alerts?id=${id}`, { method: 'DELETE' })
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════
+  return (
+    <div className="flex h-full" style={{ background: '#070B11' }}>
+
+      {/* ════════════ LEFT — ALERT FEED ════════════ */}
+      <div className="flex-1 flex flex-col min-w-0 border-r border-white/[0.05]">
+
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <h1 className="text-[15px] font-bold tracking-wide text-white">Alert Center</h1>
+              {counts.unread > 0 && (
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold"
+                  style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  {counts.unread} unread
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => void load()}
+                className="text-[10px] text-white/30 hover:text-white/60 px-2 py-1 rounded-md hover:bg-white/[0.03] transition">
+                ↻ Refresh
+              </button>
+              {counts.unread > 0 && (
+                <button onClick={() => void markAllRead()}
+                  className="text-[10px] text-blue-400/70 hover:text-blue-400 px-2.5 py-1 rounded-md hover:bg-blue-500/[0.06] border border-blue-500/10 transition">
+                  Mark all read
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter tabs */}
+          <div className="flex gap-1">
+            {(['all', 'critical', 'high', 'medium', 'unread'] as const).map((tab) => {
+              const active = filter === tab
+              const count = counts[tab]
+              const tabColor = tab === 'critical' ? '#ef4444' : tab === 'high' ? '#f97316' : tab === 'medium' ? '#eab308' : tab === 'unread' ? '#a855f7' : '#3b82f6'
+              return (
+                <button key={tab} onClick={() => setFilter(tab)}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all flex items-center gap-1.5"
+                  style={{
+                    background: active ? `${tabColor}12` : 'transparent',
+                    color: active ? tabColor : 'rgba(255,255,255,0.3)',
+                    border: active ? `1px solid ${tabColor}25` : '1px solid transparent',
+                  }}>
+                  {tab}
+                  {count > 0 && (
+                    <span className="text-[8px] px-1 py-0.5 rounded-md min-w-[16px] text-center"
+                      style={{ background: active ? `${tabColor}20` : 'rgba(255,255,255,0.05)', color: active ? tabColor : 'rgba(255,255,255,0.25)' }}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+
+        {/* Alert list */}
+        <div className="flex-1 overflow-y-auto cr-scrollbar">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full px-8 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-4">
+                <svg className="w-7 h-7 text-white/15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                </svg>
+              </div>
+              <p className="text-[13px] text-white/60 font-medium mb-1">No alerts</p>
+              <p className="text-[11px] text-white/25 max-w-[240px]">
+                {filter === 'all' ? 'Set up PIRs or alert rules to start receiving intelligence notifications.' : `No ${filter} alerts right now. Try a different filter.`}
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/[0.03]">
+              {filtered.map((alert) => {
+                const sev = getSev(alert.severity)
+                const isExpanded = expandedId === alert.id
+                const isUnread = !alert.read
+                return (
+                  <div key={alert.id}
+                    className="group relative cursor-pointer transition-colors hover:bg-white/[0.015]"
+                    style={{ borderLeft: `3px solid ${isUnread ? sev.color : 'transparent'}` }}
+                    onClick={() => {
+                      setExpandedId(prev => prev === alert.id ? null : alert.id)
+                      if (isUnread) void markRead(alert.id)
+                    }}>
+                    <div className="px-5 py-3.5">
+                      {/* Main row */}
+                      <div className="flex items-start gap-3">
+                        {/* Severity dot */}
+                        <div className="mt-1.5 flex-shrink-0">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{
+                            backgroundColor: sev.color,
+                            boxShadow: isUnread ? `0 0 8px ${sev.color}60` : 'none',
+                            opacity: isUnread ? 1 : 0.4,
+                          }} />
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
+                              style={{ color: sev.color, background: sev.bg }}>{sev.label}</span>
+                            {alert.channel && alert.channel !== 'in_app' && (
+                              <span className="text-[8px] text-white/20 uppercase tracking-wider">{alert.channel}</span>
+                            )}
+                          </div>
+                          <p className={`text-[12px] leading-snug ${isUnread ? 'text-white font-medium' : 'text-white/60'}`}>
+                            {alert.title}
+                          </p>
+                        </div>
+
+                        {/* Meta */}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="text-[10px] text-white/20 font-mono">{timeAgo(alert.created_at)}</span>
+                          <button onClick={(e) => { e.stopPropagation(); void dismissAlert(alert.id) }}
+                            className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/[0.05] transition-all">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expanded detail */}
+                      {isExpanded && (
+                        <div className="mt-3 ml-5 pl-3 border-l-2 transition-all"
+                          style={{ borderColor: `${sev.color}30` }}>
+                          <p className="text-[11px] text-white/40 leading-relaxed">
+                            {alert.body || alert.description || 'No additional details available for this alert.'}
+                          </p>
+                          <div className="flex items-center gap-3 mt-3">
+                            {alert.event_id && (
+                              <a href={`/feed?event=${alert.event_id}`}
+                                className="text-[9px] text-blue-400/60 hover:text-blue-400 transition">
+                                View source event →
+                              </a>
+                            )}
+                            <span className="text-[9px] text-white/15 font-mono">ID: {alert.id.slice(0, 8)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer stats */}
+        <div className="px-6 py-3 border-t border-white/[0.04] flex items-center justify-between">
+          <span className="text-[9px] text-white/20">
+            {filtered.length} of {alerts.length} alerts · Auto-refresh 30s
+          </span>
+          <span className="text-[9px] text-white/15 font-mono">
+            {counts.critical > 0 && <span style={{ color: '#ef4444' }}>{counts.critical} critical</span>}
+            {counts.critical > 0 && counts.high > counts.critical && ' · '}
+            {counts.high > counts.critical && <span style={{ color: '#f97316' }}>{counts.high - counts.critical} high</span>}
+          </span>
+        </div>
+      </div>
+
+      {/* ════════════ RIGHT — CONFIGURATION SIDEBAR ════════════ */}
+      <div className="w-[380px] flex-shrink-0 flex flex-col h-full bg-[#060A10]">
+
+        {/* Sidebar header with tabs */}
+        <div className="px-5 pt-5 pb-3">
+          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-white/[0.03] border border-white/[0.05]">
+            {(['pir', 'rules'] as const).map(tab => (
+              <button key={tab} onClick={() => setSidebarTab(tab)}
+                className={`flex-1 py-2 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all
+                  ${sidebarTab === tab ? 'bg-white/[0.06] text-white shadow-sm' : 'text-white/30 hover:text-white/50'}`}>
+                {tab === 'pir' ? 'Intelligence Requirements' : 'Alert Rules'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+
+        <div className="flex-1 overflow-y-auto cr-scrollbar p-5">
+
+          {/* ── PIR TAB ── */}
+          {sidebarTab === 'pir' && (
+            <>
+              {/* Create PIR form */}
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] p-4 mb-5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-3">New PIR</p>
+
+                <input value={pirName} onChange={(e) => setPirName(e.target.value)}
+                  placeholder="e.g. Iran Nuclear Escalation"
+                  className="w-full mb-3 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 text-[11px] text-white
+                    placeholder:text-white/20 focus:outline-none focus:border-blue-500/30 transition" />
+
+                {pirConditions.map((cond, idx) => (
+                  <div key={idx} className="mb-2 flex gap-1.5">
+                    <input value={cond.keyword}
+                      onChange={(e) => setPirConditions(prev => prev.map((c, i) => i === idx ? { ...c, keyword: e.target.value } : c))}
+                      placeholder="keyword"
+                      className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-2 text-[11px] text-white
+                        placeholder:text-white/20 focus:outline-none focus:border-blue-500/30 transition" />
+                    <select value={cond.region}
+                      onChange={(e) => setPirConditions(prev => prev.map((c, i) => i === idx ? { ...c, region: e.target.value } : c))}
+                      className="w-[100px] rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-2 text-[10px] text-white
+                        focus:outline-none focus:border-blue-500/30 transition appearance-none">
+                      <option value="">Region</option>
+                      <option value="SY">Syria</option><option value="IQ">Iraq</option>
+                      <option value="YE">Yemen</option><option value="IL">Israel/Gaza</option>
+                      <option value="IR">Iran</option><option value="UA">Ukraine</option>
+                      <option value="RU">Russia</option><option value="SD">Sudan</option>
+                      <option value="ET">Ethiopia</option><option value="AF">Afghanistan</option>
+                      <option value="MM">Myanmar</option><option value="TW">Taiwan</option>
+                      <option value="KP">North Korea</option><option value="CD">DR Congo</option>
+                      <option value="LY">Libya</option><option value="SO">Somalia</option>
+                    </select>
+                    <select value={cond.severity}
+                      onChange={(e) => setPirConditions(prev => prev.map((c, i) => i === idx ? { ...c, severity: e.target.value } : c))}
+                      className="w-[80px] rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-2 text-[10px] text-white
+                        focus:outline-none focus:border-blue-500/30 transition appearance-none">
+                      <option value="all">Any</option>
+                      <option value="critical">Critical</option>
+                      <option value="high">High+</option>
+                      <option value="medium">Med+</option>
+                    </select>
+                    {pirConditions.length > 1 && (
+                      <button onClick={() => setPirConditions(prev => prev.filter((_, i) => i !== idx))}
+                        className="w-8 rounded-lg border border-white/[0.06] bg-white/[0.03] text-white/30 hover:text-white/60 hover:bg-red-500/10 transition flex items-center justify-center">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                <div className="flex items-center gap-2 mt-3">
+                  <button onClick={() => setPirConditions(prev => [...prev, { keyword: '', region: '', severity: 'all' }])}
+                    className="text-[9px] text-white/30 hover:text-white/50 transition flex items-center gap-1">
+                    <span className="text-xs">+</span> Add condition
+                  </button>
+                </div>
+
+                <button onClick={() => void savePir()} disabled={pirSaving || !pirName.trim()}
+                  className="w-full mt-4 py-2.5 rounded-xl text-[11px] font-bold tracking-wider uppercase transition-all
+                    bg-gradient-to-r from-blue-600 to-indigo-600 text-white
+                    hover:from-blue-500 hover:to-indigo-500
+                    disabled:opacity-40 disabled:cursor-not-allowed
+                    shadow-lg shadow-blue-600/20 border border-blue-500/20">
+                  {pirSaving ? 'Saving...' : 'Create PIR'}
+                </button>
+              </div>
+
+              {/* Existing PIRs */}
+              {pirs.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">Active PIRs ({pirs.length})</p>
+                  <div className="flex flex-col gap-2">
+                    {pirs.map((pir) => (
+                      <div key={pir.id} className="rounded-xl border border-indigo-500/10 bg-indigo-500/[0.03] p-3.5 group">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="w-1.5 h-1.5 rounded-full" style={{ background: pir.active !== false ? '#818cf8' : '#555' }} />
+                              <p className="text-[11px] text-white font-semibold truncate">{pir.name}</p>
+                            </div>
+                            <p className="text-[9px] text-white/25 leading-relaxed">
+                              {(pir.conditions ?? []).map(c => `${c.type}: ${c.value}`).join(' · ') || 'No conditions'}
+                            </p>
+                          </div>
+                          <button onClick={() => void deletePir(pir.id)}
+                            className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md flex items-center justify-center text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-white/[0.04]">
+                          <span className="text-[9px] text-white/20">
+                            Last triggered: {pir.last_triggered_at ? timeAgo(pir.last_triggered_at) : 'never'}
+                          </span>
+                          <span className={`text-[8px] font-semibold uppercase tracking-wider ${pir.active !== false ? 'text-indigo-400' : 'text-white/20'}`}>
+                            {pir.active !== false ? 'Active' : 'Paused'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── RULES TAB ── */}
+          {sidebarTab === 'rules' && (
+            <>
+              {rules.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-white/15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                  </div>
+                  <p className="text-[11px] text-white/40 mb-1">No alert rules configured</p>
+                  <p className="text-[9px] text-white/20 max-w-[200px]">
+                    Alert rules are created via the Settings page. They auto-match against incoming events.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-2">Active Rules ({rules.length})</p>
+                  {rules.map((rule) => (
+                    <div key={rule.id} className="rounded-xl border border-cyan-500/10 bg-cyan-500/[0.03] p-3.5 group">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/15">
+                              {rule.alert_type}
+                            </span>
+                            <p className="text-[11px] text-white font-semibold truncate">{rule.name}</p>
+                          </div>
+                          <p className="text-[9px] text-white/25">
+                            Channels: {(rule.channels ?? ['in_app']).join(', ')} · Triggered {rule.trigger_count ?? 0}×
+                          </p>
+                        </div>
+                        <button onClick={() => void deleteRule(rule.id)}
+                          className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md flex items-center justify-center text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-white/[0.04]">
+                        <span className="text-[9px] text-white/20">Last: {rule.last_triggered ? timeAgo(rule.last_triggered) : 'never'}</span>
+                        <span className={`text-[8px] font-semibold uppercase tracking-wider ${rule.active !== false ? 'text-cyan-400' : 'text-white/20'}`}>
+                          {rule.active !== false ? 'Active' : 'Paused'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Sidebar footer */}
+        <div className="px-5 py-3 border-t border-white/[0.04]">
+          <p className="text-[8px] text-white/15 text-center uppercase tracking-widest">
+            {pirs.length} PIRs · {rules.length} Rules · Evaluated every 5min
+          </p>
+        </div>
+      </div>
+    </div>
+  )
 }
