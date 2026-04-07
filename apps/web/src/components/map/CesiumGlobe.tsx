@@ -604,7 +604,11 @@ export default function CesiumGlobe() {
         const entity = picked.id as {
           id: string;
           position?: { getValue: (t: unknown) => { x: number; y: number; z: number } | undefined };
-          properties?: Record<string, unknown>;
+          properties?: {
+            propertyNames?: string[];
+            getValue?: (t: unknown) => Record<string, unknown>;
+            [key: string]: unknown;
+          };
         };
 
         // Get lat/lng from entity position
@@ -618,19 +622,34 @@ export default function CesiumGlobe() {
           }
         }
 
-        // Read properties (Cesium wraps them in PropertyBag getters)
+        // Read properties — use PropertyBag.getValue() for reliable extraction
         const rawProps = entity.properties;
-        if (!rawProps) return;
-
         const getP = (key: string): unknown => {
-          const v = rawProps[key];
-          if (v && typeof (v as { getValue?: () => unknown }).getValue === 'function') {
-            return (v as { getValue: () => unknown }).getValue();
-          }
-          return v;
+          if (!rawProps) return undefined;
+          // Method 1: PropertyBag.getValue(time) returns all properties as plain object
+          try {
+            const allProps = rawProps.getValue?.(Ce.JulianDate.now());
+            if (allProps && key in allProps) return allProps[key];
+          } catch { /* fall through */ }
+          // Method 2: Direct property access with .getValue()
+          try {
+            const v = rawProps[key];
+            if (v && typeof (v as { getValue?: () => unknown }).getValue === 'function') {
+              return (v as { getValue: () => unknown }).getValue();
+            }
+            if (v !== undefined) return v;
+          } catch { /* fall through */ }
+          return undefined;
         };
 
-        const type = String(getP('_type') ?? '');
+        // Determine type from entity ID prefix (most reliable) or from properties
+        const eid = entity.id ?? '';
+        const type = eid.startsWith('evt-') ? 'event'
+          : eid.startsWith('flt-') ? 'flight'
+          : eid.startsWith('vsl-') ? 'vessel'
+          : eid.startsWith('acled-') ? 'acled'
+          : eid === 'iss' ? 'iss'
+          : String(getP('_type') ?? '');
 
         if (type === 'event') {
           const ev: Record<string, unknown> = {
