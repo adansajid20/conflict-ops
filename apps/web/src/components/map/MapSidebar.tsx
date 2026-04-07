@@ -20,7 +20,6 @@ export interface MapSidebarProps {
   severity: string; onSeverityChange: (v: string) => void;
   category: string; onCategoryChange: (v: string) => void;
   region: string; onRegionChange: (v: string) => void;
-  // ACLED-specific filters
   acledEventType: string; onAcledEventTypeChange: (v: string) => void;
   acledDisorderType: string; onAcledDisorderTypeChange: (v: string) => void;
   acledCountry: string; onAcledCountryChange: (v: string) => void;
@@ -40,8 +39,9 @@ export interface MapSidebarProps {
 function Toggle({ on, onChange, color = 'bg-blue-500' }: { on: boolean; onChange: () => void; color?: string }) {
   return (
     <button onClick={onChange}
-      className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${on ? color : 'bg-white/[0.1]'}`}>
-      <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${on ? 'translate-x-4' : ''}`} />
+      className={`relative w-10 h-[22px] rounded-full transition-colors duration-200 ${on ? color : 'bg-white/[0.08]'}`}
+      style={on ? { boxShadow: '0 0 8px rgba(255,255,255,0.08)' } : undefined}>
+      <div className={`absolute top-[3px] left-[3px] w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${on ? 'translate-x-[18px]' : ''}`} />
     </button>
   );
 }
@@ -49,29 +49,42 @@ function Toggle({ on, onChange, color = 'bg-blue-500' }: { on: boolean; onChange
 // ═══════════════════════════════════════
 // COLLAPSIBLE SECTION
 // ═══════════════════════════════════════
-function Section({ title, badge, children, defaultOpen = true }: {
-  title: string; badge?: string | number; children: React.ReactNode; defaultOpen?: boolean;
+function Section({ title, badge, children, defaultOpen = true, accentColor }: {
+  title: string; badge?: string | number; children: React.ReactNode; defaultOpen?: boolean; accentColor?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border-b border-white/[0.05] last:border-b-0">
+    <div className="mx-3 mb-2">
       <button onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition">
+        className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/[0.02] transition">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold tracking-[0.15em] text-white/25 uppercase">{title}</span>
+          {accentColor && <span className="w-1 h-3.5 rounded-full" style={{ background: accentColor }} />}
+          <span className="text-[10px] font-bold tracking-[0.15em] text-white/40 uppercase">{title}</span>
           {badge !== undefined && (
-            <span className="text-[9px] font-medium bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+            <span className="text-[9px] font-semibold bg-white/[0.06] text-white/50 px-1.5 py-0.5 rounded-md min-w-[20px] text-center tabular-nums">
               {badge}
             </span>
           )}
         </div>
-        <svg className={`w-3 h-3 text-white/50 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        <svg className={`w-3 h-3 text-white/30 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {open && <div className="px-4 pb-4">{children}</div>}
+      {open && <div className="px-1 pb-2 pt-1">{children}</div>}
     </div>
+  );
+}
+
+// ═══════════════════════════════════════
+// CHEVRON DOWN SVG
+// ═══════════════════════════════════════
+function ChevronDown() {
+  return (
+    <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/30 pointer-events-none"
+      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    </svg>
   );
 }
 
@@ -102,105 +115,134 @@ export default function MapSidebar({
   const activeLayers = [showEvents, showFlights, showVessels, showISS, showACLED].filter(Boolean).length;
 
   return (
-    <div className="w-[300px] flex-shrink-0 h-full flex flex-col
-      bg-[#070B11] backdrop-blur-2xl border-l border-white/[0.05]">
+    <div className="w-[300px] flex-shrink-0 h-full flex flex-col bg-[#060A10] border-l border-white/[0.06]">
 
       {/* ═══ HEADER ═══ */}
-      <div className="px-4 py-4 border-b border-white/[0.05]">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xs font-bold tracking-[0.15em] text-white uppercase">Control Panel</h2>
-            <p className="text-[9px] text-white/50 mt-0.5">{activeLayers} layer{activeLayers !== 1 ? 's' : ''} active</p>
-          </div>
-          <div className="flex items-center gap-1.5">
+      <div className="px-4 pt-5 pb-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[13px] font-bold tracking-wide text-white">Map Controls</h2>
+          <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-1">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[9px] text-emerald-400 font-medium uppercase tracking-wider">Live</span>
+            <span className="text-[9px] text-emerald-400 font-semibold uppercase tracking-wider">Live</span>
           </div>
         </div>
 
-        {/* Stats bar */}
-        <div className="flex gap-2 mt-3">
-          <div className="flex-1 bg-white/[0.03] rounded-lg px-2 py-1.5 border border-white/[0.06]">
-            <p className="text-[8px] text-white/50 uppercase tracking-wider">Events</p>
-            <p className="text-sm font-bold text-white font-mono">{eventCount.toLocaleString()}</p>
+        {/* Stats cards */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-xl px-3 py-2.5 border transition-colors"
+            style={{
+              background: showEvents ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.015)',
+              borderColor: showEvents ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)',
+            }}>
+            <p className="text-[8px] font-semibold uppercase tracking-wider"
+              style={{ color: showEvents ? 'rgba(239,68,68,0.7)' : 'rgba(255,255,255,0.3)' }}>Events</p>
+            <p className="text-[15px] font-bold font-mono mt-0.5"
+              style={{ color: showEvents ? '#ef4444' : 'rgba(255,255,255,0.5)' }}>
+              {eventCount.toLocaleString()}
+            </p>
           </div>
-          <div className="flex-1 bg-white/[0.03] rounded-lg px-2 py-1.5 border border-white/[0.06]">
-            <p className="text-[8px] text-cyan-400 uppercase tracking-wider">Flights</p>
-            <p className="text-sm font-bold text-cyan-400 font-mono">{showFlights ? flightCount.toLocaleString() : 'OFF'}</p>
+          <div className="rounded-xl px-3 py-2.5 border transition-colors"
+            style={{
+              background: showFlights ? 'rgba(6,182,212,0.06)' : 'rgba(255,255,255,0.015)',
+              borderColor: showFlights ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.05)',
+            }}>
+            <p className="text-[8px] font-semibold uppercase tracking-wider"
+              style={{ color: showFlights ? 'rgba(6,182,212,0.7)' : 'rgba(255,255,255,0.3)' }}>Flights</p>
+            <p className="text-[15px] font-bold font-mono mt-0.5"
+              style={{ color: showFlights ? '#06b6d4' : 'rgba(255,255,255,0.3)' }}>
+              {showFlights ? flightCount.toLocaleString() : 'OFF'}
+            </p>
           </div>
-          <div className="flex-1 bg-white/[0.03] rounded-lg px-2 py-1.5 border border-white/[0.06]">
-            <p className="text-[8px] text-emerald-400 uppercase tracking-wider">Vessels</p>
-            <p className="text-sm font-bold text-emerald-400 font-mono">{showVessels ? vesselCount.toLocaleString() : 'OFF'}</p>
+          <div className="rounded-xl px-3 py-2.5 border transition-colors"
+            style={{
+              background: showVessels ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.015)',
+              borderColor: showVessels ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)',
+            }}>
+            <p className="text-[8px] font-semibold uppercase tracking-wider"
+              style={{ color: showVessels ? 'rgba(16,185,129,0.7)' : 'rgba(255,255,255,0.3)' }}>Vessels</p>
+            <p className="text-[15px] font-bold font-mono mt-0.5"
+              style={{ color: showVessels ? '#10b981' : 'rgba(255,255,255,0.3)' }}>
+              {showVessels ? vesselCount.toLocaleString() : 'OFF'}
+            </p>
           </div>
         </div>
       </div>
 
+      <div className="h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+
       {/* ═══ SCROLLABLE CONTENT ═══ */}
-      <div className="flex-1 overflow-y-auto cr-scrollbar">
+      <div className="flex-1 overflow-y-auto cr-scrollbar pt-2">
 
         {/* ── DATA LAYERS ── */}
-        <Section title="Data Layers" badge={activeLayers}>
-          <div className="flex flex-col gap-3">
+        <Section title="Data Layers" badge={activeLayers} accentColor="#3b82f6">
+          <div className="flex flex-col gap-1">
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-red-500/10 flex items-center justify-center">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-500" style={{ boxShadow: '0 0 6px rgba(255,45,45,0.5)' }} />
+            <div className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.02]"
+              style={showEvents ? { background: 'rgba(239,68,68,0.04)' } : undefined}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: 'rgba(239,68,68,0.12)' }}>
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500"
+                    style={showEvents ? { boxShadow: '0 0 8px rgba(239,68,68,0.6)' } : undefined} />
                 </div>
                 <div>
                   <p className="text-[11px] text-white font-medium">Conflict Events</p>
-                  <p className="text-[9px] text-white/50">{eventCount.toLocaleString()} tracked</p>
+                  <p className="text-[9px] text-white/40">{eventCount.toLocaleString()} tracked</p>
                 </div>
               </div>
               <Toggle on={showEvents} onChange={onToggleEvents} color="bg-red-500" />
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center text-sm">✈️</div>
+            <div className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.02]"
+              style={showFlights ? { background: 'rgba(6,182,212,0.04)' } : undefined}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-sm">✈️</div>
                 <div>
                   <p className="text-[11px] text-white font-medium">Live Flights</p>
-                  <p className="text-[9px] text-white/50">
-                    {showFlights ? <><span className="text-cyan-400">{flightCount.toLocaleString()}</span> airborne</> : 'OpenSky Network'}
+                  <p className="text-[9px] text-white/40">
+                    {showFlights ? <><span className="text-cyan-400 font-medium">{flightCount.toLocaleString()}</span> airborne</> : 'Disabled'}
                   </p>
                 </div>
               </div>
               <Toggle on={showFlights} onChange={onToggleFlights} color="bg-cyan-500" />
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-sm">🚢</div>
+            <div className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.02]"
+              style={showVessels ? { background: 'rgba(16,185,129,0.04)' } : undefined}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-sm">🚢</div>
                 <div>
                   <p className="text-[11px] text-white font-medium">Vessel Tracking</p>
-                  <p className="text-[9px] text-white/50">
-                    {showVessels ? <><span className="text-emerald-400">{vesselCount.toLocaleString()}</span> tracked</> : 'AIS Stream'}
+                  <p className="text-[9px] text-white/40">
+                    {showVessels ? <><span className="text-emerald-400 font-medium">{vesselCount.toLocaleString()}</span> tracked</> : 'Disabled'}
                   </p>
                 </div>
               </div>
               <Toggle on={showVessels} onChange={onToggleVessels} color="bg-emerald-500" />
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center text-sm">🛰️</div>
+            <div className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.02]"
+              style={showISS ? { background: 'rgba(139,92,246,0.04)' } : undefined}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-sm">🛰️</div>
                 <div>
                   <p className="text-[11px] text-white font-medium">ISS Tracker</p>
-                  <p className="text-[9px] text-white/50">
-                    {showISS ? <><span className="text-purple-400">Live</span> · every 5s</> : 'Disabled'}
+                  <p className="text-[9px] text-white/40">
+                    {showISS ? <><span className="text-purple-400 font-medium">Live</span> · every 5s</> : 'Disabled'}
                   </p>
                 </div>
               </div>
               <Toggle on={showISS} onChange={onToggleISS} color="bg-purple-500" />
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-orange-500/10 flex items-center justify-center text-sm">🔥</div>
+            <div className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.02]"
+              style={showACLED ? { background: 'rgba(249,115,22,0.04)' } : undefined}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center text-sm">🔥</div>
                 <div>
                   <p className="text-[11px] text-white font-medium">ACLED Conflicts</p>
-                  <p className="text-[9px] text-white/50">
-                    {showACLED ? <><span className="text-orange-400">{acledCount.toLocaleString()}</span> incidents</> : 'Armed Conflict Data'}
+                  <p className="text-[9px] text-white/40">
+                    {showACLED ? <><span className="text-orange-400 font-medium">{acledCount.toLocaleString()}</span> incidents</> : 'Disabled'}
                   </p>
                 </div>
               </div>
@@ -211,18 +253,18 @@ export default function MapSidebar({
         </Section>
 
         {/* ── FILTERS ── */}
-        <Section title="Filters">
-          <div className="flex flex-col gap-4">
+        <Section title="Filters" accentColor="#8b5cf6">
+          <div className="flex flex-col gap-4 px-2">
 
             <div>
-              <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Time window</p>
+              <p className="text-[9px] text-white/35 uppercase tracking-wider mb-2 font-semibold">Time window</p>
               <div className="flex gap-1.5">
                 {['24h', '7d', '30d', 'all'].map(t => (
                   <button key={t} onClick={() => onTimeWindowChange(t)}
-                    className={`flex-1 py-1.5 text-[10px] font-medium uppercase tracking-wider rounded-lg border transition
+                    className={`flex-1 py-2 text-[10px] font-semibold uppercase tracking-wider rounded-lg border transition-all duration-200
                       ${timeWindow === t
-                        ? 'bg-blue-500/15 border-blue-500/30 text-blue-400'
-                        : 'bg-transparent border-white/[0.05] text-white/50 hover:border-white/[0.08] hover:text-white/60'
+                        ? 'bg-blue-500/15 border-blue-500/25 text-blue-400 shadow-sm shadow-blue-500/10'
+                        : 'bg-white/[0.02] border-white/[0.05] text-white/35 hover:border-white/[0.1] hover:text-white/50'
                       }`}>
                     {t}
                   </button>
@@ -231,16 +273,16 @@ export default function MapSidebar({
             </div>
 
             <div>
-              <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Severity</p>
+              <p className="text-[9px] text-white/35 uppercase tracking-wider mb-2 font-semibold">Severity</p>
               <div className="flex gap-1.5">
                 {[
-                  { v: 'all', l: 'All', active: 'bg-blue-500/15 border-blue-500/30 text-blue-400' },
-                  { v: 'high', l: 'High+', active: 'bg-orange-500/15 border-orange-500/30 text-orange-400' },
-                  { v: 'critical', l: 'Crit', active: 'bg-red-500/15 border-red-500/30 text-red-400' },
+                  { v: 'all', l: 'All', active: 'bg-blue-500/15 border-blue-500/25 text-blue-400 shadow-sm shadow-blue-500/10' },
+                  { v: 'high', l: 'High+', active: 'bg-orange-500/15 border-orange-500/25 text-orange-400 shadow-sm shadow-orange-500/10' },
+                  { v: 'critical', l: 'Critical', active: 'bg-red-500/15 border-red-500/25 text-red-400 shadow-sm shadow-red-500/10' },
                 ].map(s => (
                   <button key={s.v} onClick={() => onSeverityChange(s.v)}
-                    className={`flex-1 py-1.5 text-[10px] font-medium uppercase tracking-wider rounded-lg border transition
-                      ${severity === s.v ? s.active : 'bg-transparent border-white/[0.05] text-white/50 hover:border-white/[0.08] hover:text-white/60'}`}>
+                    className={`flex-1 py-2 text-[10px] font-semibold uppercase tracking-wider rounded-lg border transition-all duration-200
+                      ${severity === s.v ? s.active : 'bg-white/[0.02] border-white/[0.05] text-white/35 hover:border-white/[0.1] hover:text-white/50'}`}>
                     {s.l}
                   </button>
                 ))}
@@ -248,11 +290,11 @@ export default function MapSidebar({
             </div>
 
             <div>
-              <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Category</p>
+              <p className="text-[9px] text-white/35 uppercase tracking-wider mb-2 font-semibold">Category</p>
               <div className="relative">
                 <select value={category} onChange={(e) => onCategoryChange(e.target.value)}
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
-                    appearance-none cursor-pointer hover:border-white/[0.08] focus:border-blue-500/40 focus:outline-none transition">
+                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2.5 text-[11px] text-white/80
+                    appearance-none cursor-pointer hover:border-white/[0.1] focus:border-blue-500/30 focus:outline-none transition">
                   <option value="all">All categories</option>
                   <option value="armed_conflict">Armed Conflict</option>
                   <option value="terrorism">Terrorism</option>
@@ -262,43 +304,38 @@ export default function MapSidebar({
                   <option value="cyber">Cyber</option>
                   <option value="humanitarian">Humanitarian</option>
                 </select>
-                <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/50 pointer-events-none"
-                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
+                <ChevronDown />
               </div>
             </div>
 
             <div>
-              <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Country / Region</p>
+              <p className="text-[9px] text-white/35 uppercase tracking-wider mb-2 font-semibold">Country / Region</p>
               <input type="text" value={region} onChange={(e) => onRegionChange(e.target.value)}
                 placeholder="e.g. Ukraine, Syria, Sahel..."
-                className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
-                  placeholder:text-white/20 hover:border-white/[0.08] focus:border-blue-500/40 focus:outline-none transition" />
+                className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2.5 text-[11px] text-white/80
+                  placeholder:text-white/20 hover:border-white/[0.1] focus:border-blue-500/30 focus:outline-none transition" />
             </div>
 
           </div>
         </Section>
 
-        {/* ── ACLED FILTERS (only visible when ACLED layer is on) ── */}
+        {/* ── ACLED FILTERS ── */}
         {showACLED && (
-          <Section title="ACLED Filters" badge={acledCount} defaultOpen>
-            <div className="flex flex-col gap-4">
+          <Section title="ACLED Filters" badge={acledCount} defaultOpen accentColor="#f97316">
+            <div className="flex flex-col gap-4 px-2">
 
-              {/* Research-tier notice */}
-              <div className="bg-orange-500/5 border border-orange-500/15 rounded-lg px-3 py-2">
-                <p className="text-[9px] text-orange-400/80 leading-relaxed">
+              <div className="rounded-lg border border-orange-500/15 bg-orange-500/[0.04] px-3 py-2.5">
+                <p className="text-[9px] text-orange-400/70 leading-relaxed">
                   Research-tier: showing data from ~13 months ago. Time window controls span relative to that date.
                 </p>
               </div>
 
-              {/* Event Type */}
               <div>
-                <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Event Type</p>
+                <p className="text-[9px] text-white/35 uppercase tracking-wider mb-2 font-semibold">Event Type</p>
                 <div className="relative">
                   <select value={acledEventType} onChange={(e) => onAcledEventTypeChange(e.target.value)}
-                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
-                      appearance-none cursor-pointer hover:border-white/[0.08] focus:border-orange-500/40 focus:outline-none transition">
+                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2.5 text-[11px] text-white/80
+                      appearance-none cursor-pointer hover:border-white/[0.1] focus:border-orange-500/30 focus:outline-none transition">
                     <option value="all">All event types</option>
                     <option value="Battles">Battles</option>
                     <option value="Violence against civilians">Violence against civilians</option>
@@ -307,40 +344,32 @@ export default function MapSidebar({
                     <option value="Protests">Protests</option>
                     <option value="Strategic developments">Strategic developments</option>
                   </select>
-                  <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/50 pointer-events-none"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <ChevronDown />
                 </div>
               </div>
 
-              {/* Disorder Type */}
               <div>
-                <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Disorder Type</p>
+                <p className="text-[9px] text-white/35 uppercase tracking-wider mb-2 font-semibold">Disorder Type</p>
                 <div className="relative">
                   <select value={acledDisorderType} onChange={(e) => onAcledDisorderTypeChange(e.target.value)}
-                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
-                      appearance-none cursor-pointer hover:border-white/[0.08] focus:border-orange-500/40 focus:outline-none transition">
+                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2.5 text-[11px] text-white/80
+                      appearance-none cursor-pointer hover:border-white/[0.1] focus:border-orange-500/30 focus:outline-none transition">
                     <option value="all">All disorder types</option>
                     <option value="Political violence">Political violence</option>
-                    <option value="Political violence; Demonstrations">Political violence & Demonstrations</option>
+                    <option value="Political violence; Demonstrations">Political violence &amp; Demonstrations</option>
                     <option value="Demonstrations">Demonstrations</option>
                     <option value="Strategic developments">Strategic developments</option>
                   </select>
-                  <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/50 pointer-events-none"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <ChevronDown />
                 </div>
               </div>
 
-              {/* ACLED Region */}
               <div>
-                <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">ACLED Region</p>
+                <p className="text-[9px] text-white/35 uppercase tracking-wider mb-2 font-semibold">ACLED Region</p>
                 <div className="relative">
                   <select value={acledRegion} onChange={(e) => onAcledRegionChange(e.target.value)}
-                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
-                      appearance-none cursor-pointer hover:border-white/[0.08] focus:border-orange-500/40 focus:outline-none transition">
+                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2.5 text-[11px] text-white/80
+                      appearance-none cursor-pointer hover:border-white/[0.1] focus:border-orange-500/30 focus:outline-none transition">
                     <option value="all">All regions</option>
                     <option value="10">Middle East</option>
                     <option value="11">Europe</option>
@@ -352,41 +381,35 @@ export default function MapSidebar({
                     <option value="7">South Asia</option>
                     <option value="9">Southeast Asia</option>
                     <option value="16">East Asia</option>
-                    <option value="12">Caucasus & Central Asia</option>
+                    <option value="12">Caucasus &amp; Central Asia</option>
                     <option value="14">South America</option>
                     <option value="13">Central America</option>
                     <option value="15">Caribbean</option>
                     <option value="17">North America</option>
                     <option value="18">Oceania</option>
                   </select>
-                  <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/50 pointer-events-none"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <ChevronDown />
                 </div>
               </div>
 
-              {/* Country */}
               <div>
-                <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Country</p>
+                <p className="text-[9px] text-white/35 uppercase tracking-wider mb-2 font-semibold">Country</p>
                 <input type="text" value={acledCountry} onChange={(e) => onAcledCountryChange(e.target.value)}
                   placeholder="e.g. Ukraine, Syria, Sudan..."
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
-                    placeholder:text-white/20 hover:border-white/[0.08] focus:border-orange-500/40 focus:outline-none transition" />
+                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2.5 text-[11px] text-white/80
+                    placeholder:text-white/20 hover:border-white/[0.1] focus:border-orange-500/30 focus:outline-none transition" />
               </div>
 
-              {/* Actor search */}
               <div>
-                <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Actor (search)</p>
+                <p className="text-[9px] text-white/35 uppercase tracking-wider mb-2 font-semibold">Actor (search)</p>
                 <input type="text" value={acledActor} onChange={(e) => onAcledActorChange(e.target.value)}
                   placeholder="e.g. Wagner, Houthis, ISIS..."
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white
-                    placeholder:text-white/20 hover:border-white/[0.08] focus:border-orange-500/40 focus:outline-none transition" />
+                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2.5 text-[11px] text-white/80
+                    placeholder:text-white/20 hover:border-white/[0.1] focus:border-orange-500/30 focus:outline-none transition" />
               </div>
 
-              {/* Minimum fatalities */}
               <div>
-                <p className="text-[9px] text-white/50 uppercase tracking-wider mb-2 font-medium">Min. Fatalities</p>
+                <p className="text-[9px] text-white/35 uppercase tracking-wider mb-2 font-semibold">Min. Fatalities</p>
                 <div className="flex gap-1.5">
                   {[
                     { v: '0', l: 'Any' },
@@ -396,10 +419,10 @@ export default function MapSidebar({
                     { v: '50', l: '50+' },
                   ].map(f => (
                     <button key={f.v} onClick={() => onAcledFatalitiesChange(f.v)}
-                      className={`flex-1 py-1.5 text-[10px] font-medium uppercase tracking-wider rounded-lg border transition
+                      className={`flex-1 py-2 text-[10px] font-semibold uppercase tracking-wider rounded-lg border transition-all duration-200
                         ${acledFatalities === f.v
-                          ? 'bg-red-500/15 border-red-500/30 text-red-400'
-                          : 'bg-transparent border-white/[0.05] text-white/50 hover:border-white/[0.08] hover:text-white/60'
+                          ? 'bg-red-500/15 border-red-500/25 text-red-400 shadow-sm shadow-red-500/10'
+                          : 'bg-white/[0.02] border-white/[0.05] text-white/35 hover:border-white/[0.1] hover:text-white/50'
                         }`}>
                       {f.l}
                     </button>
@@ -407,13 +430,12 @@ export default function MapSidebar({
                 </div>
               </div>
 
-              {/* Civilian targeting toggle */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px]">⚠️</span>
+              <div className="flex items-center justify-between rounded-lg bg-red-500/[0.04] border border-red-500/10 px-3 py-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-red-500/10 flex items-center justify-center text-[11px]">⚠️</div>
                   <div>
-                    <p className="text-[11px] text-white font-medium">Civilian targeting only</p>
-                    <p className="text-[9px] text-white/50">Filter to events targeting civilians</p>
+                    <p className="text-[11px] text-white font-medium">Civilian targeting</p>
+                    <p className="text-[9px] text-white/35">Show only civilian events</p>
                   </div>
                 </div>
                 <Toggle on={acledCivilianOnly} onChange={onAcledCivilianOnlyChange} color="bg-red-500" />
@@ -425,72 +447,67 @@ export default function MapSidebar({
 
         {/* ── SELECTED ITEM ── */}
         {(selectedEvent ?? selectedFlight ?? selectedVessel) && (
-          <Section title="Selected" defaultOpen>
-            {selectedEvent && (() => {
-              const ev = selectedEvent as Record<string, string>;
-              const sevColor = ev.severity === 'critical' ? '#ff2d2d' : ev.severity === 'high' ? '#ff8c00' : '#ffd700';
-              const sevBg = ev.severity === 'critical' ? 'rgba(255,45,45,0.1)' : 'rgba(255,140,0,0.1)';
-              return (
-              <div className="bg-white/[0.015] rounded-xl p-3 border border-white/[0.05]">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
-                    style={{ color: sevColor, backgroundColor: sevBg }}>
-                    {ev.severity ?? 'unknown'}
-                  </span>
-                  <span className="text-[9px] text-white/50">{ev.category ?? ''}</span>
+          <Section title="Selected" defaultOpen accentColor="#06b6d4">
+            <div className="px-2">
+              {selectedEvent && (() => {
+                const ev = selectedEvent as Record<string, string>;
+                const sevColor = ev.severity === 'critical' ? '#ef4444' : ev.severity === 'high' ? '#f97316' : '#eab308';
+                const sevBg = ev.severity === 'critical' ? 'rgba(239,68,68,0.08)' : ev.severity === 'high' ? 'rgba(249,115,22,0.08)' : 'rgba(234,179,8,0.08)';
+                return (
+                <div className="rounded-xl p-3.5 border"
+                  style={{ background: sevBg, borderColor: `${sevColor}20` }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border"
+                      style={{ color: sevColor, backgroundColor: `${sevColor}15`, borderColor: `${sevColor}25` }}>
+                      {ev.severity ?? 'unknown'}
+                    </span>
+                    <span className="text-[9px] text-white/40">{ev.category ?? ''}</span>
+                  </div>
+                  <p className="text-[12px] text-white font-semibold leading-snug line-clamp-2">{ev.title ?? ''}</p>
+                  <p className="text-[10px] text-white/50 mt-2 leading-relaxed line-clamp-3">{ev.summary ?? ev.description ?? ''}</p>
+                  {ev.country_region && (
+                    <p className="text-[9px] text-white/30 mt-2 flex items-center gap-1">📍 {ev.country_region}</p>
+                  )}
                 </div>
-                <p className="text-[11px] text-white font-medium leading-snug line-clamp-2">{ev.title ?? ''}</p>
-                <p className="text-[10px] text-white/50 mt-1.5 line-clamp-3">{ev.summary ?? ev.description ?? ''}</p>
-                {ev.country_region && (
-                  <p className="text-[9px] text-white/30 mt-2">📍 {ev.country_region}</p>
-                )}
-              </div>
-              );
-            })()}
-            {selectedFlight && (() => {
-              const f = selectedFlight as Record<string, string | number>;
-              return (
-              <div className="bg-white/[0.015] rounded-xl p-3 border border-cyan-400/20">
-                <p className="text-[11px] text-white font-medium">✈️ {String(f.callsign ?? f.icao24 ?? '')}</p>
-                <p className="text-[9px] text-white/50 mt-1">{String(f.originCountry ?? '')} · {Math.round(Number(f.altitude ?? 0)).toLocaleString()}m · {Math.round(Number(f.velocity ?? 0) * 3.6)}km/h</p>
-              </div>
-              );
-            })()}
-            {selectedVessel && (() => {
-              const v = selectedVessel as Record<string, string | number>;
-              return (
-              <div className="bg-white/[0.015] rounded-xl p-3 border border-emerald-400/20">
-                <p className="text-[11px] text-white font-medium">🚢 {String(v.name ?? '')}</p>
-                <p className="text-[9px] text-white/50 mt-1">{Number(v.speed ?? 0).toFixed(1)}kn → {String(v.destination ?? 'Unknown')}</p>
-              </div>
-              );
-            })()}
+                );
+              })()}
+              {selectedFlight && (() => {
+                const f = selectedFlight as Record<string, string | number>;
+                return (
+                <div className="rounded-xl p-3.5 border border-cyan-500/15 bg-cyan-500/[0.04]">
+                  <p className="text-[12px] text-white font-semibold">✈️ {String(f.callsign ?? f.icao24 ?? '')}</p>
+                  <p className="text-[10px] text-white/50 mt-1.5">{String(f.originCountry ?? '')} · {Math.round(Number(f.altitude ?? 0)).toLocaleString()}m · {Math.round(Number(f.velocity ?? 0) * 3.6)}km/h</p>
+                </div>
+                );
+              })()}
+              {selectedVessel && (() => {
+                const v = selectedVessel as Record<string, string | number>;
+                return (
+                <div className="rounded-xl p-3.5 border border-emerald-500/15 bg-emerald-500/[0.04]">
+                  <p className="text-[12px] text-white font-semibold">🚢 {String(v.name ?? '')}</p>
+                  <p className="text-[10px] text-white/50 mt-1.5">{Number(v.speed ?? 0).toFixed(1)}kn → {String(v.destination ?? 'Unknown')}</p>
+                </div>
+                );
+              })()}
+            </div>
           </Section>
         )}
 
         {/* ── INTEL CO-PILOT ── */}
-        <div className="px-4 py-4">
+        <div className="px-4 pt-2 pb-5">
           <Link href="/analyst"
-            className="w-full py-2.5 rounded-xl text-[11px] font-semibold tracking-wider uppercase
+            className="w-full py-3 rounded-xl text-[11px] font-bold tracking-wider uppercase
               bg-gradient-to-r from-blue-600 to-indigo-600 text-white
               hover:from-blue-500 hover:to-indigo-500 transition-all duration-200
-              shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2
+              border border-blue-500/20">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
             Intel Co-pilot
           </Link>
         </div>
 
-      </div>
-
-      {/* ═══ FOOTER ═══ */}
-      <div className="px-4 py-2.5 border-t border-white/[0.05] flex items-center justify-between">
-        <p className="text-[8px] text-white/30 uppercase tracking-wider">ConflictRadar v3.0</p>
-        <div className="flex items-center gap-1">
-          <div className="w-1 h-1 rounded-full bg-emerald-500" />
-          <p className="text-[8px] text-white/30">Systems operational</p>
-        </div>
       </div>
     </div>
   );
