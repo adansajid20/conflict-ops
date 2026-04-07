@@ -5,7 +5,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
 function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
+  // Support both ?token= (manual trigger) and Authorization header (Vercel cron)
+  const token = new URL(req.url).searchParams.get('token')
+  if (token && token === process.env.INTERNAL_SECRET) return true
+  const auth = req.headers.get('authorization')
+  if (auth && process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true
+  // Vercel crons on Pro+ also send this header
+  if (auth && process.env.INTERNAL_SECRET && auth === `Bearer ${process.env.INTERNAL_SECRET}`) return true
+  return false
 }
 
 /**
@@ -18,16 +25,16 @@ export async function GET(req: NextRequest) {
   if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
 
-  // Look back 5 minutes for new events
-  const h5m = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  // Look back 2 hours for events (covers ingestion delays and cron gaps)
+  const lookback = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
 
   const [{ data: alertRules }, { data: recentEvents }] = await Promise.all([
     supabase.from('user_alerts').select('*').eq('active', true),
     supabase.from('events')
       .select('id, title, severity, region, event_type, category, occurred_at')
-      .gte('occurred_at', h5m)
+      .gte('occurred_at', lookback)
       .order('occurred_at', { ascending: false })
-      .limit(100),
+      .limit(200),
   ])
 
   let triggered = 0
