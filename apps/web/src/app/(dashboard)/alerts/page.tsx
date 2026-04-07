@@ -335,7 +335,7 @@ export default function AlertsPage() {
 
         {/* Configure Alerts CTA */}
         <div className="px-5 pt-5 pb-4">
-          <a href="/settings"
+          <a href="/settings/alerts"
             className="group flex items-center gap-3 w-full p-4 rounded-xl transition-all
               bg-gradient-to-r from-blue-600/10 to-indigo-600/10
               border border-blue-500/20 hover:border-blue-500/40
@@ -442,7 +442,7 @@ export default function AlertsPage() {
                   <p className="text-[9px] text-white/20 max-w-[200px]">
                     Head to Settings to create alert rules that auto-match against incoming events.
                   </p>
-                  <a href="/settings"
+                  <a href="/settings/alerts"
                     className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/15 transition">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -454,7 +454,7 @@ export default function AlertsPage() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Active Rules ({rules.length})</p>
-                    <a href="/settings"
+                    <a href="/settings/alerts"
                       className="text-[9px] text-blue-400/60 hover:text-blue-400 transition flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

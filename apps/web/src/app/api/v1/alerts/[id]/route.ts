@@ -2,112 +2,120 @@ export const runtime = 'nodejs'
 
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
 import { createServiceClient } from '@/lib/supabase/server'
 
-const UpdateSubscriptionSchema = z.object({
-  email: z.string().email().optional(),
-  name: z.string().trim().min(1).max(120).nullable().optional(),
-  conditions: z.object({
-    severity_min: z.union([z.literal(3), z.literal(4)]).optional(),
-    regions: z.array(z.string().min(1)).optional(),
-    event_types: z.array(z.string().min(1)).optional(),
-    keywords: z.array(z.string().min(1)).optional(),
-  }).optional(),
-  frequency: z.enum(['realtime', 'hourly', 'daily']).optional(),
-  is_active: z.boolean().optional(),
-})
-
-function isMissingAlertsTable(error: { message?: string; code?: string } | null | undefined) {
-  const message = `${error?.message ?? ''}`.toLowerCase()
-  return error?.code === '42P01' || message.includes('relation') && message.includes('alerts') && message.includes('does not exist')
-}
-
-async function getOrgId(userId: string) {
-  const supabase = createServiceClient()
-  const { data } = await supabase.from('users').select('org_id').eq('clerk_user_id', userId).single()
-  return data?.org_id as string | null
-}
-
+/**
+ * PATCH /api/v1/alerts/:id — Update a user alert rule or mark an alert as read
+ *
+ * Two modes:
+ * 1. Alert history: { read: boolean } or { dismissed: boolean } — updates alert_history
+ * 2. User alert rule: { name, regions, severities, keywords, frequency, ... } — updates user_alerts
+ */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let body: unknown
+  let body: Record<string, unknown>
   try {
-    body = await req.json()
+    body = await req.json() as Record<string, unknown>
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  if (body && typeof body === 'object' && ('read' in body || 'dismissed' in body)) {
-    const orgId = await getOrgId(userId)
-    if (!orgId) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })
+  const supabase = createServiceClient()
 
-    const raw = body as { read?: boolean; dismissed?: boolean }
-    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-    if (typeof raw.read === 'boolean') {
-      updates.read = raw.read
-      updates.read_at = raw.read ? new Date().toISOString() : null
-    }
-    if (typeof raw.dismissed === 'boolean') {
-      updates.dismissed = raw.dismissed
-      updates.dismissed_at = raw.dismissed ? new Date().toISOString() : null
-    }
+  // Mode 1: Mark alert_history item as read/dismissed
+  if ('read' in body || 'dismissed' in body) {
+    const updates: Record<string, unknown> = {}
+    if (typeof body.read === 'boolean') updates.read = body.read
+    if (typeof body.dismissed === 'boolean') updates.dismissed = body.dismissed
 
-    const supabase = createServiceClient()
+    // Try alert_history first
     const { data, error } = await supabase
-      .from('alerts')
+      .from('alert_history')
       .update(updates)
       .eq('id', params.id)
-      .eq('org_id', orgId)
-      .select('*')
+      .eq('user_id', userId)
+      .select()
       .single()
 
-    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
-    return NextResponse.json({ success: true, data })
+    if (!error && data) return NextResponse.json({ success: true, data })
+
+    // Fallback to alerts table (legacy org-level)
+    const { data: legacy, error: legacyErr } = await supabase
+      .from('alerts')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', params.id)
+      .eq('user_id', userId)
+      .select()
+      .single()
+
+    if (legacyErr) return NextResponse.json({ error: legacyErr.message }, { status: 500 })
+    return NextResponse.json({ success: true, data: legacy })
   }
 
-  const parsed = UpdateSubscriptionSchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 })
-
-  const updates = {
-    ...parsed.data,
-    updated_at: new Date().toISOString(),
+  // Mode 2: Update user_alerts rule
+  const allowed = ['name', 'regions', 'severities', 'keywords', 'frequency',
+    'delivery_email', 'delivery_webhook', 'active', 'include_flights', 'include_vessels']
+  const updates: Record<string, unknown> = {}
+  for (const key of allowed) {
+    if (key in body) updates[key] = body[key]
   }
 
-  const supabase = createServiceClient()
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+  }
+
   const { data, error } = await supabase
-    .from('alerts')
+    .from('user_alerts')
     .update(updates)
     .eq('id', params.id)
     .eq('user_id', userId)
-    .select('id,user_id,email,name,conditions,frequency,is_active,last_sent_at,created_at,updated_at')
+    .select()
     .single()
 
-  if (isMissingAlertsTable(error)) {
-    return NextResponse.json({ error: 'alerts table missing - run apps/web/supabase/migrations/20260403_alerts.sql in Supabase SQL editor' }, { status: 503 })
-  }
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ alert: data })
+  return NextResponse.json({ data })
 }
 
+/**
+ * DELETE /api/v1/alerts/:id — Delete a user alert rule
+ */
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
+
+  // Try user_alerts first (most common from Settings page)
   const { error, count } = await supabase
-    .from('alerts')
+    .from('user_alerts')
     .delete({ count: 'exact' })
     .eq('id', params.id)
     .eq('user_id', userId)
 
-  if (isMissingAlertsTable(error)) {
-    return NextResponse.json({ error: 'alerts table missing - run apps/web/supabase/migrations/20260403_alerts.sql in Supabase SQL editor' }, { status: 503 })
+  if (!error && (count ?? 0) > 0) {
+    return NextResponse.json({ ok: true, deleted: count })
   }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true, deleted: count ?? 0 })
+  // Fallback: try alert_history
+  const { error: histErr, count: histCount } = await supabase
+    .from('alert_history')
+    .delete({ count: 'exact' })
+    .eq('id', params.id)
+    .eq('user_id', userId)
+
+  if (!histErr && (histCount ?? 0) > 0) {
+    return NextResponse.json({ ok: true, deleted: histCount })
+  }
+
+  // Final fallback: try legacy alerts table
+  const { error: legErr } = await supabase
+    .from('alerts')
+    .delete()
+    .eq('id', params.id)
+    .eq('user_id', userId)
+
+  if (legErr) return NextResponse.json({ error: legErr.message }, { status: 500 })
+  return NextResponse.json({ ok: true, deleted: 1 })
 }

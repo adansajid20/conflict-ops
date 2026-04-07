@@ -54,6 +54,8 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/v1/alerts — Create a new user alert rule
+ * Matches actual user_alerts table: name, regions[], severities[], keywords[],
+ * frequency, delivery_email, delivery_webhook, active
  */
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
@@ -62,21 +64,36 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
   try {
     const body = await req.json() as {
-      name?: string; alert_type?: string;
-      config?: Record<string, unknown>;
-      channels?: string[]; cooldown_minutes?: number
+      name?: string
+      regions?: string[]
+      severities?: string[]
+      keywords?: string[]
+      frequency?: string
+      delivery_email?: string
+      delivery_webhook?: string
     }
-    const { name, alert_type, config, channels, cooldown_minutes } = body
-    if (!name || !alert_type || !config) {
-      return NextResponse.json({ error: 'name, alert_type, config required' }, { status: 400 })
+    const { name } = body
+    if (!name) {
+      return NextResponse.json({ error: 'name is required' }, { status: 400 })
     }
 
-    const { data, error } = await supabase.from('user_alerts').insert({
-      user_id: userId, name, alert_type, config,
-      channels: channels ?? ['in_app'],
-      cooldown_minutes: cooldown_minutes ?? 30,
+    const row: Record<string, unknown> = {
+      user_id: userId,
+      name,
       active: true,
-    }).select().single()
+    }
+    if (body.regions?.length) row.regions = body.regions
+    if (body.severities?.length) row.severities = body.severities
+    if (body.keywords?.length) row.keywords = body.keywords
+    if (body.frequency) row.frequency = body.frequency
+    if (body.delivery_email) row.delivery_email = body.delivery_email
+    if (body.delivery_webhook) row.delivery_webhook = body.delivery_webhook
+
+    const { data, error } = await supabase
+      .from('user_alerts')
+      .insert(row)
+      .select()
+      .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ data })
