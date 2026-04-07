@@ -284,7 +284,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Settings Nav */}
             <div className="space-y-1">
               <NavLink item={{ href: '/settings', label: 'Settings', icon: Settings }} pathname={pathname} />
-              <NavLink item={{ href: '/settings/alerts', label: 'Alert Settings', icon: Bell }} pathname={pathname} />
             </div>
 
             {/* User Card */}
