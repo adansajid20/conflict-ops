@@ -25,15 +25,15 @@ export async function GET(req: NextRequest) {
   if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
 
-  // Look back 2 hours for events (covers ingestion delays and cron gaps)
-  const lookback = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+  // Look back 24 hours by ingestion time (covers cron downtime, ingestion delays)
+  const lookback = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
   const [{ data: alertRules }, { data: recentEvents }] = await Promise.all([
     supabase.from('user_alerts').select('*').eq('active', true),
     supabase.from('events')
-      .select('id, title, severity, region, event_type, category, occurred_at')
-      .gte('occurred_at', lookback)
-      .order('occurred_at', { ascending: false })
+      .select('id, title, severity, region, event_type, category, occurred_at, ingested_at')
+      .gte('ingested_at', lookback)
+      .order('ingested_at', { ascending: false })
       .limit(200),
   ])
 
