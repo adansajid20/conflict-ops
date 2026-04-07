@@ -171,44 +171,68 @@ function FeedSidebar({ events, onSelect }: { events: FeedEvent[]; onSelect: (eve
 
   return (
     <aside className="space-y-4">
-      <section className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4">
-        <div className="mb-3 text-[10px] uppercase tracking-[0.15em] font-medium text-white/20">Hot Regions</div>
-        <div className="space-y-2">
+      {/* Hot Regions — cyan accent */}
+      <section className="rounded-xl border border-cyan-500/15 bg-cyan-500/[0.04] p-4">
+        <div className="mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.15em] font-semibold text-cyan-400/80">
+          <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+          Hot Regions
+        </div>
+        <div className="space-y-2.5">
           {hotRegions.map(([region, count]) => (
             <div key={region}>
-              <div className="mb-1 flex items-center justify-between text-[12px] text-white/50">
-                <span>{formatRegion(region)}</span>
-                <span className="text-white/30 tabular-nums">{count}</span>
+              <div className="mb-1 flex items-center justify-between text-[12px]">
+                <span className="font-medium text-white/70">{formatRegion(region)}</span>
+                <span className="text-white/40 tabular-nums font-semibold">{count}</span>
               </div>
-              <div className="h-2 rounded-full bg-white/10">
-                <div className="h-2 rounded-full bg-cyan-500" style={{ width: `${Math.max(12, (count / Math.max(hotRegions[0]?.[1] ?? 1, 1)) * 100)}%` }} />
+              <div className="h-1.5 rounded-full bg-white/[0.06]">
+                <div className="h-1.5 rounded-full bg-cyan-500/80" style={{ width: `${Math.max(12, (count / Math.max(hotRegions[0]?.[1] ?? 1, 1)) * 100)}%` }} />
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4">
-        <div className="mb-3 text-[10px] uppercase tracking-[0.15em] font-medium text-white/20">Breaking Events</div>
+      {/* Breaking Events — red accent */}
+      <section className="rounded-xl border border-red-500/15 bg-red-500/[0.03] p-4">
+        <div className="mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.15em] font-semibold text-red-400/80">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" />
+          Breaking Events
+        </div>
         <div className="space-y-2">
-          {breaking.length === 0 ? <div className="text-[12px] text-white/25">No breaking events in the last 30 minutes.</div> : breaking.map((event) => <button key={event.id} onClick={() => onSelect(event)} className="block w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.06] transition-colors duration-150"><div className="text-[12px] font-medium text-white/80">{toTitleCase(event.title)}</div><div className="mt-1 text-[11px] text-white/20">{formatRegion(event.region)} · {relativeTime(event.occurred_at)}</div></button>)}
+          {breaking.length === 0 ? (
+            <div className="text-[12px] text-white/25">No breaking events in the last 30 minutes.</div>
+          ) : breaking.map((event) => (
+            <button
+              key={event.id}
+              onClick={() => onSelect(event)}
+              className="block w-full rounded-lg border border-red-500/10 bg-red-500/[0.04] px-3 py-2.5 text-left transition-colors duration-150 hover:bg-red-500/[0.08] hover:border-red-500/20"
+            >
+              <div className="text-[12px] font-medium text-white/80">{toTitleCase(event.title)}</div>
+              <div className="mt-1 text-[11px] text-white/30">{formatRegion(event.region)} · {relativeTime(event.occurred_at)}</div>
+            </button>
+          ))}
         </div>
       </section>
 
-      <section className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4">
-        <div className="mb-3 text-[10px] uppercase tracking-[0.15em] font-medium text-white/20">Critical Events</div>
-        <div className="space-y-2">
-          {critical.length === 0 ? <div className="text-[12px] text-white/25">No critical events in scope.</div> : critical.map((event) => <button key={event.id} onClick={() => onSelect(event)} className="block w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.06] transition-colors duration-150"><div className="text-[12px] font-medium text-white/80">{toTitleCase(event.title)}</div><div className="mt-1 text-[11px] text-white/25">{getOutletDisplay(event.source, event.source_id)}</div></button>)}
+      {/* Critical Events — orange accent */}
+      <section className="rounded-xl border border-orange-500/15 bg-orange-500/[0.03] p-4">
+        <div className="mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.15em] font-semibold text-orange-400/80">
+          <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+          Critical Events
         </div>
-      </section>
-
-      <section className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4">
-        <div className="mb-3 text-[10px] uppercase tracking-[0.15em] font-medium text-white/20">Data Sources</div>
-        <div className="space-y-2 text-[11px] text-white/25">
-          <div className="flex justify-between"><span>RSS</span><span>155 active</span></div>
-          <div className="flex justify-between"><span>GDELT</span><span>15m</span></div>
-          <div className="flex justify-between"><span>ACLED</span><span>15m</span></div>
-          <div className="flex justify-between"><span>ReliefWeb</span><span>30m</span></div>
+        <div className="space-y-2">
+          {critical.length === 0 ? (
+            <div className="text-[12px] text-white/25">No critical events in scope.</div>
+          ) : critical.map((event) => (
+            <button
+              key={event.id}
+              onClick={() => onSelect(event)}
+              className="block w-full rounded-lg border border-orange-500/10 bg-orange-500/[0.04] px-3 py-2.5 text-left transition-colors duration-150 hover:bg-orange-500/[0.08] hover:border-orange-500/20"
+            >
+              <div className="text-[12px] font-medium text-white/80">{toTitleCase(event.title)}</div>
+              <div className="mt-1 text-[11px] text-white/30">{getOutletDisplay(event.source, event.source_id)}</div>
+            </button>
+          ))}
         </div>
       </section>
     </aside>
