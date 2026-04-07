@@ -147,7 +147,7 @@ export default function CesiumGlobe() {
 
   // Layers
   const [showEvents, setShowEvents] = useState(true);
-  const [showFlights, setShowFlights] = useState(true);
+  const [showFlights, setShowFlights] = useState(false);
   const [showVessels, setShowVessels] = useState(false);
   const [showISS, setShowISS] = useState(true);
   const [showACLED, setShowACLED] = useState(false);
