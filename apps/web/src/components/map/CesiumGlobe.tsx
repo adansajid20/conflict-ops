@@ -27,6 +27,7 @@ interface Flight {
 interface Vessel {
   mmsi: string; name: string; latitude: number; longitude: number;
   speed: number; course: number; type: number; destination: string;
+  shipTypeName?: string; lane?: string;
 }
 interface EventData {
   id?: string; title?: string; description?: string; summary?: string;
@@ -679,6 +680,8 @@ export default function CesiumGlobe() {
           const vsl: Record<string, unknown> = {
             mmsi: getP('mmsi'), name: getP('name'),
             speed: getP('speed'), course: getP('course'), destination: getP('destination'),
+            type: getP('type'), shipTypeName: getP('shipTypeName'), lane: getP('lane'),
+            latitude: lat, longitude: lng,
           };
           setSelectedVessel(vsl);
           setSelectedEvent(null);
@@ -889,34 +892,115 @@ export default function CesiumGlobe() {
         )}
 
         {/* Vessel info card */}
-        {selectedVessel && !showModal && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#111827]/95 backdrop-blur-xl border border-emerald-500/20 rounded-2xl p-4 shadow-2xl shadow-black/40 w-80 animate-slide-up pointer-events-auto">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-base">🚢</span>
-                <div>
-                  <p className="text-white font-bold text-sm tracking-wider">{String(selectedVessel.name ?? '')}</p>
-                  <p className="text-[9px] text-gray-500">MMSI {String(selectedVessel.mmsi ?? '')}</p>
+        {selectedVessel && !showModal && (() => {
+          const vSpeed = Number(selectedVessel.speed ?? 0);
+          const vCourse = Math.round(Number(selectedVessel.course ?? 0));
+          const vName = String(selectedVessel.name ?? 'Unknown');
+          const vMmsi = String(selectedVessel.mmsi ?? '');
+          const vDest = String(selectedVessel.destination ?? '—');
+          const vType = String(selectedVessel.shipTypeName ?? '');
+          const vLane = String(selectedVessel.lane ?? '');
+          const vLat = Number(selectedVessel.latitude ?? 0);
+          const vLng = Number(selectedVessel.longitude ?? 0);
+          // Heading label
+          const headingLabels = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+          const headingLabel = headingLabels[Math.round(vCourse / 22.5) % 16];
+          // Speed status
+          const speedStatus = vSpeed < 1 ? 'At Anchor' : vSpeed < 5 ? 'Slow Steaming' : vSpeed < 14 ? 'Cruising' : 'Full Speed';
+          const speedColor = vSpeed < 1 ? '#f59e0b' : vSpeed < 5 ? '#eab308' : vSpeed < 14 ? '#34d399' : '#06b6d4';
+          // Vessel type icon
+          const typeIcon = vType === 'Tanker' ? '⛽' : vType === 'Container' ? '📦' : vType === 'Bulk Carrier' ? '🏗️' : vType === 'LNG/LPG' ? '🔥' : vType === 'Passenger' ? '🛳️' : vType === 'Fishing' ? '🎣' : vType === 'Military' ? '⚓' : '🚢';
+
+          return (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#0B1120]/95 backdrop-blur-xl border border-emerald-500/20 rounded-2xl shadow-2xl shadow-black/50 w-[380px] animate-slide-up pointer-events-auto overflow-hidden">
+
+            {/* Top accent bar */}
+            <div className="h-1 w-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-500" />
+
+            <div className="p-4">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-lg flex-shrink-0">
+                    {typeIcon}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-white font-bold text-[13px] tracking-wide truncate">{vName}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[9px] text-gray-500 font-mono">MMSI {vMmsi}</span>
+                      {vType && (
+                        <span className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/15">
+                          {vType}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedVessel(null)}
+                  className="text-gray-500 hover:text-white text-xs w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/5 transition flex-shrink-0">✕</button>
+              </div>
+
+              {/* Status pill */}
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border" style={{ backgroundColor: `${speedColor}10`, borderColor: `${speedColor}25` }}>
+                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: speedColor }} />
+                  <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: speedColor }}>{speedStatus}</span>
+                </div>
+                {vLane && (
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
+                    <span className="text-[9px] text-gray-400">📍 {vLane}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Stats grid */}
+              <div className="grid grid-cols-4 gap-1.5 mb-3">
+                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Speed</p>
+                  <p className="text-white font-mono text-sm font-bold">{vSpeed.toFixed(1)}</p>
+                  <p className="text-gray-600 text-[8px]">knots</p>
+                </div>
+                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Course</p>
+                  <p className="text-white font-mono text-sm font-bold">{vCourse}°</p>
+                  <p className="text-gray-600 text-[8px]">{headingLabel}</p>
+                </div>
+                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Lat</p>
+                  <p className="text-white font-mono text-sm font-bold">{vLat.toFixed(2)}</p>
+                  <p className="text-gray-600 text-[8px]">{vLat >= 0 ? 'N' : 'S'}</p>
+                </div>
+                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Lon</p>
+                  <p className="text-white font-mono text-sm font-bold">{vLng.toFixed(2)}</p>
+                  <p className="text-gray-600 text-[8px]">{vLng >= 0 ? 'E' : 'W'}</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedVessel(null)} className="text-gray-500 hover:text-white text-xs w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/5">✕</button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-black/30 rounded-lg p-2 text-center">
-                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Speed</p>
-                <p className="text-white font-mono text-xs">{Number(selectedVessel.speed ?? 0).toFixed(1)}kn</p>
+
+              {/* Destination bar */}
+              <div className="flex items-center gap-3 bg-emerald-500/[0.05] border border-emerald-500/10 rounded-xl px-3 py-2.5">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-[10px] text-gray-500 flex-shrink-0">DEST</span>
+                  <div className="flex-1 h-px bg-gradient-to-r from-emerald-500/30 via-emerald-500/10 to-transparent relative">
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  </div>
+                  <span className="text-[11px] text-emerald-400 font-semibold flex-shrink-0 truncate max-w-[140px]">{vDest}</span>
+                </div>
               </div>
-              <div className="bg-black/30 rounded-lg p-2 text-center">
-                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Course</p>
-                <p className="text-white font-mono text-xs">{Math.round(Number(selectedVessel.course ?? 0))}°</p>
-              </div>
-              <div className="bg-black/30 rounded-lg p-2 text-center">
-                <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Dest</p>
-                <p className="text-white font-mono text-xs truncate">{String(selectedVessel.destination ?? '—')}</p>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/[0.04]">
+                <div className="flex items-center gap-3 text-[9px] text-gray-600">
+                  <span className="font-mono">IMO —</span>
+                  <span>Flag —</span>
+                  <span>Draught —</span>
+                </div>
+                <span className="text-[8px] text-gray-600 uppercase tracking-wider">Live Tracking</span>
               </div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ACLED info card */}
         {selectedAcled && !showModal && (
