@@ -160,10 +160,10 @@ export default function AlertsPage() {
   // RENDER
   // ═══════════════════════════════════════════════════════════
   return (
-    <div className="flex h-full" style={{ background: '#070B11' }}>
+    <div className="flex flex-col lg:flex-row h-full" style={{ background: '#070B11' }}>
 
       {/* ════════════ LEFT — ALERT FEED ════════════ */}
-      <div className="flex-1 flex flex-col min-w-0 border-r border-white/[0.05]">
+      <div className="flex-1 flex flex-col min-w-0 border-r border-white/[0.05] min-h-[50vh] lg:min-h-0">
 
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
@@ -331,7 +331,7 @@ export default function AlertsPage() {
       </div>
 
       {/* ════════════ RIGHT — CONFIGURATION SIDEBAR ════════════ */}
-      <div className="w-[380px] flex-shrink-0 flex flex-col h-full bg-[#060A10]">
+      <div className="w-full lg:w-[380px] flex-shrink-0 flex flex-col lg:h-full bg-[#060A10]">
 
         {/* Configure Alerts CTA */}
         <div className="px-5 pt-5 pb-4">
