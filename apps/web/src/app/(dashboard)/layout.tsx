@@ -18,7 +18,9 @@ import {
   FlaskConical,
   GitCompare,
   Globe,
+  Heart,
   LayoutDashboard,
+  LineChart,
   Lock,
   MapPin,
   Palette,
@@ -67,10 +69,16 @@ const INTELLIGENCE_NAV: NavItem[] = [
 const ANALYSIS_NAV: NavItem[] = [
   { href: '/analysis/trends', label: 'Trends', icon: TrendingUp },
   { href: '/analysis/predictions', label: 'Predictions', icon: Brain },
+  { href: '/analysis/forecasts', label: 'Predictive Forecasts', icon: LineChart },
   { href: '/analysis/actors', label: 'Actors', icon: Users },
   { href: '/analysis/reports', label: 'Reports', icon: FileText },
   { href: '/analysis/countries', label: 'Countries', icon: Flag },
   { href: '/analysis/market', label: 'Market', icon: BarChart3 },
+]
+
+const INTELLIGENCE_PREMIUM_NAV: NavItem[] = [
+  { href: '/situation-room', label: 'Situation Room', icon: Radio },
+  { href: '/humanitarian', label: 'Humanitarian Tracker', icon: Heart },
 ]
 
 const TOOLS_NAV: NavItem[] = [
@@ -93,10 +101,16 @@ const ADMIN_NAV: NavItem[] = [
   { href: '/admin/doctor', label: 'Doctor', icon: Stethoscope },
 ]
 
+const REFERENCE_NAV: NavItem[] = [
+  { href: '/methodology', label: 'Methodology', icon: FileText },
+]
+
 const NAV_SECTIONS: NavSection[] = [
   { label: 'INTELLIGENCE', items: INTELLIGENCE_NAV },
+  { label: 'INTELLIGENCE (PREMIUM)', items: INTELLIGENCE_PREMIUM_NAV },
   { label: 'ANALYSIS', items: ANALYSIS_NAV },
   { label: 'TOOLS', items: TOOLS_NAV },
+  { label: 'REFERENCE', items: REFERENCE_NAV },
 ]
 
 function NavLink({
