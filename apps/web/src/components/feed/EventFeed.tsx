@@ -355,6 +355,22 @@ export function EventFeed() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [lastFetched, setLastFetched] = useState<Date | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
+  // Track the pending deep-link event ID (consumed once after events load)
+  const pendingDeepLinkId = useRef<string | null>(null)
+
+  // On mount: read deep-link event ID from sessionStorage or URL params
+  useEffect(() => {
+    let eventId = sessionStorage.getItem('cr_open_event')
+    if (eventId) {
+      sessionStorage.removeItem('cr_open_event')
+    } else {
+      const params = new URLSearchParams(window.location.search)
+      eventId = params.get('event') || params.get('eventId')
+    }
+    if (eventId) {
+      pendingDeepLinkId.current = eventId
+    }
+  }, [])
 
   // Debounce search input
   useEffect(() => {
@@ -368,7 +384,41 @@ export function EventFeed() {
     try {
       const response = await fetch(`/api/v1/events?window=${timeWindow}&limit=200`, { cache: 'no-store' })
       const json = await response.json() as FeedResponse
-      setEvents(json.data ?? [])
+      let loadedEvents = json.data ?? []
+
+      // If we have a deep-link pending, handle it right here inside the fetch
+      const deepId = pendingDeepLinkId.current
+      if (deepId) {
+        pendingDeepLinkId.current = null // consume it
+
+        // Check if event is already in loaded list
+        const alreadyLoaded = loadedEvents.find(e => e.id === deepId)
+        if (alreadyLoaded) {
+          setEvents(loadedEvents)
+          setSelectedId(deepId)
+          setLastFetched(new Date())
+          return
+        }
+
+        // Not in list — fetch the individual event and prepend it
+        try {
+          const singleRes = await fetch(`/api/v1/events/${deepId}`, { cache: 'no-store' })
+          if (singleRes.ok) {
+            const singleJson = await singleRes.json() as { event?: FeedEvent; data?: FeedEvent }
+            const evt = singleJson.event ?? singleJson.data
+            if (evt) {
+              loadedEvents = [evt, ...loadedEvents]
+            }
+          }
+        } catch { /* silent */ }
+
+        setEvents(loadedEvents)
+        setSelectedId(deepId)
+        setLastFetched(new Date())
+        return
+      }
+
+      setEvents(loadedEvents)
       setLastFetched(new Date())
     } finally {
       setLoading(false)
@@ -409,11 +459,25 @@ export function EventFeed() {
     low: activeFilteredBase.filter((event) => (event.severity ?? 1) === 1).length,
   }), [activeFilteredBase])
 
-  const selectedIndex = useMemo(() => filteredEvents.findIndex((event) => event.id === selectedId), [filteredEvents, selectedId])
+  // For deep-linked events, search ALL events not just filtered
+  const selectedIndex = useMemo(() => {
+    const idx = filteredEvents.findIndex((event) => event.id === selectedId)
+    if (idx >= 0) return idx
+    // If not in filtered list, check full events list (deep-linked event might be filtered out)
+    const fullIdx = events.findIndex((event) => event.id === selectedId)
+    return fullIdx >= 0 ? fullIdx : -1
+  }, [filteredEvents, events, selectedId])
 
-  useEffect(() => {
-    if (selectedId && selectedIndex === -1) setSelectedId(null)
-  }, [selectedId, selectedIndex])
+  // The events list to pass to EventDetailPanel — use filteredEvents if event is there, else full events
+  const panelEvents = useMemo(() => {
+    if (filteredEvents.findIndex(e => e.id === selectedId) >= 0) return filteredEvents
+    return events
+  }, [filteredEvents, events, selectedId])
+
+  const panelIndex = useMemo(() => panelEvents.findIndex(e => e.id === selectedId), [panelEvents, selectedId])
+
+  // Don't auto-clear selection — user can close it themselves
+  // (removed the effect that cleared selectedId when not in filteredEvents)
 
   const lastFetchedLabel = lastFetched
     ? `Updated ${lastFetched.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
@@ -582,7 +646,7 @@ export function EventFeed() {
         </div>
       </div>
 
-      {selectedIndex >= 0 ? <EventDetailPanel events={filteredEvents} selectedIndex={selectedIndex} onClose={() => setSelectedId(null)} onNavigate={(next) => setSelectedId(filteredEvents[next]?.id ?? null)} /> : null}
+      {panelIndex >= 0 ? <EventDetailPanel events={panelEvents} selectedIndex={panelIndex} onClose={() => setSelectedId(null)} onNavigate={(next) => setSelectedId(panelEvents[next]?.id ?? null)} /> : null}
     </div>
   )
 }

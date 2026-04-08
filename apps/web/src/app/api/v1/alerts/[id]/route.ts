@@ -54,9 +54,32 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ success: true, data: legacy })
   }
 
+  // Mode 1b: Acknowledgment status update
+  if ('ack_status' in body) {
+    const ackUpdates: Record<string, unknown> = {
+      ack_status: body.ack_status,
+      ack_at: new Date().toISOString(),
+      ack_by: userId,
+    }
+    if (body.ack_note) ackUpdates.ack_note = body.ack_note
+
+    const { data, error } = await supabase
+      .from('alert_history')
+      .update(ackUpdates)
+      .eq('id', params.id)
+      .eq('user_id', userId)
+      .select()
+      .single()
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true, data })
+  }
+
   // Mode 2: Update user_alerts rule
   const allowed = ['name', 'regions', 'severities', 'keywords', 'frequency',
-    'delivery_email', 'delivery_webhook', 'active', 'include_flights', 'include_vessels']
+    'delivery_email', 'delivery_webhook', 'active', 'include_flights', 'include_vessels',
+    'rule_definition', 'channel_routing', 'dedupe_config', 'escalation_policy',
+    'suppression_windows', 'tags', 'actor_ids', 'watchlist_id']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
