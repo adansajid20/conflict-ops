@@ -262,8 +262,8 @@ function InteractiveAreaChart({ data }: { data: DayVolume[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
-  const w = Math.max(data.length * 10, 200)
-  const h = 130
+  const w = Math.max(data.length * 14, 400)
+  const h = 180
   const maxTotal = Math.max(...data.map(d => d.total), 1)
   const px = (i: number) => (i / Math.max(data.length - 1, 1)) * w
   const py = (val: number) => h - (val / maxTotal) * (h - 10)
@@ -345,9 +345,22 @@ function InteractiveAreaChart({ data }: { data: DayVolume[] }) {
           />
         )}
 
+        {/* X-axis date labels */}
+        {data.map((d, i) => {
+          // Show label every ~5 days, or first & last
+          const step = Math.max(Math.floor(data.length / 6), 1)
+          if (i !== 0 && i !== data.length - 1 && i % step !== 0) return null
+          const dateStr = d.date.slice(5) // "MM-DD"
+          return (
+            <text key={i} x={px(i)} y={h + 16} textAnchor="middle" fill="rgba(255,255,255,0.2)" fontSize="9" fontFamily="monospace">
+              {dateStr}
+            </text>
+          )
+        })}
+
         <rect
           width={w}
-          height={h}
+          height={h + 20}
           fill="transparent"
           onMouseMove={(e) => {
             const rect = e.currentTarget.getBoundingClientRect()
@@ -578,14 +591,20 @@ function AnimProgress({ pct, color, delay = 0 }: { pct: number; color: string; d
 function Delta({ value }: { value: number }) {
   if (value === 0) return <span className="text-white/15 text-[11px]">—</span>
   const up = value > 0
+  // Cap display at ±999% — anything higher shows "New" or ">999%"
+  const displayVal = Math.abs(value) > 999 ? '>999' : String(Math.abs(value))
+  const label = Math.abs(value) > 999
+    ? (up ? 'Significant increase vs prior period' : 'Significant decrease vs prior period')
+    : `${Math.abs(value)}% ${up ? 'increase' : 'decrease'} vs prior period`
   return (
     <motion.span initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} transition={SPRING_SNAPPY}
+      title={label}
       className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${up ? 'text-red-400' : 'text-emerald-400'}`}>
       <motion.svg width="10" height="10" viewBox="0 0 10 10"
         animate={{ rotate: up ? 0 : 180 }} transition={SPRING_SNAPPY}>
         <path d="M5 2L8 7H2L5 2Z" fill="currentColor" />
       </motion.svg>
-      {Math.abs(value)}%
+      {displayVal}%
     </motion.span>
   )
 }
@@ -743,14 +762,14 @@ export function TrendsClient() {
         {/* ========== 1. KPI STRIP ========== */}
         <div className="grid grid-cols-5 gap-3">
           {[
-            { id: 'total-events', label: 'Total Events', desc: 'All recorded incidents in the time window', v: cs.total_events, ch: cs.events_change_pct, sp: cs.daily_sparkline, c: '#3b82f6', href: '/feed' },
-            { id: 'fatalities', label: 'Est. Fatalities', desc: 'Estimated deaths from conflict events', v: cs.total_fatalities, ch: cs.fatalities_change_pct, sp: cs.fatality_sparkline, c: '#ef4444', scrollId: 'casualty-tracker' },
-            { id: 'displacement', label: 'Displacement', desc: 'Events causing population displacement', v: cs.displacement_events, ch: cs.displacement_change_pct, sp: null, c: '#a78bfa', scrollId: 'casualty-tracker' },
-            { id: 'conflicts', label: 'Active Conflicts', desc: 'Distinct countries with ongoing conflict', v: cs.active_conflicts, ch: null, sp: null, c: '#f97316', href: '/analysis/countries' },
-            { id: 'escalation', label: 'Escalation Idx', desc: 'Weighted severity indicator (0-5 scale)', v: cs.escalation_index, ch: cs.escalation_change_pct, sp: null, c: '#eab308', dec: 2, scrollId: 'escalation-section' },
+            { label: 'Total Events', desc: 'Conflict incidents, political events, and security alerts recorded from verified open-source intelligence feeds.', methodology: `Tracked across ${days} days from multiple global sources`, v: cs.total_events, ch: cs.events_change_pct, sp: cs.daily_sparkline, c: '#3b82f6', href: '/feed', linkLabel: 'Browse all events →' },
+            { label: 'Est. Fatalities', desc: 'Estimated deaths extracted from event reports. Figures are approximate — based on reported casualties, not confirmed body counts.', methodology: 'Aggregated from casualty reports in conflict data', v: cs.total_fatalities, ch: cs.fatalities_change_pct, sp: cs.fatality_sparkline, c: '#ef4444', scrollId: 'casualty-tracker', linkLabel: 'See breakdown ↓' },
+            { label: 'Displacement Events', desc: 'Events that report forced population movement — refugees, internal displacement, or mass evacuations.', methodology: 'Flagged from humanitarian and conflict event reports', v: cs.displacement_events, ch: cs.displacement_change_pct, sp: null, c: '#a78bfa', scrollId: 'casualty-tracker', linkLabel: 'See impact data ↓' },
+            { label: 'Active Conflicts', desc: 'Number of distinct countries currently experiencing active armed conflict or significant political violence.', methodology: 'Countries with ≥3 high-severity events', v: cs.active_conflicts, ch: null, sp: null, c: '#f97316', href: '/analysis/countries', linkLabel: 'View country profiles →' },
+            { label: 'Escalation Index', desc: 'A 0–5 composite score measuring how quickly conflict intensity is increasing. Higher = faster escalation.', methodology: 'Weighted: severity × frequency × fatalities', v: cs.escalation_index, ch: cs.escalation_change_pct, sp: null, c: '#eab308', dec: 2, scrollId: 'escalation-section', linkLabel: 'See escalation data ↓' },
           ].map((kpi, i) => (
             <Reveal key={kpi.label} delay={i * 0.06}>
-              <motion.div className="relative rounded-2xl overflow-hidden group cursor-pointer"
+              <motion.div className="relative rounded-2xl overflow-hidden group"
                 style={{
                   background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%)',
                   border: '1px solid rgba(255,255,255,0.06)', padding: '16px 18px',
@@ -758,34 +777,30 @@ export function TrendsClient() {
                 whileHover={{ y: -3, borderColor: `${kpi.c}30`, boxShadow: `0 8px 30px ${kpi.c}08`, transition: { duration: 0.3 } }}>
                 <div className="absolute top-0 inset-x-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${kpi.c}15, transparent)` }} />
 
-                {/* Info icon tooltip */}
-                <div className="relative absolute top-4 right-4 group/info">
-                  <div className="w-4 h-4 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors">
-                    <Info size={12} className="text-white/40" />
-                  </div>
-                  <div className="absolute right-0 top-6 w-40 bg-black/95 text-white text-[10px] p-2 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none whitespace-normal z-50 border border-white/10">
-                    {kpi.desc}
-                  </div>
-                </div>
+                <div className="text-[10px] uppercase tracking-[0.15em] text-white/25 font-medium mb-1">{kpi.label}</div>
+                <p className="text-[10px] text-white/15 leading-relaxed mb-3 min-h-[28px]">{kpi.desc}</p>
 
-                <div className="text-[10px] uppercase tracking-[0.15em] text-white/20 font-medium mb-3">{kpi.label}</div>
                 <div className="flex items-end justify-between">
                   <div>
                     <div className="text-[28px] font-bold tracking-tight leading-none" style={{ color: kpi.c }}>
                       <SpringNumber value={kpi.v} decimals={(kpi as {dec?: number}).dec ?? 0} />
                     </div>
-                    {kpi.ch !== null && <div className="mt-1.5"><Delta value={kpi.ch} /></div>}
+                    <div className="mt-1.5 flex items-center gap-2">
+                      {kpi.ch !== null && <Delta value={kpi.ch} />}
+                      <span className="text-[9px] text-white/10">vs prior {days}d</span>
+                    </div>
                   </div>
                   {kpi.sp && kpi.sp.length > 1 && (
                     <AnimatedSparkline data={kpi.sp} color={kpi.c} h={30} w={95} />
                   )}
                 </div>
 
-                {/* View details link */}
-                <div className="mt-3 pt-3 border-t border-white/[0.04]">
+                {/* Methodology + action link */}
+                <div className="mt-3 pt-3 border-t border-white/[0.04] flex items-center justify-between">
+                  <span className="text-[9px] text-white/10 italic max-w-[120px] leading-tight">{kpi.methodology}</span>
                   {kpi.href ? (
-                    <Link href={kpi.href} className="text-blue-400/60 hover:text-blue-400 text-[11px] font-semibold inline-flex items-center gap-1 transition-colors hover:underline">
-                      View details →
+                    <Link href={kpi.href} className="text-blue-400/60 hover:text-blue-400 text-[10px] font-semibold transition-colors hover:underline whitespace-nowrap">
+                      {kpi.linkLabel}
                     </Link>
                   ) : (
                     <button
@@ -795,8 +810,8 @@ export function TrendsClient() {
                           if (el) el.scrollIntoView({ behavior: 'smooth' })
                         }
                       }}
-                      className="text-blue-400/60 hover:text-blue-400 text-[11px] font-semibold inline-flex items-center gap-1 transition-colors hover:underline cursor-pointer">
-                      View details →
+                      className="text-blue-400/60 hover:text-blue-400 text-[10px] font-semibold transition-colors hover:underline cursor-pointer whitespace-nowrap">
+                      {kpi.linkLabel}
                     </button>
                   )}
                 </div>
@@ -805,11 +820,24 @@ export function TrendsClient() {
           ))}
         </div>
 
+        {/* ========== DATA METHODOLOGY NOTE ========== */}
+        <Reveal delay={0.1}>
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.08)' }}>
+            <Info size={14} className="text-blue-400/40 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-[11px] text-white/30 leading-relaxed">
+                <span className="text-white/45 font-medium">How we gather this data:</span> ConflictRadar aggregates events from verified open-source intelligence (OSINT) feeds, government reports, and credible news agencies worldwide. Fatality estimates are extracted from event reports and may differ from official counts. All figures are approximate and updated continuously.
+              </p>
+            </div>
+          </div>
+        </Reveal>
+
         {/* ========== 2. EVENT VOLUME + ESCALATION ========== */}
         <div className="grid grid-cols-[1.5fr_1fr] gap-4">
           <TiltCard delay={0.1} glow="#3b82f6">
-            <SH title="Event Volume by Severity" sub={`Daily breakdown — ${days}-day window`} action={{ label: 'View full feed →', href: '/feed' }} />
-            <div className="w-full">
+            <SH title="Event Volume by Severity" sub={`Daily event count broken down by severity level — hover over the chart to see exact numbers for any day`} action={{ label: 'View full feed →', href: '/feed' }} />
+            <p className="text-[10px] text-white/15 mb-3 leading-relaxed">Each colored layer represents a severity level. The height of the combined layers shows total daily events. Spikes may indicate escalating situations or breaking events.</p>
+            <div className="w-full" style={{ minHeight: 180 }}>
               <InteractiveAreaChart data={dv} />
             </div>
             <div className="flex gap-5 mt-4 pt-3 border-t border-white/[0.04]">
@@ -823,8 +851,24 @@ export function TrendsClient() {
           </TiltCard>
 
           <TiltCard delay={0.15} glow="#f97316" id="escalation-section">
-            <SH title="Escalation Monitor" sub="Country threat levels from event data" action={{ label: 'View countries →', href: '/analysis/countries' }} />
-            <div className="space-y-1.5 max-h-[310px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+            <SH title="Escalation Monitor" sub="Country threat levels computed from event severity, frequency, and casualties" action={{ label: 'View countries →', href: '/analysis/countries' }} />
+            {/* Escalation Level Legend */}
+            <div className="flex flex-wrap gap-2 mb-4 pb-3 border-b border-white/[0.04]">
+              {[
+                { level: 1, label: 'Stable', desc: 'Low activity', color: '#22c55e' },
+                { level: 2, label: 'Tension', desc: 'Rising incidents', color: '#84cc16' },
+                { level: 3, label: 'Crisis', desc: 'Active crisis', color: '#eab308' },
+                { level: 4, label: 'Conflict', desc: 'Armed conflict', color: '#f97316' },
+                { level: 5, label: 'War', desc: 'Full-scale war', color: '#ef4444' },
+              ].map(l => (
+                <div key={l.level} className="flex items-center gap-1.5 group/esc" title={l.desc}>
+                  <div className="w-2 h-2 rounded-full" style={{ background: l.color }} />
+                  <span className="text-[9px] text-white/25 font-medium">L{l.level} {l.label}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-white/15 mb-3 leading-relaxed">Click any country to see detailed breakdown, signals, and navigation to filtered views.</p>
+            <div className="space-y-1.5 max-h-[260px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
               {et.length > 0 ? et.slice(0, 12).map((entry, i) => (
                 <Reveal key={entry.country_code} delay={i * 0.04}>
                   <div>
@@ -920,6 +964,9 @@ export function TrendsClient() {
         {/* ========== 3. CASUALTY TRACKER ========== */}
         <TiltCard delay={0.1} glow="#ef4444" id="casualty-tracker">
           <SH title="Casualty & Impact Tracker" sub="Fatality estimates and humanitarian indicators extracted from event data" />
+          <div className="mb-4 px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.03)', border: '1px solid rgba(239,68,68,0.06)' }}>
+            <p className="text-[10px] text-white/20 leading-relaxed"><span className="text-red-400/50 font-semibold">Important:</span> Fatality numbers are estimates extracted from news reports, government sources, and conflict databases. Actual figures may be higher or lower. Displacement counts reflect events reporting forced movement, not individual persons displaced.</p>
+          </div>
           <div className="grid grid-cols-4 gap-6">
             <div>
               <div className="text-[10px] uppercase tracking-[0.15em] text-white/15 font-medium mb-4">Overview</div>
