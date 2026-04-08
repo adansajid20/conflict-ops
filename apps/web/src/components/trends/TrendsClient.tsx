@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback, MouseEvent } from 'react'
 import { motion, AnimatePresence, useInView, useSpring, useTransform, useMotionValue, MotionValue } from 'framer-motion'
+import Link from 'next/link'
+import { ChevronDown, Info } from 'lucide-react'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -182,7 +184,7 @@ function Reveal({ children, delay = 0, className = '' }: { children: React.React
 /* ------------------------------------------------------------------ */
 /*  TiltCard — 3D Parallax Hover (PREMIUM #1)                         */
 /* ------------------------------------------------------------------ */
-function TiltCard({ children, className = '', delay = 0, glow }: { children: React.ReactNode; className?: string; delay?: number; glow?: string }) {
+function TiltCard({ children, className = '', delay = 0, glow, id }: { children: React.ReactNode; className?: string; delay?: number; glow?: string; id?: string }) {
   const ref = useRef<HTMLDivElement>(null)
   const x = useMotionValue(0)
   const y = useMotionValue(0)
@@ -215,6 +217,7 @@ function TiltCard({ children, className = '', delay = 0, glow }: { children: Rea
     <Reveal delay={delay} className={className}>
       <motion.div
         ref={ref}
+        id={id}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         className="relative rounded-2xl overflow-hidden cursor-pointer"
@@ -590,11 +593,24 @@ function Delta({ value }: { value: number }) {
 /* ------------------------------------------------------------------ */
 /*  Section header                                                     */
 /* ------------------------------------------------------------------ */
-function SH({ title, sub }: { title: string; sub?: string }) {
+function SH({ title, sub, action }: { title: string; sub?: string; action?: { label: string; href?: string; onClick?: () => void } }) {
   return (
-    <div className="mb-5">
-      <h2 className="text-[15px] font-semibold text-white tracking-[-0.01em]">{title}</h2>
-      {sub && <p className="text-[11px] text-white/20 mt-1 leading-relaxed">{sub}</p>}
+    <div className="mb-5 flex items-start justify-between">
+      <div>
+        <h2 className="text-[15px] font-semibold text-white tracking-[-0.01em]">{title}</h2>
+        {sub && <p className="text-[11px] text-white/20 mt-1 leading-relaxed">{sub}</p>}
+      </div>
+      {action && (
+        action.href ? (
+          <Link href={action.href} className="text-blue-400/60 hover:text-blue-400 text-[12px] font-semibold whitespace-nowrap hover:underline transition-colors">
+            {action.label}
+          </Link>
+        ) : (
+          <button onClick={action.onClick} className="text-blue-400/60 hover:text-blue-400 text-[12px] font-semibold whitespace-nowrap hover:underline transition-colors cursor-pointer">
+            {action.label}
+          </button>
+        )
+      )}
     </div>
   )
 }
@@ -643,6 +659,8 @@ export function TrendsClient() {
   const [data, setData] = useState<TrendsData | null>(null)
   const [days, setDays] = useState(30)
   const [loading, setLoading] = useState(true)
+  const [expandedEscalation, setExpandedEscalation] = useState<string | null>(null)
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     setLoading(true)
@@ -658,6 +676,24 @@ export function TrendsClient() {
   const { command_strip: cs, daily_volume: dv, escalation_timeline: et, casualty_tracker: ct, attack_patterns: ap, attack_trend_lines: atl, region_threat_matrix: rtm, actor_intel: ai, prediction_panel: pp, comparative_analysis: ca, velocity_panel: vp } = data
   const tc = ca.trend === 'escalating' ? '#ef4444' : ca.trend === 'de_escalating' ? '#22c55e' : '#64748b'
   const tl = ca.trend === 'escalating' ? 'Escalating' : ca.trend === 'de_escalating' ? 'De-escalating' : 'Stable'
+
+  const toggleSection = (sectionId: string) => {
+    const newSet = new Set(collapsedSections)
+    if (newSet.has(sectionId)) {
+      newSet.delete(sectionId)
+    } else {
+      newSet.add(sectionId)
+    }
+    setCollapsedSections(newSet)
+  }
+
+  const KPITooltips: Record<string, string> = {
+    'Total Events': 'All recorded incidents in the time window',
+    'Est. Fatalities': 'Estimated deaths from conflict events',
+    'Displacement': 'Events causing population displacement',
+    'Active Conflicts': 'Distinct countries with ongoing conflict',
+    'Escalation Idx': 'Weighted severity indicator (0-5 scale)'
+  }
 
   return (
     <AnimatePresence mode="wait">
@@ -707,20 +743,31 @@ export function TrendsClient() {
         {/* ========== 1. KPI STRIP ========== */}
         <div className="grid grid-cols-5 gap-3">
           {[
-            { label: 'Total Events', v: cs.total_events, ch: cs.events_change_pct, sp: cs.daily_sparkline, c: '#3b82f6' },
-            { label: 'Est. Fatalities', v: cs.total_fatalities, ch: cs.fatalities_change_pct, sp: cs.fatality_sparkline, c: '#ef4444' },
-            { label: 'Displacement', v: cs.displacement_events, ch: cs.displacement_change_pct, sp: null, c: '#a78bfa' },
-            { label: 'Active Conflicts', v: cs.active_conflicts, ch: null, sp: null, c: '#f97316' },
-            { label: 'Escalation Idx', v: cs.escalation_index, ch: cs.escalation_change_pct, sp: null, c: '#eab308', dec: 2 },
+            { id: 'total-events', label: 'Total Events', desc: 'All recorded incidents in the time window', v: cs.total_events, ch: cs.events_change_pct, sp: cs.daily_sparkline, c: '#3b82f6', href: '/feed' },
+            { id: 'fatalities', label: 'Est. Fatalities', desc: 'Estimated deaths from conflict events', v: cs.total_fatalities, ch: cs.fatalities_change_pct, sp: cs.fatality_sparkline, c: '#ef4444', scrollId: 'casualty-tracker' },
+            { id: 'displacement', label: 'Displacement', desc: 'Events causing population displacement', v: cs.displacement_events, ch: cs.displacement_change_pct, sp: null, c: '#a78bfa', scrollId: 'casualty-tracker' },
+            { id: 'conflicts', label: 'Active Conflicts', desc: 'Distinct countries with ongoing conflict', v: cs.active_conflicts, ch: null, sp: null, c: '#f97316', href: '/analysis/countries' },
+            { id: 'escalation', label: 'Escalation Idx', desc: 'Weighted severity indicator (0-5 scale)', v: cs.escalation_index, ch: cs.escalation_change_pct, sp: null, c: '#eab308', dec: 2, scrollId: 'escalation-section' },
           ].map((kpi, i) => (
             <Reveal key={kpi.label} delay={i * 0.06}>
-              <motion.div className="relative rounded-2xl overflow-hidden"
+              <motion.div className="relative rounded-2xl overflow-hidden group cursor-pointer"
                 style={{
                   background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%)',
                   border: '1px solid rgba(255,255,255,0.06)', padding: '16px 18px',
                 }}
                 whileHover={{ y: -3, borderColor: `${kpi.c}30`, boxShadow: `0 8px 30px ${kpi.c}08`, transition: { duration: 0.3 } }}>
                 <div className="absolute top-0 inset-x-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${kpi.c}15, transparent)` }} />
+
+                {/* Info icon tooltip */}
+                <div className="relative absolute top-4 right-4 group/info">
+                  <div className="w-4 h-4 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors">
+                    <Info size={12} className="text-white/40" />
+                  </div>
+                  <div className="absolute right-0 top-6 w-40 bg-black/95 text-white text-[10px] p-2 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none whitespace-normal z-50 border border-white/10">
+                    {kpi.desc}
+                  </div>
+                </div>
+
                 <div className="text-[10px] uppercase tracking-[0.15em] text-white/20 font-medium mb-3">{kpi.label}</div>
                 <div className="flex items-end justify-between">
                   <div>
@@ -733,6 +780,26 @@ export function TrendsClient() {
                     <AnimatedSparkline data={kpi.sp} color={kpi.c} h={30} w={95} />
                   )}
                 </div>
+
+                {/* View details link */}
+                <div className="mt-3 pt-3 border-t border-white/[0.04]">
+                  {kpi.href ? (
+                    <Link href={kpi.href} className="text-blue-400/60 hover:text-blue-400 text-[11px] font-semibold inline-flex items-center gap-1 transition-colors hover:underline">
+                      View details →
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (kpi.scrollId) {
+                          const el = document.getElementById(kpi.scrollId)
+                          if (el) el.scrollIntoView({ behavior: 'smooth' })
+                        }
+                      }}
+                      className="text-blue-400/60 hover:text-blue-400 text-[11px] font-semibold inline-flex items-center gap-1 transition-colors hover:underline cursor-pointer">
+                      View details →
+                    </button>
+                  )}
+                </div>
               </motion.div>
             </Reveal>
           ))}
@@ -741,8 +808,8 @@ export function TrendsClient() {
         {/* ========== 2. EVENT VOLUME + ESCALATION ========== */}
         <div className="grid grid-cols-[1.5fr_1fr] gap-4">
           <TiltCard delay={0.1} glow="#3b82f6">
-            <SH title="Event Volume by Severity" sub={`Daily breakdown — ${days}-day window`} />
-            <div className="overflow-x-auto">
+            <SH title="Event Volume by Severity" sub={`Daily breakdown — ${days}-day window`} action={{ label: 'View full feed →', href: '/feed' }} />
+            <div className="w-full">
               <InteractiveAreaChart data={dv} />
             </div>
             <div className="flex gap-5 mt-4 pt-3 border-t border-white/[0.04]">
@@ -755,27 +822,95 @@ export function TrendsClient() {
             </div>
           </TiltCard>
 
-          <TiltCard delay={0.15} glow="#f97316">
-            <SH title="Escalation Monitor" sub="Country threat levels from event data" />
+          <TiltCard delay={0.15} glow="#f97316" id="escalation-section">
+            <SH title="Escalation Monitor" sub="Country threat levels from event data" action={{ label: 'View countries →', href: '/analysis/countries' }} />
             <div className="space-y-1.5 max-h-[310px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
               {et.length > 0 ? et.slice(0, 12).map((entry, i) => (
                 <Reveal key={entry.country_code} delay={i * 0.04}>
-                  <motion.div className="flex items-center justify-between py-1.5 px-2 rounded-lg"
-                    whileHover={{ backgroundColor: 'rgba(255,255,255,0.03)' }} transition={{ duration: 0.2 }}>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[13px] font-mono text-white/45 w-8 font-semibold">{entry.country_code}</span>
-                      <EscBadge level={entry.level} />
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[11px] text-white/20 font-mono">{entry.event_count} ev</span>
-                      {entry.fatality_estimate > 0 && <span className="text-[11px] text-red-400/50 font-mono">{entry.fatality_estimate}</span>}
-                      {entry.signals.length > 0 && entry.signals[0] && (
-                        <motion.span className="w-2.5 h-2.5 rounded-full"
-                          style={{ background: SIG_C[entry.signals[0]!.signal_type] ?? '#64748b', boxShadow: `0 0 10px ${SIG_C[entry.signals[0]!.signal_type] ?? '#64748b'}50` }}
-                          animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
+                  <div>
+                    <motion.div
+                      onClick={() => setExpandedEscalation(expandedEscalation === entry.country_code ? null : entry.country_code)}
+                      className="flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer group"
+                      whileHover={{ backgroundColor: 'rgba(255,255,255,0.05)' }} transition={{ duration: 0.2 }}>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[13px] font-mono text-white/45 w-8 font-semibold">{entry.country_code}</span>
+                        <EscBadge level={entry.level} />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] text-white/20 font-mono">{entry.event_count} ev</span>
+                        {entry.fatality_estimate > 0 && <span className="text-[11px] text-red-400/50 font-mono">{entry.fatality_estimate}</span>}
+                        {entry.signals.length > 0 && entry.signals[0] && (
+                          <motion.span className="w-2.5 h-2.5 rounded-full"
+                            style={{ background: SIG_C[entry.signals[0]!.signal_type] ?? '#64748b', boxShadow: `0 0 10px ${SIG_C[entry.signals[0]!.signal_type] ?? '#64748b'}50` }}
+                            animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
+                        )}
+                      </div>
+                    </motion.div>
+
+                    {/* Expanded detail view */}
+                    <AnimatePresence>
+                      {expandedEscalation === entry.country_code && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ ...SPRING_SMOOTH }}
+                          className="mt-2 p-3 rounded-lg border border-white/[0.04]"
+                          style={{ background: 'rgba(255,255,255,0.02)' }}>
+                          <div className="space-y-3">
+                            {/* Daily sparkline */}
+                            {entry.daily_counts.length > 0 && (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-[0.1em] text-white/20 mb-2 font-medium">Daily Events</div>
+                                <AnimatedSparkline data={entry.daily_counts.map(d => d.count)} color={ESC_C[entry.level - 1] ?? '#64748b'} h={40} w={200} />
+                              </div>
+                            )}
+
+                            {/* Key metrics */}
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <div className="text-[10px] text-white/20 mb-1">Events</div>
+                                <div className="text-[14px] font-semibold text-white">{entry.event_count}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] text-white/20 mb-1">Avg Severity</div>
+                                <div className="text-[14px] font-semibold text-orange-400">{entry.avg_severity.toFixed(1)}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] text-white/20 mb-1">Fatalities</div>
+                                <div className="text-[14px] font-semibold text-red-400">{entry.fatality_estimate}</div>
+                              </div>
+                            </div>
+
+                            {/* Signals */}
+                            {entry.signals.length > 0 && (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-[0.1em] text-white/20 mb-2 font-medium">Signals</div>
+                                <div className="space-y-1">
+                                  {entry.signals.slice(0, 3).map((sig, si) => (
+                                    <div key={si} className="text-[10px] text-white/40 flex items-center gap-2">
+                                      <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: SIG_C[sig.signal_type] ?? '#64748b' }} />
+                                      <span className="font-semibold">{sig.signal_type.replace(/_/g, ' ')} ({Math.round(sig.confidence * 100)}%)</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Navigation links */}
+                            <div className="flex gap-2 pt-2 border-t border-white/[0.04]">
+                              <Link href={`/feed?country=${entry.country_code}`} className="text-blue-400/60 hover:text-blue-400 text-[11px] font-semibold transition-colors hover:underline">
+                                View in feed →
+                              </Link>
+                              <Link href={`/map?country=${entry.country_code}`} className="text-blue-400/60 hover:text-blue-400 text-[11px] font-semibold transition-colors hover:underline">
+                                View on map →
+                              </Link>
+                            </div>
+                          </div>
+                        </motion.div>
                       )}
-                    </div>
-                  </motion.div>
+                    </AnimatePresence>
+                  </div>
                 </Reveal>
               )) : <p className="text-white/10 text-[11px] text-center py-6">No escalation data</p>}
             </div>
@@ -783,7 +918,7 @@ export function TrendsClient() {
         </div>
 
         {/* ========== 3. CASUALTY TRACKER ========== */}
-        <TiltCard delay={0.1} glow="#ef4444">
+        <TiltCard delay={0.1} glow="#ef4444" id="casualty-tracker">
           <SH title="Casualty & Impact Tracker" sub="Fatality estimates and humanitarian indicators extracted from event data" />
           <div className="grid grid-cols-4 gap-6">
             <div>
@@ -840,7 +975,7 @@ export function TrendsClient() {
 
         {/* ========== 4. ATTACK PATTERNS ========== */}
         <TiltCard delay={0.1} glow="#f97316">
-          <SH title="Attack Pattern Analysis" sub="Event type breakdown with trend comparison vs prior period" />
+          <SH title="Attack Pattern Analysis" sub="Event type breakdown with trend comparison vs prior period" action={{ label: 'View events →', href: '/feed' }} />
           <div className="grid grid-cols-[1fr_1fr] gap-8">
             <div>
               <div className="grid grid-cols-[1fr_55px_50px_50px_60px_45px] gap-2 mb-3 text-[9px] uppercase tracking-[0.15em] text-white/12 font-medium pb-2 border-b border-white/[0.04]">
@@ -881,7 +1016,7 @@ export function TrendsClient() {
 
         {/* ========== 5. REGIONAL THREAT MATRIX (HEATMAP) ========== */}
         <TiltCard delay={0.1} glow="#eab308">
-          <SH title="Regional Threat Matrix" sub="Multi-dimensional threat assessment across severity, escalation, casualties, and displacement" />
+          <SH title="Regional Threat Matrix" sub="Multi-dimensional threat assessment across severity, escalation, casualties, and displacement" action={{ label: 'View regions →', href: '/analysis/countries' }} />
           <HeatmapGrid
             rows={rtm.map(r => ({
               label: r.region.replace(/_/g, ' '),
@@ -900,7 +1035,7 @@ export function TrendsClient() {
 
         {/* ========== 6. ACTOR INTELLIGENCE ========== */}
         <TiltCard delay={0.1} glow="#a78bfa">
-          <SH title="Actor Intelligence" sub="Key actors extracted from event data — frequency, severity, regional activity, and trending" />
+          <SH title="Actor Intelligence" sub="Key actors extracted from event data — frequency, severity, regional activity, and trending" action={{ label: 'View all actors →', href: '/actors' }} />
           <div className="grid grid-cols-[1.2fr_0.8fr] gap-8">
             <div>
               <div className="grid grid-cols-[1fr_50px_45px_45px_45px_40px] gap-2 mb-3 text-[9px] uppercase tracking-[0.15em] text-white/12 font-medium pb-2 border-b border-white/[0.04]">
@@ -966,7 +1101,7 @@ export function TrendsClient() {
         {/* ========== 7. PREDICTIONS (with AnimatedDonut) ========== */}
         <div className="grid grid-cols-2 gap-4">
           <TiltCard delay={0.1} glow="#a78bfa">
-            <SH title="Prediction Accuracy" sub="Forecast vs actual outcomes" />
+            <SH title="Prediction Accuracy" sub="Forecast vs actual outcomes" action={{ label: 'View predictions →', href: '/analysis/predictions' }} />
             <div className="flex items-center gap-8 mb-6">
               <div className="flex flex-col items-center justify-center">
                 <AnimatedDonut
@@ -1016,7 +1151,7 @@ export function TrendsClient() {
           </TiltCard>
 
           <TiltCard delay={0.15} glow="#f97316">
-            <SH title="High-Confidence Predictions" sub="Active forecasts ≥70% probability" />
+            <SH title="High-Confidence Predictions" sub="Active forecasts ≥70% probability" action={{ label: 'View predictions →', href: '/analysis/predictions' }} />
             <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
               {pp.high_confidence.length > 0 ? pp.high_confidence.map((pred, pi) => (
                 <Reveal key={pred.id} delay={pi * 0.05}>
@@ -1105,7 +1240,7 @@ export function TrendsClient() {
 
         {/* ========== 9. VELOCITY ========== */}
         <TiltCard delay={0.1} glow="#3b82f6">
-          <SH title="Event Velocity (48h)" sub="Hourly ingestion rate with σ-based anomaly detection" />
+          <SH title="Event Velocity (48h)" sub="Hourly ingestion rate with σ-based anomaly detection" action={{ label: 'View live feed →', href: '/feed' }} />
           <div className="grid grid-cols-[1fr_180px] gap-6">
             <div>
               <div className="flex items-end gap-[2px]" style={{ height: 70 }}>
@@ -1151,54 +1286,58 @@ export function TrendsClient() {
         {/* ========== FORECAST + COUNTRY RISK ========== */}
         <div className="grid grid-cols-2 gap-4">
           <TiltCard delay={0.1} glow="#22c55e">
-            <SH title="Forecast Signals" sub="Active intelligence signals" />
+            <SH title="Forecast Signals" sub="Active intelligence signals" action={{ label: 'View on map →', href: '/map' }} />
             <div className="space-y-1.5 max-h-[250px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
               {data.forecast_signals.length > 0 ? data.forecast_signals.slice(0, 12).map((sig, si) => (
                 <Reveal key={si} delay={si * 0.04}>
-                  <motion.div className="flex items-center justify-between py-[6px] px-2 rounded-lg"
-                    whileHover={{ backgroundColor: 'rgba(255,255,255,0.025)' }}>
-                    <div className="flex items-center gap-2.5">
-                      <motion.span className="w-2.5 h-2.5 rounded-full" style={{ background: SIG_C[sig.signal_type] ?? '#64748b', boxShadow: `0 0 10px ${SIG_C[sig.signal_type] ?? '#64748b'}40` }}
-                        animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
-                      <span className="text-[12px] text-white/40 font-mono font-semibold">{sig.country_code}</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider font-semibold"
-                        style={{ background: `${SIG_C[sig.signal_type] ?? '#64748b'}10`, color: SIG_C[sig.signal_type] ?? '#64748b' }}>
-                        {sig.signal_type.replace(/_/g, ' ')}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-white/25 font-mono">{Math.round(sig.confidence * 100)}%</span>
-                  </motion.div>
+                  <Link href={`/map?country=${sig.country_code}`} className="block">
+                    <motion.div className="flex items-center justify-between py-[6px] px-2 rounded-lg cursor-pointer"
+                      whileHover={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                      <div className="flex items-center gap-2.5">
+                        <motion.span className="w-2.5 h-2.5 rounded-full" style={{ background: SIG_C[sig.signal_type] ?? '#64748b', boxShadow: `0 0 10px ${SIG_C[sig.signal_type] ?? '#64748b'}40` }}
+                          animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
+                        <span className="text-[12px] text-white/40 font-mono font-semibold">{sig.country_code}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider font-semibold"
+                          style={{ background: `${SIG_C[sig.signal_type] ?? '#64748b'}10`, color: SIG_C[sig.signal_type] ?? '#64748b' }}>
+                          {sig.signal_type.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-white/25 font-mono">{Math.round(sig.confidence * 100)}%</span>
+                    </motion.div>
+                  </Link>
                 </Reveal>
               )) : <p className="text-white/10 text-[11px] text-center py-6">No active signals</p>}
             </div>
           </TiltCard>
 
           <TiltCard delay={0.15} glow="#3b82f6">
-            <SH title="Country Risk Scores" sub="Composite risk assessment" />
+            <SH title="Country Risk Scores" sub="Composite risk assessment" action={{ label: 'View countries →', href: '/analysis/countries' }} />
             <div className="space-y-1 max-h-[250px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
               {data.country_risks.map((cr, ci) => {
                 const c = cr.risk_score >= 70 ? '#ef4444' : cr.risk_score >= 40 ? '#f97316' : cr.risk_score >= 20 ? '#eab308' : '#22c55e'
                 const tc2 = cr.trend === 'rising' ? '#ef4444' : cr.trend === 'falling' ? '#22c55e' : '#475569'
                 return (
                   <Reveal key={cr.country_code} delay={ci * 0.03}>
-                    <motion.div className="flex items-center justify-between py-[6px] px-2 rounded-lg"
-                      whileHover={{ backgroundColor: 'rgba(255,255,255,0.025)' }}>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[12px] text-white/45 font-mono font-semibold w-8">{cr.country_code}</span>
-                        <div className="w-16 h-[5px] bg-white/[0.03] rounded-full overflow-hidden">
-                          <AnimProgress pct={cr.risk_score} color={c} delay={ci * 0.04} />
+                    <Link href={`/analysis/countries?country=${cr.country_code}`} className="block">
+                      <motion.div className="flex items-center justify-between py-[6px] px-2 rounded-lg cursor-pointer"
+                        whileHover={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[12px] text-white/45 font-mono font-semibold w-8">{cr.country_code}</span>
+                          <div className="w-16 h-[5px] bg-white/[0.03] rounded-full overflow-hidden">
+                            <AnimProgress pct={cr.risk_score} color={c} delay={ci * 0.04} />
+                          </div>
+                          <span className="text-[12px] font-bold font-mono" style={{ color: c }}>{cr.risk_score}</span>
                         </div>
-                        <span className="text-[12px] font-bold font-mono" style={{ color: c }}>{cr.risk_score}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-white/12 font-mono">{cr.event_count_7d}/7d</span>
-                        <motion.span className="text-[10px] font-semibold" style={{ color: tc2 }}
-                          animate={cr.trend === 'rising' ? { y: [0, -2, 0] } : cr.trend === 'falling' ? { y: [0, 2, 0] } : {}}
-                          transition={{ duration: 2, repeat: Infinity }}>
-                          {cr.trend === 'rising' ? '▲' : cr.trend === 'falling' ? '▼' : '—'}
-                        </motion.span>
-                      </div>
-                    </motion.div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] text-white/12 font-mono">{cr.event_count_7d}/7d</span>
+                          <motion.span className="text-[10px] font-semibold" style={{ color: tc2 }}
+                            animate={cr.trend === 'rising' ? { y: [0, -2, 0] } : cr.trend === 'falling' ? { y: [0, 2, 0] } : {}}
+                            transition={{ duration: 2, repeat: Infinity }}>
+                            {cr.trend === 'rising' ? '▲' : cr.trend === 'falling' ? '▼' : '—'}
+                          </motion.span>
+                        </div>
+                      </motion.div>
+                    </Link>
                   </Reveal>
                 )
               })}
