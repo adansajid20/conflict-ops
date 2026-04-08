@@ -93,6 +93,7 @@ const EV_LABELS: Record<string, string> = {
   border_incident: 'Border Incident', maritime_incident: 'Maritime Incident',
   aviation_incident: 'Aviation Incident', military: 'Military', mobilization: 'Mobilization',
   explosion: 'Explosion', attack: 'Attack', news: 'News', unknown: 'Unknown',
+  other_events: 'Other Events',
 }
 
 /* spring configs */
@@ -296,8 +297,8 @@ function InteractiveAreaChart({ data }: { data: DayVolume[] }) {
   ]
 
   return (
-    <div className="relative">
-      <svg ref={ref} width={w + 20} height={h + 40} className="overflow-visible" style={{ maxWidth: '100%', height: 'auto' }}>
+    <div className="relative w-full">
+      <svg ref={ref} viewBox={`0 0 ${w + 20} ${h + 30}`} preserveAspectRatio="xMidYMid meet" className="overflow-visible w-full" style={{ height: 'auto', minHeight: '160px' }}>
         <defs>
           {areas.map((a, i) => (
             <linearGradient key={i} id={`grad-${i}`} x1="0" y1="0" x2="0" y2="1">
@@ -1008,13 +1009,23 @@ export function TrendsClient() {
 
           {ct.daily_fatalities.length > 0 && ct.total_fatalities > 0 && (
             <div className="mt-5 pt-4 border-t border-white/[0.04]">
-              <div className="text-[10px] uppercase tracking-[0.15em] text-white/15 font-medium mb-3">Daily Fatality Timeline</div>
-              <div className="flex items-end gap-[2px]" style={{ height: 44 }}>
+              <div className="text-[10px] uppercase tracking-[0.15em] text-white/15 font-medium mb-2">Daily Fatality Timeline</div>
+              <p className="text-[9px] text-white/10 mb-3">Each bar represents one day. Height = estimated fatalities reported that day.</p>
+              <div className="flex items-end gap-[3px]" style={{ height: 60 }}>
                 {ct.daily_fatalities.map((d, di) => {
                   const max = Math.max(...ct.daily_fatalities.map(x => x.fatalities), 1)
-                  const h = Math.max(2, Math.round((d.fatalities / max) * 44))
-                  return <AnimBar key={d.date} height={d.fatalities > 0 ? h : 2} color={d.fatalities > 0 ? '#ef4444' : 'rgba(255,255,255,0.02)'} delay={di * 0.01} tooltip={`${d.date}: ${d.fatalities}`} />
+                  const barH = Math.max(2, Math.round((d.fatalities / max) * 60))
+                  return (
+                    <div key={d.date} className="flex-1 min-w-[3px] max-w-[14px]" title={`${d.date}: ${d.fatalities} fatalities`}>
+                      <AnimBar height={d.fatalities > 0 ? barH : 2} color={d.fatalities > 0 ? '#ef4444' : 'rgba(255,255,255,0.03)'} delay={di * 0.01} />
+                    </div>
+                  )
                 })}
+              </div>
+              {/* Date range labels */}
+              <div className="flex justify-between mt-1">
+                <span className="text-[8px] text-white/10 font-mono">{ct.daily_fatalities[0]?.date?.slice(5)}</span>
+                <span className="text-[8px] text-white/10 font-mono">{ct.daily_fatalities[ct.daily_fatalities.length - 1]?.date?.slice(5)}</span>
               </div>
             </div>
           )}

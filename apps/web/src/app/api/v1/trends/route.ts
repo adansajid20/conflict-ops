@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
   const countryStats = new Map<string, { events: number; severity_sum: number; max_sev: number; fatalities: number; escalation_count: number }>()
   for (const e of events) {
     const cc = (e.country_code as string) ?? ''
-    if (!cc) continue
+    if (!cc || cc.length !== 2 || cc === 'XX' || cc === 'ZZ') continue
     if (!countryStats.has(cc)) countryStats.set(cc, { events: 0, severity_sum: 0, max_sev: 0, fatalities: 0, escalation_count: 0 })
     const d = countryStats.get(cc)!
     d.events++
@@ -153,7 +153,12 @@ export async function GET(req: NextRequest) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, counts]) => ({ date, ...counts }))
 
-  const pctChange = (curr: number, prev: number) => prev > 0 ? Math.round(((curr - prev) / prev) * 100) : curr > 0 ? 100 : 0
+  // Cap % change at ±999 to avoid absurd numbers when prior period had near-zero data
+  const pctChange = (curr: number, prev: number) => {
+    if (prev <= 0) return curr > 0 ? 100 : 0
+    const raw = Math.round(((curr - prev) / prev) * 100)
+    return Math.max(-999, Math.min(999, raw))
+  }
 
   const commandStrip = {
     total_events: events.length,
@@ -206,11 +211,23 @@ export async function GET(req: NextRequest) {
     const f = e.casualty_estimate as number | null
     if (typeof f !== 'number' || f <= 0) continue
     const r = (e.region as string) ?? 'Unknown'
-    const cc = (e.country_code as string) ?? 'XX'
+    const cc = (e.country_code as string) || ''
     const t = (e.event_type as string) ?? 'unknown'
-    fatalityByRegion.set(r, (fatalityByRegion.get(r) ?? 0) + f)
-    fatalityByCountry.set(cc, (fatalityByCountry.get(cc) ?? 0) + f)
-    fatalityByType.set(t, (fatalityByType.get(t) ?? 0) + f)
+    if (r && r !== 'Unknown') fatalityByRegion.set(r, (fatalityByRegion.get(r) ?? 0) + f)
+    else fatalityByRegion.set('Other / Unclassified', (fatalityByRegion.get('Other / Unclassified') ?? 0) + f)
+    // Skip empty/invalid country codes
+    if (cc && cc.length === 2 && cc !== 'XX' && cc !== 'ZZ') {
+      fatalityByCountry.set(cc, (fatalityByCountry.get(cc) ?? 0) + f)
+    } else {
+      fatalityByCountry.set('Unidentified', (fatalityByCountry.get('Unidentified') ?? 0) + f)
+    }
+    // Skip non-conflict event types for fatality breakdown
+    const SKIP_TYPES = new Set(['news', 'unknown', 'other', 'general', 'report', 'analysis', 'update', 'statement'])
+    if (!SKIP_TYPES.has(t.toLowerCase())) {
+      fatalityByType.set(t, (fatalityByType.get(t) ?? 0) + f)
+    } else {
+      fatalityByType.set('Other Events', (fatalityByType.get('Other Events') ?? 0) + f)
+    }
   }
 
   const dailyFatalities = dailyVolume.map(d => ({ date: d.date, fatalities: d.fatalities }))
@@ -240,8 +257,11 @@ export async function GET(req: NextRequest) {
   const typeMap = new Map<string, { count: number; critical: number; fatalities: number; countries: Set<string> }>()
   const priorTypeMap = new Map<string, number>()
 
+  // Skip event types that aren't real conflict/intelligence categories
+  const NOISE_TYPES = new Set(['news', 'unknown', 'other', 'general', 'report', 'analysis', 'update', 'statement', 'weather', 'forecast'])
   for (const e of events) {
-    const t = (e.event_type as string) ?? 'unknown'
+    let t = (e.event_type as string) ?? 'unknown'
+    if (NOISE_TYPES.has(t.toLowerCase())) t = 'other_events'
     if (!typeMap.has(t)) typeMap.set(t, { count: 0, critical: 0, fatalities: 0, countries: new Set() })
     const d = typeMap.get(t)!
     d.count++
@@ -251,7 +271,8 @@ export async function GET(req: NextRequest) {
     if (e.country_code) d.countries.add(e.country_code as string)
   }
   for (const e of priorEvents) {
-    const t = (e.event_type as string) ?? 'unknown'
+    let t = (e.event_type as string) ?? 'unknown'
+    if (NOISE_TYPES.has(t.toLowerCase())) t = 'other_events'
     priorTypeMap.set(t, (priorTypeMap.get(t) ?? 0) + 1)
   }
 
