@@ -147,7 +147,7 @@ export default function OrgSettingsPage() {
                 </div>
 
                 <h3 className="text-xl font-semibold text-white mb-2">Organization Profile</h3>
-                <p className="text-sm text-white/50 mb-6">Configure your organization's basic settings and information</p>
+                <p className="text-sm text-white/50 mb-6">Configure your organization&apos;s basic settings and information</p>
 
                 <label className="block mb-4">
                   <span className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-2 block">Organization Name</span>
@@ -207,7 +207,7 @@ export default function OrgSettingsPage() {
                   />
                 </label>
 
-                <p className="text-xs text-white/40 mb-6 leading-relaxed">They'll receive an email with instructions to join your workspace.</p>
+                <p className="text-xs text-white/40 mb-6 leading-relaxed">They&apos;ll receive an email with instructions to join your workspace.</p>
 
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -294,7 +294,7 @@ export default function OrgSettingsPage() {
 
               <div className="relative z-10">
                 <h3 className="text-xl font-semibold text-white mb-2">White-Label Branding</h3>
-                <p className="text-sm text-white/50 mb-6">Customize your application's appearance and branding</p>
+                <p className="text-sm text-white/50 mb-6">Customize your application&apos;s appearance and branding</p>
                 <BrandingEditor />
               </div>
             </div>

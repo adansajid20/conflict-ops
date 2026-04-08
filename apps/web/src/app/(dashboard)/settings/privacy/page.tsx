@@ -144,7 +144,7 @@ export default function PrivacySettingsPage() {
               </p>
 
               <label className="block mb-4">
-                <span className="text-xs font-semibold text-red-300/60 uppercase tracking-wider mb-2 block">Type "DELETE" to confirm</span>
+                <span className="text-xs font-semibold text-red-300/60 uppercase tracking-wider mb-2 block">Type &quot;DELETE&quot; to confirm</span>
                 <input
                   type="text"
                   value={deleteConfirm}
