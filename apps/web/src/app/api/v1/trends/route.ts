@@ -21,20 +21,18 @@ export async function GET(req: NextRequest) {
     priorEventsRes,
     regionsRes,
     predictionsRes,
-    escalationRes,
     forecastRes,
     countryRiskRes,
-    actorsRes,
   ] = await Promise.all([
     // Current period events — pull rich fields
     supabase.from('events')
-      .select('id, occurred_at, severity, region, country_code, event_type, key_actors, entities, provenance_raw, provenance_inferred, escalation_indicator, significance_score, sentiment_score, is_humanitarian_report')
+      .select('id, occurred_at, severity, region, country_code, event_type, category, entities, provenance_raw, provenance_inferred, escalation_indicator, significance_score, sentiment_score, is_humanitarian_report, casualty_estimate, actor_ids')
       .gte('occurred_at', since)
       .order('occurred_at', { ascending: false })
       .limit(5000),
     // Prior period events (for comparison)
     supabase.from('events')
-      .select('id, occurred_at, severity, region, country_code, event_type, provenance_raw, escalation_indicator, is_humanitarian_report')
+      .select('id, occurred_at, severity, region, country_code, event_type, category, provenance_raw, escalation_indicator, is_humanitarian_report, casualty_estimate, entities')
       .gte('occurred_at', priorStart)
       .lt('occurred_at', since)
       .limit(5000),
@@ -47,10 +45,6 @@ export async function GET(req: NextRequest) {
     supabase.from('predictions')
       .select('id, prediction_type, title, outcome, probability, severity_if_true, region, time_horizon_hours, created_at, evidence')
       .gte('created_at', since),
-    // Escalation levels
-    supabase.from('escalation_levels')
-      .select('country_code, level, label, event_count, avg_severity, fatality_estimate, computed_at')
-      .order('level', { ascending: false }),
     // Forecast signals
     supabase.from('forecast_signals')
       .select('id, conflict_zone, country_code, signal_type, confidence, basis, valid_until, created_at')
@@ -61,29 +55,62 @@ export async function GET(req: NextRequest) {
       .select('country_code, risk_score, trend, event_count_7d, severity_avg, updated_at')
       .order('risk_score', { ascending: false })
       .limit(50),
-    // Actors table
-    supabase.from('actors')
-      .select('id, name, type, country_code, tags')
-      .limit(200),
   ])
 
   const events = eventsRes.data ?? []
   const priorEvents = priorEventsRes.data ?? []
   const predictions = predictionsRes.data ?? []
-  const escalationLevels = escalationRes.data ?? []
   const forecastSignals = forecastRes.data ?? []
   const countryRisks = countryRiskRes.data ?? []
-  const actorsTable = actorsRes.data ?? []
+
+  // Build escalation levels from event data (the escalation_levels table doesn't exist in prod)
+  const countryStats = new Map<string, { events: number; severity_sum: number; max_sev: number; fatalities: number; escalation_count: number }>()
+  for (const e of events) {
+    const cc = (e.country_code as string) ?? ''
+    if (!cc) continue
+    if (!countryStats.has(cc)) countryStats.set(cc, { events: 0, severity_sum: 0, max_sev: 0, fatalities: 0, escalation_count: 0 })
+    const d = countryStats.get(cc)!
+    d.events++
+    const sev = (e.severity as number) ?? 1
+    d.severity_sum += sev
+    if (sev > d.max_sev) d.max_sev = sev
+    const f = e.casualty_estimate as number | null
+    if (typeof f === 'number') d.fatalities += f
+    if (e.escalation_indicator) d.escalation_count++
+  }
+
+  const escalationLevels = [...countryStats.entries()]
+    .filter(([, d]) => d.events >= 3) // only countries with meaningful activity
+    .map(([cc, d]) => {
+      const avgSev = d.severity_sum / d.events
+      let level = 1
+      if (d.fatalities > 200 || (d.max_sev >= 5 && d.events > 20)) level = 5
+      else if (d.fatalities > 50 || (d.max_sev >= 4 && d.events > 10) || avgSev >= 4) level = 4
+      else if (d.fatalities > 10 || (d.max_sev >= 3 && d.events > 5) || avgSev >= 3) level = 3
+      else if (d.events >= 3 || avgSev >= 2) level = 2
+      const labels = ['', 'Stable', 'Tension', 'Crisis', 'Conflict', 'War']
+      return {
+        country_code: cc,
+        level,
+        label: labels[level] ?? 'Unknown',
+        event_count: d.events,
+        avg_severity: Math.round(avgSev * 100) / 100,
+        fatality_estimate: d.fatalities,
+      }
+    })
+    .sort((a, b) => b.level - a.level || b.event_count - a.event_count)
+    .slice(0, 30)
 
   /* ================================================================ */
   /*  1. COMMAND STRIP — KPIs                                         */
   /* ================================================================ */
+  // Use casualty_estimate column for fatalities (integer, can be null)
   const totalFatalities = events.reduce((sum, e) => {
-    const f = (e.provenance_raw as Record<string, unknown>)?.fatalities
+    const f = e.casualty_estimate as number | null
     return sum + (typeof f === 'number' ? f : 0)
   }, 0)
   const priorFatalities = priorEvents.reduce((sum, e) => {
-    const f = (e.provenance_raw as Record<string, unknown>)?.fatalities
+    const f = e.casualty_estimate as number | null
     return sum + (typeof f === 'number' ? f : 0)
   }, 0)
 
@@ -119,7 +146,7 @@ export async function GET(req: NextRequest) {
     else if (sev >= 4) d.high++
     else if (sev >= 3) d.medium++
     else d.low++
-    const f = (e.provenance_raw as Record<string, unknown>)?.fatalities
+    const f = e.casualty_estimate as number | null
     if (typeof f === 'number') d.fatalities += f
   }
   const dailyVolume = [...dailyMap.entries()]
@@ -150,7 +177,6 @@ export async function GET(req: NextRequest) {
   /* ================================================================ */
   /*  2. ESCALATION TIMELINE                                          */
   /* ================================================================ */
-  // Group escalation levels per country with recent events
   const escalationTimeline = escalationLevels.slice(0, 15).map(el => {
     const countryEvents = events.filter(e => e.country_code === el.country_code)
     const dailyCounts = new Map<string, number>()
@@ -173,12 +199,11 @@ export async function GET(req: NextRequest) {
   /* ================================================================ */
   /*  3. CASUALTY & IMPACT TRACKER                                    */
   /* ================================================================ */
-  // Fatalities by region
   const fatalityByRegion = new Map<string, number>()
   const fatalityByCountry = new Map<string, number>()
   const fatalityByType = new Map<string, number>()
   for (const e of events) {
-    const f = (e.provenance_raw as Record<string, unknown>)?.fatalities
+    const f = e.casualty_estimate as number | null
     if (typeof f !== 'number' || f <= 0) continue
     const r = (e.region as string) ?? 'Unknown'
     const cc = (e.country_code as string) ?? 'XX'
@@ -188,7 +213,6 @@ export async function GET(req: NextRequest) {
     fatalityByType.set(t, (fatalityByType.get(t) ?? 0) + f)
   }
 
-  // Daily fatality timeline
   const dailyFatalities = dailyVolume.map(d => ({ date: d.date, fatalities: d.fatalities }))
 
   const casualtyTracker = {
@@ -222,7 +246,7 @@ export async function GET(req: NextRequest) {
     const d = typeMap.get(t)!
     d.count++
     if ((e.severity as number) >= 4) d.critical++
-    const f = (e.provenance_raw as Record<string, unknown>)?.fatalities
+    const f = e.casualty_estimate as number | null
     if (typeof f === 'number') d.fatalities += f
     if (e.country_code) d.countries.add(e.country_code as string)
   }
@@ -276,7 +300,7 @@ export async function GET(req: NextRequest) {
     if ((e.severity as number) >= 4) d.critical++
     if (e.escalation_indicator) d.escalation++
     if (e.event_type === 'displacement' || e.event_type === 'humanitarian_crisis' || e.is_humanitarian_report) d.displacement++
-    const f = (e.provenance_raw as Record<string, unknown>)?.fatalities
+    const f = e.casualty_estimate as number | null
     if (typeof f === 'number') d.fatalities += f
     if (e.event_type) d.attack_types.add(e.event_type as string)
     if (e.country_code) d.countries.add(e.country_code as string)
@@ -306,8 +330,6 @@ export async function GET(req: NextRequest) {
 
   for (const e of events) {
     const actors: string[] = []
-    // From key_actors TEXT[]
-    if (Array.isArray(e.key_actors)) actors.push(...(e.key_actors as string[]))
     // From provenance_inferred.actor_names
     const inferred = e.provenance_inferred as Record<string, unknown> | null
     if (inferred && Array.isArray(inferred.actor_names)) actors.push(...(inferred.actor_names as string[]))
@@ -323,19 +345,18 @@ export async function GET(req: NextRequest) {
       if (e.region) d.regions.add(e.region as string)
       if (e.country_code) d.countries.add(e.country_code as string)
       d.severity_sum += (e.severity as number) ?? 1
-      const f = (e.provenance_raw as Record<string, unknown>)?.fatalities
+      const f = e.casualty_estimate as number | null
       if (typeof f === 'number') d.fatalities += f
       if (e.event_type) d.event_types.add(e.event_type as string)
     }
   }
 
-  // Also pull prior-period actor counts for trending
+  // Prior-period actor counts for trending
   const priorActorFreq = new Map<string, number>()
   for (const e of priorEvents) {
-    const raw = e.provenance_raw as Record<string, unknown> | null
-    // Prior events don't have full fields but we still check key patterns
     const actors: string[] = []
-    if (Array.isArray((e as Record<string, unknown>).key_actors)) actors.push(...((e as Record<string, unknown>).key_actors as string[]))
+    const ent = e.entities as Record<string, unknown> | null
+    if (ent && Array.isArray(ent.actors)) actors.push(...(ent.actors as string[]))
     for (const actor of [...new Set(actors.map(a => a.trim()).filter(a => a.length > 1))]) {
       priorActorFreq.set(actor, (priorActorFreq.get(actor) ?? 0) + 1)
     }
@@ -352,8 +373,6 @@ export async function GET(req: NextRequest) {
       event_types: [...data.event_types],
       prior_count: priorActorFreq.get(name) ?? 0,
       trending: pctChange(data.count, priorActorFreq.get(name) ?? 0),
-      // Match to actors table for enrichment
-      actor_type: actorsTable.find(a => a.name === name)?.type ?? null,
     }))
     .sort((a, b) => b.event_count - a.event_count)
     .slice(0, 25)
@@ -396,7 +415,6 @@ export async function GET(req: NextRequest) {
   /* ================================================================ */
   /*  8. COMPARATIVE ANALYSIS                                         */
   /* ================================================================ */
-  // Week-over-week comparison
   const now = Date.now()
   const weekMs = 7 * 24 * 60 * 60 * 1000
   const thisWeekEvents = events.filter(e => new Date(e.occurred_at ?? '').getTime() > now - weekMs)
@@ -411,7 +429,7 @@ export async function GET(req: NextRequest) {
   const overallTrend = events.length > priorEvents.length * 1.2 ? 'escalating'
     : events.length < priorEvents.length * 0.8 ? 'de_escalating' : 'stable'
 
-  // Anomaly detection: find days with event counts > 2 standard deviations from mean
+  // Anomaly detection: days with event counts > 2 standard deviations from mean
   const dailyCounts = dailyVolume.map(d => d.total)
   const mean = dailyCounts.length > 0 ? dailyCounts.reduce((s, v) => s + v, 0) / dailyCounts.length : 0
   const stddev = dailyCounts.length > 1 ? Math.sqrt(dailyCounts.reduce((s, v) => s + (v - mean) ** 2, 0) / (dailyCounts.length - 1)) : 0
@@ -451,7 +469,6 @@ export async function GET(req: NextRequest) {
   /* ================================================================ */
   /*  9. EVENT VELOCITY & ANOMALY DETECTION                           */
   /* ================================================================ */
-  // Hourly velocity for last 48 hours
   const h48 = new Date(now - 48 * 60 * 60 * 1000).toISOString()
   const recentEvents = events.filter(e => (e.occurred_at ?? '') >= h48)
   const hourlyMap = new Map<string, number>()
@@ -482,7 +499,7 @@ export async function GET(req: NextRequest) {
   }
 
   /* ================================================================ */
-  /*  EXTRA: Forecast signals + Country risk summaries                */
+  /*  RESPONSE                                                         */
   /* ================================================================ */
 
   return NextResponse.json({

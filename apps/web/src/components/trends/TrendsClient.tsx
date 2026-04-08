@@ -46,7 +46,7 @@ type RegionThreat = {
 type ActorEntry = {
   name: string; event_count: number; regions: string[]; countries: string[]
   avg_severity: number; fatalities: number; event_types: string[]
-  prior_count: number; trending: number; actor_type: string | null
+  prior_count: number; trending: number
 }
 
 type PredictionPanel = {
@@ -519,8 +519,8 @@ export function TrendsClient() {
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-[10px] text-white/20 w-4 text-right flex-shrink-0">{idx + 1}</span>
                     <span className="text-[12px] text-white/70 truncate">{actor.name}</span>
-                    {actor.actor_type && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.05] text-white/30 flex-shrink-0 uppercase">{actor.actor_type}</span>
+                    {actor.event_types.length > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.05] text-white/30 flex-shrink-0">{actor.event_types[0]}</span>
                     )}
                   </div>
                   <span className="text-[12px] text-white/60 text-right font-mono">{actor.event_count}</span>
