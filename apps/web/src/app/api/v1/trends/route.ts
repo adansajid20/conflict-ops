@@ -28,13 +28,13 @@ export async function GET(req: NextRequest) {
   ] = await Promise.all([
     // Current period events — pull rich fields
     supabase.from('events')
-      .select('id, occurred_at, severity, region, country_code, event_type, category, key_actors, entities, provenance_raw, provenance_inferred, escalation_indicator, significance_score, sentiment_score, is_humanitarian_report')
+      .select('id, occurred_at, severity, region, country_code, event_type, key_actors, entities, provenance_raw, provenance_inferred, escalation_indicator, significance_score, sentiment_score, is_humanitarian_report')
       .gte('occurred_at', since)
       .order('occurred_at', { ascending: false })
       .limit(5000),
     // Prior period events (for comparison)
     supabase.from('events')
-      .select('id, occurred_at, severity, region, country_code, event_type, category, provenance_raw, escalation_indicator, is_humanitarian_report')
+      .select('id, occurred_at, severity, region, country_code, event_type, provenance_raw, escalation_indicator, is_humanitarian_report')
       .gte('occurred_at', priorStart)
       .lt('occurred_at', since)
       .limit(5000),
