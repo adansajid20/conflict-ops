@@ -56,14 +56,22 @@ export default function SecurityPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6">
-        <BlurIn className="max-w-3xl mx-auto text-center">
-          <p className="text-sm font-medium text-blue-400 tracking-wide uppercase mb-5">Trust Center</p>
-          <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6 bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">
-            Security by design.
+      <section className="pt-32 pb-24 px-6 relative">
+        {/* Background accents */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute top-1/4 left-1/3 w-[600px] h-[400px] bg-green-600/[0.08] rounded-full blur-[150px]" />
+          <div className="absolute bottom-0 right-1/4 w-[500px] h-[400px] bg-blue-600/[0.06] rounded-full blur-[130px]" />
+        </div>
+
+        <BlurIn className="max-w-4xl mx-auto text-center relative z-10">
+          <p className="text-sm font-bold text-blue-400 tracking-widest uppercase mb-6">Trust Center</p>
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-8 leading-tight">
+            <span className="bg-gradient-to-b from-white via-white/95 to-white/70 bg-clip-text text-transparent">
+              Security by design.
+            </span>
           </h1>
-          <p className="text-lg text-white/40 max-w-2xl mx-auto leading-relaxed">
-            TLS 1.3 across the public edge, encrypted data at rest and in transit, and zero plaintext secrets. Your data deserves better.
+          <p className="text-lg md:text-xl text-white/45 max-w-3xl mx-auto leading-relaxed">
+            TLS 1.3 across all connections, AES-256 at rest, zero plaintext secrets in storage or logs. Your data security is our mission.
           </p>
         </BlurIn>
       </section>

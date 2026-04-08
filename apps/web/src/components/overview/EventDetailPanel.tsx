@@ -223,7 +223,7 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
         initial={{ opacity: 0, x: 40, scale: 0.97 }}
         animate={{ opacity: 1, x: 0, scale: 1 }}
         exit={{ opacity: 0, x: 40, scale: 0.97 }}
-        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+        transition={{ type: 'spring' as const, damping: 28, stiffness: 320 }}
         className="fixed right-4 top-4 z-50 flex flex-col overflow-y-auto rounded-2xl"
         style={{
           width: 'min(440px, calc(100vw - 32px))',

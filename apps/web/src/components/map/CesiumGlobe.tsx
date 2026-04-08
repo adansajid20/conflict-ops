@@ -1,10 +1,10 @@
-// ConflictRadar – CesiumGlobe (managed via Cowork)
+// ConflictRadar – CesiumGlobe (Premium Map Experience)
 'use client';
 
 import { useRef, useEffect, useState, useCallback } from 'react';
 import Script from 'next/script';
 import MapSidebar from './MapSidebar';
-import { EventCardModal } from './EventCardModal';
+import { EventCardModal } from './EventModal';
 
 // ─── Cesium CDN — loaded as global, NOT bundled via webpack ──────────────────
 const CESIUM_VERSION = '1.140.0';
@@ -19,55 +19,105 @@ declare global {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Flight {
-  icao24: string; callsign: string; originCountry: string;
-  latitude: number; longitude: number; altitude: number;
-  onGround: boolean; velocity: number; heading: number;
-  verticalRate: number; squawk?: string; corridor?: string;
+  icao24: string;
+  callsign: string;
+  originCountry: string;
+  latitude: number;
+  longitude: number;
+  altitude: number;
+  onGround: boolean;
+  velocity: number;
+  heading: number;
+  verticalRate: number;
+  squawk?: string;
+  corridor?: string;
 }
+
 interface Vessel {
-  mmsi: string; name: string; latitude: number; longitude: number;
-  speed: number; course: number; type: number; destination: string;
-  shipTypeName?: string; lane?: string;
+  mmsi: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  speed: number;
+  course: number;
+  type: number;
+  destination: string;
+  shipTypeName?: string;
+  lane?: string;
 }
+
 interface EventData {
-  id?: string; title?: string; description?: string; summary?: string;
-  severity?: string; category?: string; country_region?: string;
-  created_at?: string; source_url?: string; publishedAt?: string;
+  id?: string;
+  title?: string;
+  description?: string;
+  summary?: string;
+  severity?: string;
+  category?: string;
+  country_region?: string;
+  created_at?: string;
+  source_url?: string;
+  publishedAt?: string;
 }
 
 // ─── Severity config ──────────────────────────────────────────────────────────
 const SEV_COLORS: Record<string, string> = {
-  critical: '#ff1744', high: '#ff6d00', medium: '#ffc400', low: '#448aff',
-};
-const SEV_GLOW: Record<string, string> = {
-  critical: 'rgba(255,23,68,0.45)', high: 'rgba(255,109,0,0.3)', medium: 'rgba(255,196,0,0.2)', low: 'rgba(68,138,255,0.15)',
-};
-const SEV_SIZE: Record<string, number> = {
-  critical: 16, high: 12, medium: 9, low: 7,
-};
-const SEV_OUTLINE: Record<string, number> = {
-  critical: 3, high: 2, medium: 1.5, low: 1,
+  critical: '#ef4444',
+  high: '#f97316',
+  medium: '#eab308',
+  low: '#22c55e',
 };
 
-// ─── ACLED event type → color mapping ────────────────────────────────────────
+const SEV_GLOW: Record<string, string> = {
+  critical: 'rgba(239,68,68,0.5)',
+  high: 'rgba(249,115,22,0.4)',
+  medium: 'rgba(234,179,8,0.3)',
+  low: 'rgba(34,197,94,0.2)',
+};
+
+const SEV_SIZE: Record<string, number> = {
+  critical: 18,
+  high: 14,
+  medium: 10,
+  low: 8,
+};
+
+const SEV_OUTLINE: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1.5,
+};
+
+// ─── ACLED event type → color mapping ────────────────────────────────────
 const ACLED_TYPE_COLORS: Record<string, string> = {
-  'Battles': '#e53935',                  // red
-  'Violence against civilians': '#ff6f00', // dark orange
-  'Explosions/Remote violence': '#ff8f00', // amber
-  'Riots': '#ffab00',                    // gold
-  'Protests': '#7c4dff',                 // purple
-  'Strategic developments': '#00bfa5',    // teal
+  'Battles': '#e53935',
+  'Violence against civilians': '#ff6f00',
+  'Explosions/Remote violence': '#ff8f00',
+  'Riots': '#ffab00',
+  'Protests': '#7c4dff',
+  'Strategic developments': '#00bfa5',
 };
 const ACLED_DEFAULT_COLOR = '#ff9100';
 
 interface AcledEvent {
-  id: string; date: string; eventType: string; subEventType: string;
-  actor1: string; actor2: string; country: string; admin1: string;
-  lat: number; lon: number; fatalities: number; notes: string;
-  disorderType: string; region: string; civilianTargeting: string;
+  id: string;
+  date: string;
+  eventType: string;
+  subEventType: string;
+  actor1: string;
+  actor2: string;
+  country: string;
+  admin1: string;
+  lat: number;
+  lon: number;
+  fatalities: number;
+  notes: string;
+  disorderType: string;
+  region: string;
+  civilianTargeting: string;
 }
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
+// ─── Helper types ─────────────────────────────────────────────────────────────
 type CesiumImageryLayer = {
   brightness: number;
   contrast: number;
@@ -75,6 +125,7 @@ type CesiumImageryLayer = {
   gamma: number;
   alpha: number;
 };
+
 type CesiumViewer = {
   entities: {
     values: Array<{ id: string }>;
@@ -98,11 +149,13 @@ type CesiumViewer = {
       atmosphereBrightnessShift: number;
       atmosphereSaturationShift: number;
     };
-    skyAtmosphere: {
-      brightnessShift: number;
-      saturationShift: number;
-      hueShift: number;
-    } | undefined;
+    skyAtmosphere:
+      | {
+          brightnessShift: number;
+          saturationShift: number;
+          hueShift: number;
+        }
+      | undefined;
     skyBox: { show: boolean } | undefined;
     backgroundColor: unknown;
     morphTo2D: (d: number) => void;
@@ -132,7 +185,7 @@ export default function CesiumGlobe() {
   const viewerRef = useRef<CesiumViewer | null>(null);
   const issIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const flightIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // wsRef removed — vessels now use polling instead of WebSocket
+  const vesselIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // State
   const [cesiumReady, setCesiumReady] = useState(false);
@@ -180,7 +233,8 @@ export default function CesiumGlobe() {
   const getCe = () => (typeof window !== 'undefined' ? window.Cesium : null);
 
   function flyTo(lng: number, lat: number, alt: number, tilt = -60) {
-    const v = getViewer(); const Ce = getCe();
+    const v = getViewer();
+    const Ce = getCe();
     if (!v || !Ce) return;
     v.camera.flyTo({
       destination: Ce.Cartesian3.fromDegrees(lng, lat, alt),
@@ -192,7 +246,7 @@ export default function CesiumGlobe() {
   function removeEntitiesByPrefix(prefix: string) {
     const v = getViewer();
     if (!v) return;
-    const toRemove = v.entities.values.filter(e => e.id.startsWith(prefix));
+    const toRemove = v.entities.values.filter((e) => e.id.startsWith(prefix));
     for (const e of toRemove) {
       const entity = v.entities.getById(e.id);
       if (entity) v.entities.remove(entity);
@@ -201,17 +255,17 @@ export default function CesiumGlobe() {
 
   // ── FETCH EVENTS ──────────────────────────────────────────────────
   const plotEvents = useCallback(async (tw: string, sev: string, cat: string, reg: string) => {
-    const Ce = getCe(); const v = getViewer();
+    const Ce = getCe();
+    const v = getViewer();
     if (!Ce || !v) return;
 
-    // Map time window to API param (route reads `window`, not `hours`)
-    const windowParam = tw === 'all' ? '30d' : tw; // API max is 30d
+    const windowParam = tw === 'all' ? '30d' : tw;
     let url = `/api/v1/map/events?window=${windowParam}`;
     if (sev !== 'all') url += `&severity=${sev}`;
 
     try {
       const res = await fetch(url);
-      const geojson = await res.json() as {
+      const geojson = (await res.json()) as {
         features: Array<{
           geometry: { coordinates: [number, number] };
           properties: Record<string, unknown>;
@@ -222,37 +276,32 @@ export default function CesiumGlobe() {
       const features = geojson.features ?? [];
       setEventCount(geojson.meta?.total ?? features.length ?? 0);
 
-      // Remove old event entities
       removeEntitiesByPrefix('evt-');
 
-      // ── Client-side micro-jitter to separate overlapping pins ──
-      // Group by rounded coordinates (0.3° grid) and offset duplicates
+      // ── Client-side jitter to separate overlapping pins ──
       const gridMap = new Map<string, number>();
       function spreadPin(lon: number, lat: number): [number, number] {
         const key = `${Math.round(lon * 3)}:${Math.round(lat * 3)}`;
         const count = gridMap.get(key) ?? 0;
         gridMap.set(key, count + 1);
         if (count === 0) return [lon, lat];
-        // Spiral offset — each subsequent pin in same cell moves outward
-        const angle = (count * 137.5) * (Math.PI / 180); // golden angle
-        const radius = 0.15 + count * 0.08; // degrees
+        const angle = (count * 137.5) * (Math.PI / 180);
+        const radius = 0.15 + count * 0.08;
         return [lon + Math.cos(angle) * radius, lat + Math.sin(angle) * radius];
       }
 
       for (const feature of features) {
         const p = feature.properties;
         const sevStr = ((p.severity as string) ?? 'low').toLowerCase();
-        const color = Ce.Color.fromCssColorString(SEV_COLORS[sevStr] ?? '#448aff');
-        const glowColor = Ce.Color.fromCssColorString(SEV_GLOW[sevStr] ?? 'rgba(68,138,255,0.2)');
-        const size = SEV_SIZE[sevStr] ?? 7;
-        const outline = SEV_OUTLINE[sevStr] ?? 1;
+        const color = Ce.Color.fromCssColorString(SEV_COLORS[sevStr] ?? '#22c55e');
+        const size = SEV_SIZE[sevStr] ?? 8;
+        const outline = SEV_OUTLINE[sevStr] ?? 1.5;
         const rawLon = feature.geometry.coordinates[0];
         const rawLat = feature.geometry.coordinates[1];
         const [lon, lat] = spreadPin(rawLon, rawLat);
 
         const evtId = String(p.id ?? Math.random().toString(36).slice(2));
 
-        // Single stable pin — colored outline acts as glow, no separate entities
         v.entities.add({
           id: `evt-${evtId}`,
           position: Ce.Cartesian3.fromDegrees(lon, lat),
@@ -267,12 +316,13 @@ export default function CesiumGlobe() {
             country_region: String(p.region ?? ''),
             created_at: String(p.publishedAt ?? ''),
             source_url: String(p.sourceUrl ?? ''),
-            _lat: lat, _lon: lon,
+            _lat: lat,
+            _lon: lon,
           },
           point: {
             pixelSize: size,
             color,
-            outlineColor: Ce.Color.fromCssColorString(SEV_GLOW[sevStr] ?? 'rgba(68,138,255,0.2)'),
+            outlineColor: Ce.Color.fromCssColorString(SEV_GLOW[sevStr] ?? 'rgba(34,197,94,0.3)'),
             outlineWidth: sevStr === 'critical' ? 6 : sevStr === 'high' ? 4 : 3,
             heightReference: Ce.HeightReference.CLAMP_TO_GROUND,
           },
@@ -281,7 +331,7 @@ export default function CesiumGlobe() {
     } catch (err) {
       console.error('[CESIUM] plotEvents error:', err);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -289,84 +339,97 @@ export default function CesiumGlobe() {
       if (showEvents) void plotEvents(timeWindow, severity, category, region);
       else removeEntitiesByPrefix('evt-');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cesiumReady, showEvents, timeWindow, severity, category, region]);
 
   // ── ACLED DATA LAYER ─────────────────────────────────────────────
-  const plotACLED = useCallback(async (
-    tw: string,
-    filters: {
-      eventType: string; disorderType: string; country: string;
-      region: string; actor: string; fatalities: string; civilianOnly: boolean;
-    },
-  ) => {
-    const Ce = getCe(); const v = getViewer();
-    if (!Ce || !v) return;
+  const plotACLED = useCallback(
+    async (
+      tw: string,
+      filters: {
+        eventType: string;
+        disorderType: string;
+        country: string;
+        region: string;
+        actor: string;
+        fatalities: string;
+        civilianOnly: boolean;
+      },
+    ) => {
+      const Ce = getCe();
+      const v = getViewer();
+      if (!Ce || !v) return;
 
-    const windowParam = tw === 'all' ? '90d' : tw;
-    const params = new URLSearchParams({ window: windowParam, limit: '3000' });
-    if (filters.eventType !== 'all') params.set('event_type', filters.eventType);
-    if (filters.disorderType !== 'all') params.set('disorder_type', filters.disorderType);
-    if (filters.country.trim()) params.set('country', filters.country.trim());
-    if (filters.region !== 'all') params.set('region', filters.region);
-    if (filters.actor.trim()) params.set('actor', filters.actor.trim());
-    if (filters.fatalities !== '0') params.set('fatalities', filters.fatalities);
-    if (filters.civilianOnly) params.set('civilian_targeting', 'true');
+      const windowParam = tw === 'all' ? '90d' : tw;
+      const params = new URLSearchParams({ window: windowParam, limit: '3000' });
+      if (filters.eventType !== 'all') params.set('event_type', filters.eventType);
+      if (filters.disorderType !== 'all') params.set('disorder_type', filters.disorderType);
+      if (filters.country.trim()) params.set('country', filters.country.trim());
+      if (filters.region !== 'all') params.set('region', filters.region);
+      if (filters.actor.trim()) params.set('actor', filters.actor.trim());
+      if (filters.fatalities !== '0') params.set('fatalities', filters.fatalities);
+      if (filters.civilianOnly) params.set('civilian_targeting', 'true');
 
-    try {
-      const res = await fetch(`/api/acled?${params.toString()}`, {
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!res.ok) { console.warn('[ACLED] API returned', res.status); return; }
-      const d = await res.json() as { events: AcledEvent[]; count: number; error?: string };
-      if (d.error) { console.warn('[ACLED]', d.error); return; }
+      try {
+        const res = await fetch(`/api/acled?${params.toString()}`, {
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!res.ok) {
+          console.warn('[ACLED] API returned', res.status);
+          return;
+        }
+        const d = (await res.json()) as { events: AcledEvent[]; count: number; error?: string };
+        if (d.error) {
+          console.warn('[ACLED]', d.error);
+          return;
+        }
 
-      const events = d.events ?? [];
-      setAcledCount(events.length);
-      removeEntitiesByPrefix('acl-');
+        const events = d.events ?? [];
+        setAcledCount(events.length);
+        removeEntitiesByPrefix('acl-');
 
-      for (const e of events) {
-        if (!e.lat || !e.lon) continue;
-        const typeColor = ACLED_TYPE_COLORS[e.eventType] ?? ACLED_DEFAULT_COLOR;
-        // Size by fatalities: min 4, max 18
-        const fatalSize = Math.min(4 + Math.sqrt(e.fatalities) * 2.5, 18);
+        for (const e of events) {
+          if (!e.lat || !e.lon) continue;
+          const typeColor = ACLED_TYPE_COLORS[e.eventType] ?? ACLED_DEFAULT_COLOR;
+          const fatalSize = Math.min(4 + Math.sqrt(e.fatalities) * 2.5, 18);
 
-        v.entities.add({
-          id: `acl-${e.id}`,
-          position: Ce.Cartesian3.fromDegrees(e.lon, e.lat),
-          name: `${e.eventType}: ${e.subEventType}`,
-          properties: {
-            _type: 'acled',
-            eventType: e.eventType,
-            subEventType: e.subEventType,
-            actor1: e.actor1,
-            actor2: e.actor2 ?? '',
-            country: e.country,
-            admin1: e.admin1,
-            date: e.date,
-            fatalities: e.fatalities,
-            notes: e.notes,
-            civilianTargeting: e.civilianTargeting,
-          },
-          point: {
-            pixelSize: fatalSize,
-            color: Ce.Color.fromCssColorString(typeColor).withAlpha(0.85),
-            outlineColor: Ce.Color.fromCssColorString(typeColor).withAlpha(0.3),
-            outlineWidth: e.fatalities > 5 ? 4 : 2,
-            heightReference: Ce.HeightReference.CLAMP_TO_GROUND,
-          },
-        } as never);
+          v.entities.add({
+            id: `acl-${e.id}`,
+            position: Ce.Cartesian3.fromDegrees(e.lon, e.lat),
+            name: `${e.eventType}: ${e.subEventType}`,
+            properties: {
+              _type: 'acled',
+              eventType: e.eventType,
+              subEventType: e.subEventType,
+              actor1: e.actor1,
+              actor2: e.actor2 ?? '',
+              country: e.country,
+              admin1: e.admin1,
+              date: e.date,
+              fatalities: e.fatalities,
+              notes: e.notes,
+              civilianTargeting: e.civilianTargeting,
+            },
+            point: {
+              pixelSize: fatalSize,
+              color: Ce.Color.fromCssColorString(typeColor).withAlpha(0.85),
+              outlineColor: Ce.Color.fromCssColorString(typeColor).withAlpha(0.3),
+              outlineWidth: e.fatalities > 5 ? 4 : 2,
+              heightReference: Ce.HeightReference.CLAMP_TO_GROUND,
+            },
+          } as never);
+        }
+      } catch (err) {
+        console.error('[ACLED] plotACLED error:', err);
       }
-    } catch (err) {
-      console.error('[ACLED] plotACLED error:', err);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!cesiumReady) return;
     if (showACLED) {
-      // Debounce text input filters (country, actor) by 500ms
       const t = setTimeout(() => {
         void plotACLED(timeWindow, {
           eventType: acledEventType,
@@ -383,19 +446,26 @@ export default function CesiumGlobe() {
       removeEntitiesByPrefix('acl-');
       setAcledCount(0);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cesiumReady, showACLED, timeWindow, acledEventType, acledDisorderType, acledCountry, acledRegion, acledActor, acledFatalities, acledCivilianOnly]);
 
   // ── FLIGHTS ───────────────────────────────────────────────────────
   const fetchFlights = useCallback(async () => {
-    const Ce = getCe(); const v = getViewer();
+    const Ce = getCe();
+    const v = getViewer();
     if (!Ce || !v) return;
     try {
-      const res = await fetch('/api/flights', { signal: AbortSignal.timeout(15_000) });
-      if (!res.ok) { console.warn('[CESIUM] flights API returned', res.status); return; }
-      const d = await res.json() as { flights: Flight[]; error?: string };
-      if (d.error) { console.warn('[CESIUM] flights:', d.error); return; }
-      const airborne = (d.flights ?? []).filter(f => !f.onGround);
+      const res = await fetch('/api/flights', { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) {
+        console.warn('[CESIUM] flights API returned', res.status);
+        return;
+      }
+      const d = (await res.json()) as { flights: Flight[]; error?: string };
+      if (d.error) {
+        console.warn('[CESIUM] flights:', d.error);
+        return;
+      }
+      const airborne = (d.flights ?? []).filter((f) => !f.onGround);
       setFlightCount(airborne.length);
 
       removeEntitiesByPrefix('flt-');
@@ -405,10 +475,10 @@ export default function CesiumGlobe() {
           position: Ce.Cartesian3.fromDegrees(f.longitude, f.latitude, f.altitude || 10000),
           properties: { _type: 'flight', ...f },
           point: {
-            pixelSize: 4,
+            pixelSize: 6,
             color: Ce.Color.fromCssColorString('#00e5ff'),
-            outlineColor: Ce.Color.fromCssColorString('rgba(0,229,255,0.3)'),
-            outlineWidth: 1,
+            outlineColor: Ce.Color.fromCssColorString('rgba(0,229,255,0.4)'),
+            outlineWidth: 2,
           },
         } as never);
       }
@@ -427,20 +497,21 @@ export default function CesiumGlobe() {
     }
     void fetchFlights();
     flightIntervalRef.current = setInterval(() => void fetchFlights(), 15000);
-    return () => { if (flightIntervalRef.current) clearInterval(flightIntervalRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      if (flightIntervalRef.current) clearInterval(flightIntervalRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cesiumReady, showFlights]);
 
-  // ── VESSELS (polling /api/vessels) ──────────────────────────────────
-  const vesselIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
+  // ── VESSELS ────────────────────────────────────────────────────────
   const fetchVessels = useCallback(async () => {
-    const Ce = getCe(); const v = getViewer();
+    const Ce = getCe();
+    const v = getViewer();
     if (!Ce || !v) return;
     try {
       const res = await fetch('/api/vessels');
       if (!res.ok) return;
-      const data = await res.json() as { count: number; vessels: Vessel[] };
+      const data = (await res.json()) as { count: number; vessels: Vessel[] };
       const vessels = data.vessels ?? [];
       setVesselCount(vessels.length);
       removeEntitiesByPrefix('vsl-');
@@ -450,14 +521,16 @@ export default function CesiumGlobe() {
           position: Ce.Cartesian3.fromDegrees(vsl.longitude, vsl.latitude, 0),
           properties: { _type: 'vessel', ...vsl },
           point: {
-            pixelSize: 5,
+            pixelSize: 7,
             color: Ce.Color.fromCssColorString('#34d399'),
-            outlineColor: Ce.Color.fromCssColorString('rgba(52,211,153,0.3)'),
-            outlineWidth: 1,
+            outlineColor: Ce.Color.fromCssColorString('rgba(52,211,153,0.4)'),
+            outlineWidth: 2,
           },
         } as never);
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, []);
 
   useEffect(() => {
@@ -470,34 +543,44 @@ export default function CesiumGlobe() {
     }
     void fetchVessels();
     vesselIntervalRef.current = setInterval(() => void fetchVessels(), 30000);
-    return () => { if (vesselIntervalRef.current) clearInterval(vesselIntervalRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      if (vesselIntervalRef.current) clearInterval(vesselIntervalRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cesiumReady, showVessels]);
 
   // ── ISS ───────────────────────────────────────────────────────────
   const updateISS = useCallback(async () => {
-    const Ce = getCe(); const v = getViewer();
+    const Ce = getCe();
+    const v = getViewer();
     if (!Ce || !v) return;
     try {
-      const d = await fetch('https://api.wheretheiss.at/v1/satellites/25544').then(r => r.json()) as { longitude: number; latitude: number };
+      const d = (await fetch('https://api.wheretheiss.at/v1/satellites/25544').then((r) => r.json())) as {
+        longitude: number;
+        latitude: number;
+      };
       const existing = v.entities.getById('iss') as { position: unknown } | undefined;
       if (existing) {
-        existing.position = new Ce.ConstantPositionProperty(Ce.Cartesian3.fromDegrees(d.longitude, d.latitude, 408_000)) as never;
+        existing.position = new Ce.ConstantPositionProperty(
+          Ce.Cartesian3.fromDegrees(d.longitude, d.latitude, 408000),
+        ) as never;
       } else {
         v.entities.add({
           id: 'iss',
-          position: Ce.Cartesian3.fromDegrees(d.longitude, d.latitude, 408_000),
+          position: Ce.Cartesian3.fromDegrees(d.longitude, d.latitude, 408000),
           name: 'ISS — International Space Station',
           properties: { _type: 'iss' },
           point: {
-            pixelSize: 12,
+            pixelSize: 14,
             color: Ce.Color.fromCssColorString('#a855f7'),
             outlineColor: Ce.Color.fromCssColorString('#c084fc'),
-            outlineWidth: 4,
+            outlineWidth: 5,
           },
         } as never);
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, []);
 
   useEffect(() => {
@@ -505,12 +588,17 @@ export default function CesiumGlobe() {
     if (!showISS) {
       if (issIntervalRef.current) clearInterval(issIntervalRef.current);
       const v = getViewer();
-      if (v) { const e = v.entities.getById('iss'); if (e) v.entities.remove(e); }
+      if (v) {
+        const e = v.entities.getById('iss');
+        if (e) v.entities.remove(e);
+      }
       return;
     }
     void updateISS();
     issIntervalRef.current = setInterval(() => void updateISS(), 5000);
-    return () => { if (issIntervalRef.current) clearInterval(issIntervalRef.current); };
+    return () => {
+      if (issIntervalRef.current) clearInterval(issIntervalRef.current);
+    };
   }, [cesiumReady, showISS, updateISS]);
 
   // ── GLOBE/MAP TOGGLE ─────────────────────────────────────────────
@@ -529,49 +617,53 @@ export default function CesiumGlobe() {
 
     try {
       const viewer = new Ce.Viewer(containerRef.current, {
-        timeline: false, animation: false, homeButton: false,
-        sceneModePicker: false, projectionPicker: false,
-        baseLayerPicker: false, navigationHelpButton: false,
-        geocoder: false, fullscreenButton: false,
-        selectionIndicator: false, infoBox: false,
+        timeline: false,
+        animation: false,
+        homeButton: false,
+        sceneModePicker: false,
+        projectionPicker: false,
+        baseLayerPicker: false,
+        navigationHelpButton: false,
+        geocoder: false,
+        fullscreenButton: false,
+        selectionIndicator: false,
+        infoBox: false,
         scene3DOnly: false,
         creditContainer: document.createElement('div'),
       }) as unknown as CesiumViewer;
 
-      // ── IMAGERY: CartoDB Dark Matter — sharp vector-style dark tiles ──
-      // Clean, crisp borders + city names + dark aesthetic. No API key.
+      // ── IMAGERY: CartoDB Dark Matter — premium dark tiles ──
       try {
         viewer.imageryLayers.removeAll();
-        const cartoDark = new (Ce as unknown as {
-          UrlTemplateImageryProvider: new (o: unknown) => unknown
-        }).UrlTemplateImageryProvider({
+        const cartoDark = new (Ce as unknown as { UrlTemplateImageryProvider: new (o: unknown) => unknown })
+          .UrlTemplateImageryProvider({
           url: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
           credit: 'CartoDB',
           maximumLevel: 18,
           minimumLevel: 0,
         });
         viewer.imageryLayers.addImageryProvider(cartoDark);
-      } catch { /* keep default */ }
-
-      // No terrain — flat is cleaner with vector tiles
+      } catch {
+        /* keep default */
+      }
 
       // ═══════════════════════════════════════
       // DARK INTELLIGENCE GLOBE THEME
       // ═══════════════════════════════════════
 
-      // ── 1. Tile layer tweaks — boost contrast on already-dark tiles ──
+      // ── 1. Tile layer tweaks ──
       const baseLayer = viewer.imageryLayers.get(0);
       if (baseLayer) {
-        baseLayer.brightness = 1.05;   // tiles are already dark, tiny lift
-        baseLayer.contrast = 1.15;     // sharpen borders and text
-        baseLayer.saturation = 0.3;    // slight desaturation for intel feel
+        baseLayer.brightness = 1.05;
+        baseLayer.contrast = 1.15;
+        baseLayer.saturation = 0.3;
         baseLayer.gamma = 1.0;
       }
 
-      // ── 2. No day/night — always fully visible ──
+      // ── 2. No day/night ──
       viewer.scene.globe.enableLighting = false;
 
-      // ── 3. Atmosphere — cool blue limb glow ──
+      // ── 3. Atmosphere ──
       if (viewer.scene.skyAtmosphere) {
         viewer.scene.skyAtmosphere.brightnessShift = -0.3;
         viewer.scene.skyAtmosphere.saturationShift = 0.1;
@@ -580,19 +672,19 @@ export default function CesiumGlobe() {
       viewer.scene.globe.atmosphereBrightnessShift = -0.15;
       viewer.scene.globe.atmosphereSaturationShift = 0.0;
 
-      // ── 4. Stars + deep space ──
+      // ── 4. Stars ──
       if (viewer.scene.skyBox) viewer.scene.skyBox.show = true;
       viewer.scene.backgroundColor = Ce.Color.fromCssColorString('#05080f');
 
-      // ── 5. Atmosphere glow on globe edge ──
+      // ── 5. Atmosphere glow ──
       viewer.scene.globe.showGroundAtmosphere = true;
 
-      // ── 5. Hide Cesium default bottom bar ──
+      // ── 6. Hide default bar ──
       if (viewer.bottomContainer) viewer.bottomContainer.style.display = 'none';
 
-      // Initial view — center on Middle East / Africa / Europe hotspot corridor
+      // Initial view
       viewer.camera.setView({
-        destination: Ce.Cartesian3.fromDegrees(38, 25, 18_000_000),
+        destination: Ce.Cartesian3.fromDegrees(38, 25, 18000000),
         orientation: { heading: Ce.Math.toRadians(-5), pitch: Ce.Math.toRadians(-85), roll: 0 },
       });
 
@@ -612,8 +704,8 @@ export default function CesiumGlobe() {
           };
         };
 
-        // Get lat/lng from entity position
-        let lat = 0, lng = 0;
+        let lat = 0,
+          lng = 0;
         if (entity.position) {
           const pos3d = entity.position.getValue(Ce.JulianDate.now());
           if (pos3d) {
@@ -623,123 +715,150 @@ export default function CesiumGlobe() {
           }
         }
 
-        // Read properties — use PropertyBag.getValue() for reliable extraction
         const rawProps = entity.properties;
         const getP = (key: string): unknown => {
           if (!rawProps) return undefined;
-          // Method 1: PropertyBag.getValue(time) returns all properties as plain object
           try {
             const allProps = rawProps.getValue?.(Ce.JulianDate.now());
             if (allProps && key in allProps) return allProps[key];
-          } catch { /* fall through */ }
-          // Method 2: Direct property access with .getValue()
+          } catch {
+            /* fall through */
+          }
           try {
             const v = rawProps[key];
             if (v && typeof (v as { getValue?: () => unknown }).getValue === 'function') {
               return (v as { getValue: () => unknown }).getValue();
             }
             if (v !== undefined) return v;
-          } catch { /* fall through */ }
+          } catch {
+            /* fall through */
+          }
           return undefined;
         };
 
-        // Determine type from entity ID prefix (most reliable) or from properties
         const eid = entity.id ?? '';
-        const type = eid.startsWith('evt-') ? 'event'
-          : eid.startsWith('flt-') ? 'flight'
-          : eid.startsWith('vsl-') ? 'vessel'
-          : eid.startsWith('acled-') ? 'acled'
-          : eid === 'iss' ? 'iss'
-          : String(getP('_type') ?? '');
+        const type =
+          eid.startsWith('evt-')
+            ? 'event'
+            : eid.startsWith('flt-')
+              ? 'flight'
+              : eid.startsWith('vsl-')
+                ? 'vessel'
+                : eid.startsWith('acled-')
+                  ? 'acled'
+                  : eid === 'iss'
+                    ? 'iss'
+                    : String(getP('_type') ?? '');
 
         if (type === 'event') {
           const ev: Record<string, unknown> = {
             id: entity.id,
-            title: getP('title'), summary: getP('summary'),
-            severity: getP('severity'), category: getP('category'),
+            title: getP('title'),
+            summary: getP('summary'),
+            severity: getP('severity'),
+            category: getP('category'),
             country_region: getP('country_region'),
-            created_at: getP('created_at'), source_url: getP('source_url'),
+            created_at: getP('created_at'),
+            source_url: getP('source_url'),
+            _lat: lat,
+            _lon: lng,
           };
           setSelectedEvent(ev);
           setSelectedFlight(null);
           setSelectedVessel(null);
           setShowModal(true);
-          flyTo(lng, lat, 800_000, -50);
+          flyTo(lng, lat, 800000, -50);
         } else if (type === 'flight') {
           const f: Record<string, unknown> = {
-            icao24: getP('icao24'), callsign: getP('callsign'),
-            originCountry: getP('originCountry'), altitude: getP('altitude'),
-            velocity: getP('velocity'), heading: getP('heading'), squawk: getP('squawk'),
-            verticalRate: getP('verticalRate'), corridor: getP('corridor'),
-            latitude: lat, longitude: lng,
+            icao24: getP('icao24'),
+            callsign: getP('callsign'),
+            originCountry: getP('originCountry'),
+            altitude: getP('altitude'),
+            velocity: getP('velocity'),
+            heading: getP('heading'),
+            squawk: getP('squawk'),
+            verticalRate: getP('verticalRate'),
+            corridor: getP('corridor'),
+            latitude: lat,
+            longitude: lng,
           };
           setSelectedFlight(f);
           setSelectedEvent(null);
           setSelectedVessel(null);
           setShowModal(false);
-          flyTo(lng, lat, 500_000, -45);
+          flyTo(lng, lat, 500000, -45);
         } else if (type === 'vessel') {
           const vsl: Record<string, unknown> = {
-            mmsi: getP('mmsi'), name: getP('name'),
-            speed: getP('speed'), course: getP('course'), destination: getP('destination'),
-            type: getP('type'), shipTypeName: getP('shipTypeName'), lane: getP('lane'),
-            latitude: lat, longitude: lng,
+            mmsi: getP('mmsi'),
+            name: getP('name'),
+            speed: getP('speed'),
+            course: getP('course'),
+            destination: getP('destination'),
+            type: getP('type'),
+            shipTypeName: getP('shipTypeName'),
+            lane: getP('lane'),
+            latitude: lat,
+            longitude: lng,
           };
           setSelectedVessel(vsl);
           setSelectedEvent(null);
           setSelectedFlight(null);
           setSelectedAcled(null);
           setShowModal(false);
-          flyTo(lng, lat, 300_000, -45);
+          flyTo(lng, lat, 300000, -45);
         } else if (type === 'acled') {
           const acl: Record<string, unknown> = {
-            eventType: getP('eventType'), subEventType: getP('subEventType'),
-            actor1: getP('actor1'), actor2: getP('actor2'),
-            country: getP('country'), admin1: getP('admin1'),
-            date: getP('date'), fatalities: getP('fatalities'),
-            notes: getP('notes'), civilianTargeting: getP('civilianTargeting'),
+            eventType: getP('eventType'),
+            subEventType: getP('subEventType'),
+            actor1: getP('actor1'),
+            actor2: getP('actor2'),
+            country: getP('country'),
+            admin1: getP('admin1'),
+            date: getP('date'),
+            fatalities: getP('fatalities'),
+            notes: getP('notes'),
+            civilianTargeting: getP('civilianTargeting'),
           };
           setSelectedAcled(acl);
           setSelectedEvent(null);
           setSelectedFlight(null);
           setSelectedVessel(null);
           setShowModal(false);
-          flyTo(lng, lat, 500_000, -50);
+          flyTo(lng, lat, 500000, -50);
         }
       }, Ce.ScreenSpaceEventType.LEFT_CLICK);
 
-      // Hover cursor (throttled to ~15fps to reduce expensive pick() calls)
+      // Hover cursor
       let lastHoverTime = 0;
       handler.setInputAction((movement: { endPosition: { x: number; y: number } }) => {
         const now = Date.now();
-        if (now - lastHoverTime < 66) return; // ~15fps
+        if (now - lastHoverTime < 66) return;
         lastHoverTime = now;
         const picked = viewer.scene.pick(movement.endPosition as never);
         viewer.scene.canvas.style.cursor = (picked as { id?: unknown } | undefined)?.id ? 'pointer' : 'default';
       }, Ce.ScreenSpaceEventType.MOUSE_MOVE);
 
-      // Auto-rotation removed — globe stays still until user interacts
-
-      // ── PINCH-TO-ZOOM on trackpad ──────────────────────────────────
-      // Browsers send trackpad pinch as wheel events with ctrlKey=true.
-      // CesiumJS ignores those, so we intercept and forward as regular
-      // zoom commands to the camera.
+      // ── PINCH-TO-ZOOM ──────────────────────────────────────
       const canvas = viewer.scene.canvas;
-      canvas.addEventListener('wheel', (e: WheelEvent) => {
-        if (!e.ctrlKey) return; // normal scroll — let Cesium handle it
-        e.preventDefault();
-        const camera = viewer.camera as unknown as {
-          zoomIn: (amount: number) => void;
-          zoomOut: (amount: number) => void;
-          positionCartographic: { height: number };
-        };
-        const height = camera.positionCartographic?.height ?? 10_000_000;
-        const zoomAmount = height * 0.04; // 4% of current altitude per tick
-        if (e.deltaY < 0) camera.zoomIn(zoomAmount);
-        else camera.zoomOut(zoomAmount);
-      }, { passive: false });
+      canvas.addEventListener(
+        'wheel',
+        (e: WheelEvent) => {
+          if (!e.ctrlKey) return;
+          e.preventDefault();
+          const camera = viewer.camera as unknown as {
+            zoomIn: (amount: number) => void;
+            zoomOut: (amount: number) => void;
+            positionCartographic: { height: number };
+          };
+          const height = camera.positionCartographic?.height ?? 10000000;
+          const zoomAmount = height * 0.04;
+          if (e.deltaY < 0) camera.zoomIn(zoomAmount);
+          else camera.zoomOut(zoomAmount);
+        },
+        { passive: false },
+      );
 
-      // ── RESIZE OBSERVER — tell Cesium when flex layout changes canvas size ──
+      // ── RESIZE OBSERVER ────────────────────────────────────
       if (containerRef.current) {
         const ro = new ResizeObserver(() => {
           if (viewer && !(viewer as unknown as { isDestroyed: () => boolean }).isDestroyed()) {
@@ -747,7 +866,6 @@ export default function CesiumGlobe() {
           }
         });
         ro.observe(containerRef.current);
-        // Store for cleanup
         (viewer as unknown as { _resizeObserver?: ResizeObserver })._resizeObserver = ro;
       }
 
@@ -764,7 +882,10 @@ export default function CesiumGlobe() {
   // Safety timeout
   useEffect(() => {
     const t = setTimeout(() => {
-      if (isLoading) { setIsLoading(false); setLoadError(true); }
+      if (isLoading) {
+        setIsLoading(false);
+        setLoadError(true);
+      }
     }, 25000);
     return () => clearTimeout(t);
   }, [isLoading]);
@@ -777,7 +898,6 @@ export default function CesiumGlobe() {
       if (vesselIntervalRef.current) clearInterval(vesselIntervalRef.current);
       const v = viewerRef.current;
       if (v) {
-        // Disconnect resize observer
         const ro = (v as unknown as { _resizeObserver?: ResizeObserver })._resizeObserver;
         if (ro) ro.disconnect();
         if (!v.isDestroyed()) v.destroy();
@@ -790,8 +910,7 @@ export default function CesiumGlobe() {
   // RENDER
   // ═══════════════════════════════════════
   return (
-    <div className="w-full h-full overflow-hidden bg-black flex">
-
+    <div className="w-full h-full overflow-hidden bg-black flex flex-col">
       {/* Cesium CSS */}
       <link rel="stylesheet" href={`${CESIUM_CDN}/Widgets/widgets.css`} />
 
@@ -803,61 +922,85 @@ export default function CesiumGlobe() {
           window.CESIUM_BASE_URL = `${CESIUM_CDN}/`;
           setTimeout(() => initCesium(), 150);
         }}
-        onError={() => { setIsLoading(false); setLoadError(true); }}
+        onError={() => {
+          setIsLoading(false);
+          setLoadError(true);
+        }}
       />
 
-      {/* ══ GLOBE AREA — fills remaining space beside sidebar ══ */}
-      <div className="flex-1 relative min-w-0">
-
-        {/* Cesium canvas — fills its flex parent naturally */}
+      {/* Main map area */}
+      <div className="flex-1 relative w-full overflow-hidden">
+        {/* Cesium canvas */}
         <div ref={containerRef} className="absolute inset-0 z-[1] cr-viewer" />
 
-        {/* HEADER */}
-        <div className="absolute top-4 left-4 z-10 pointer-events-none">
-          <div className="flex items-center gap-2 mb-0.5">
-            <h1 className="text-sm font-bold tracking-[0.2em] text-white/90 uppercase">Operational Map</h1>
-            <span className="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full font-medium">β</span>
-          </div>
-          <p className="text-[10px] text-gray-500 tracking-wide">Real-time conflict intelligence overlay</p>
-          <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
-            <span><span className="text-white font-semibold">{eventCount.toLocaleString()}</span> events</span>
-            {showFlights && <span><span className="text-cyan-400 font-semibold">{flightCount.toLocaleString()}</span> flights</span>}
-            {showVessels && <span><span className="text-emerald-400 font-semibold">{vesselCount.toLocaleString()}</span> vessels</span>}
+        {/* Header Info Floating Panel */}
+        <div className="absolute top-4 right-4 z-20 bg-black/40 backdrop-blur-md border border-white/[0.06] rounded-xl px-4 py-3 pointer-events-none">
+          <div className="text-right">
+            <p className="text-[10px] text-gray-500 tracking-wide">Operational Map</p>
+            <p className="text-sm font-bold text-white mt-1">{eventCount.toLocaleString()} events</p>
+            {showFlights && <p className="text-[10px] text-cyan-400 mt-1">{flightCount.toLocaleString()} flights</p>}
+            {showVessels && <p className="text-[10px] text-emerald-400 mt-0.5">{vesselCount.toLocaleString()} vessels</p>}
           </div>
         </div>
 
-        {/* Globe / 2D toggle */}
-        <div className="absolute top-4 right-3 z-10 flex bg-[#111827]/70 backdrop-blur-sm rounded-lg p-0.5 border border-white/5 pointer-events-auto">
-          {(['globe', 'map'] as const).map(m => (
-            <button key={m} onClick={() => setMapMode(m)}
-              className={`px-3 py-1.5 text-[10px] font-medium tracking-wider uppercase rounded-md transition
-                ${mapMode === m ? 'bg-blue-500/20 text-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>
+        {/* Globe/2D Toggle */}
+        <div className="absolute top-4 left-4 z-20 flex bg-black/40 backdrop-blur-md rounded-lg p-0.5 border border-white/[0.06] pointer-events-auto gap-1">
+          {(['globe', 'map'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMapMode(m)}
+              className={`px-3 py-1.5 text-[10px] font-medium tracking-wider uppercase rounded-md transition ${
+                mapMode === m ? 'bg-blue-500/20 text-blue-400' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
               {m === 'globe' ? '🌐 Globe' : '🗺️ 2D'}
             </button>
           ))}
         </div>
 
-        {/* Legend */}
-        <div className="absolute bottom-16 left-4 z-10 pointer-events-none">
-          <div className="bg-[#0d1117]/80 backdrop-blur-xl border border-gray-700/30 rounded-xl p-3">
-            <p className="text-[9px] font-bold tracking-[0.15em] text-gray-400 uppercase mb-2">Legend</p>
-            <div className="flex flex-col gap-1.5">
-              {[
-                { c: '#ff1744', l: 'Critical', sz: 12 }, { c: '#ff6d00', l: 'High', sz: 9 },
-                { c: '#ffc400', l: 'Medium', sz: 7 }, { c: '#448aff', l: 'Low', sz: 6 },
-              ].map(i => (
-                <div key={i.l} className="flex items-center gap-2">
-                  <div className="rounded-full flex-shrink-0"
-                    style={{ width: i.sz, height: i.sz, backgroundColor: i.c, boxShadow: `0 0 4px ${i.c}` }} />
-                  <span className="text-[10px] text-gray-400">{i.l}</span>
-                </div>
-              ))}
-              <div className="mt-1 pt-1 border-t border-gray-700/30 flex flex-col gap-1.5">
-                {showFlights && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-cyan-400" style={{ boxShadow: '0 0 4px #00e5ff' }} /><span className="text-[10px] text-gray-500">Flights</span></div>}
-                {showVessels && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 4px #34d399' }} /><span className="text-[10px] text-gray-500">Vessels</span></div>}
-                {showISS && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-purple-500" style={{ boxShadow: '0 0 4px #a855f7' }} /><span className="text-[10px] text-gray-500">ISS</span></div>}
-                {showACLED && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500" style={{ boxShadow: '0 0 4px #ff9100' }} /><span className="text-[10px] text-gray-500">ACLED</span></div>}
+        {/* Legend Floating Panel */}
+        <div className="absolute bottom-20 left-4 z-20 bg-black/40 backdrop-blur-md border border-white/[0.06] rounded-xl px-4 py-3 pointer-events-none">
+          <p className="text-[9px] font-bold tracking-[0.15em] text-gray-400 uppercase mb-2">Legend</p>
+          <div className="flex flex-col gap-1.5">
+            {[
+              { c: '#ef4444', l: 'Critical', sz: 12 },
+              { c: '#f97316', l: 'High', sz: 9 },
+              { c: '#eab308', l: 'Medium', sz: 7 },
+              { c: '#22c55e', l: 'Low', sz: 6 },
+            ].map((i) => (
+              <div key={i.l} className="flex items-center gap-2">
+                <div
+                  className="rounded-full flex-shrink-0"
+                  style={{ width: i.sz, height: i.sz, backgroundColor: i.c, boxShadow: `0 0 6px ${i.c}` }}
+                />
+                <span className="text-[10px] text-gray-400">{i.l}</span>
               </div>
+            ))}
+            <div className="mt-2 pt-2 border-t border-white/[0.06] flex flex-col gap-1.5">
+              {showFlights && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" style={{ boxShadow: '0 0 6px #00e5ff' }} />
+                  <span className="text-[10px] text-gray-500">Flights</span>
+                </div>
+              )}
+              {showVessels && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 6px #34d399' }} />
+                  <span className="text-[10px] text-gray-500">Vessels</span>
+                </div>
+              )}
+              {showISS && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-purple-500" style={{ boxShadow: '0 0 6px #a855f7' }} />
+                  <span className="text-[10px] text-gray-500">ISS</span>
+                </div>
+              )}
+              {showACLED && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-orange-500" style={{ boxShadow: '0 0 6px #ff9100' }} />
+                  <span className="text-[10px] text-gray-500">ACLED</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -878,125 +1021,93 @@ export default function CesiumGlobe() {
           const fLat = Number(selectedFlight.latitude ?? 0);
           const fLng = Number(selectedFlight.longitude ?? 0);
 
-          // Heading compass
           const hLabels = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
           const hLabel = hLabels[Math.round(fHeading / 22.5) % 16];
 
-          // Flight level (altitude in hundreds of feet)
           const fAltFt = Math.round(fAlt * 3.281);
           const flightLevel = `FL${Math.round(fAltFt / 100)}`;
 
-          // Vertical status
           const vertStatus = fVert > 2 ? 'Climbing' : fVert < -2 ? 'Descending' : 'Cruising';
           const vertColor = fVert > 2 ? '#34d399' : fVert < -2 ? '#f59e0b' : '#06b6d4';
           const vertIcon = fVert > 2 ? '↗' : fVert < -2 ? '↘' : '→';
 
-          // Squawk special codes
           const squawkAlert = fSquawk === '7500' ? 'HIJACK' : fSquawk === '7600' ? 'RADIO FAIL' : fSquawk === '7700' ? 'EMERGENCY' : '';
 
           return (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#0B1120]/95 backdrop-blur-xl border border-cyan-500/20 rounded-2xl shadow-2xl shadow-black/50 w-[400px] animate-slide-up pointer-events-auto overflow-hidden">
+            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#0B1120]/95 backdrop-blur-xl border border-cyan-500/20 rounded-2xl shadow-2xl shadow-black/50 w-[400px] animate-slide-up pointer-events-auto overflow-hidden">
+              <div className="h-1 w-full bg-gradient-to-r from-cyan-600 via-cyan-400 to-blue-500" />
 
-            {/* Top accent bar */}
-            <div className="h-1 w-full bg-gradient-to-r from-cyan-600 via-cyan-400 to-blue-500" />
-
-            <div className="p-4">
-              {/* Header */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-lg flex-shrink-0">
-                    ✈️
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-white font-bold text-[14px] tracking-wider font-mono">{fCallsign || fIcao}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[9px] text-gray-500">{fCountry}</span>
-                      {fCorridor && (
-                        <span className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/15">
-                          {fCorridor}
-                        </span>
-                      )}
+              <div className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-lg flex-shrink-0">✈️</div>
+                    <div className="min-w-0">
+                      <p className="text-white font-bold text-[14px] tracking-wider font-mono">{fCallsign || fIcao}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[9px] text-gray-500">{fCountry}</span>
+                        {fCorridor && (
+                          <span className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/15">
+                            {fCorridor}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  <button
+                    onClick={() => setSelectedFlight(null)}
+                    className="text-gray-500 hover:text-white text-xs w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/5 transition flex-shrink-0"
+                  >
+                    ✕
+                  </button>
                 </div>
-                <button onClick={() => setSelectedFlight(null)}
-                  className="text-gray-500 hover:text-white text-xs w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/5 transition flex-shrink-0">✕</button>
-              </div>
 
-              {/* Status pill row */}
-              <div className="flex items-center gap-2 mb-3">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border" style={{ backgroundColor: `${vertColor}10`, borderColor: `${vertColor}25` }}>
-                  <span className="text-xs" style={{ color: vertColor }}>{vertIcon}</span>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: vertColor }}>{vertStatus}</span>
-                </div>
-                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
-                  <span className="text-[9px] text-cyan-400 font-mono font-semibold">{flightLevel}</span>
-                </div>
-                {squawkAlert && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-500/15 border border-red-500/25 animate-pulse">
-                    <span className="text-[9px] text-red-400 font-bold uppercase tracking-wider">⚠ {squawkAlert}</span>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border" style={{ backgroundColor: `${vertColor}10`, borderColor: `${vertColor}25` }}>
+                    <span className="text-xs" style={{ color: vertColor }}>
+                      {vertIcon}
+                    </span>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: vertColor }}>
+                      {vertStatus}
+                    </span>
                   </div>
-                )}
-              </div>
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
+                    <span className="text-[9px] text-cyan-400 font-mono font-semibold">{flightLevel}</span>
+                  </div>
+                  {squawkAlert && (
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-500/15 border border-red-500/25 animate-pulse">
+                      <span className="text-[9px] text-red-400 font-bold uppercase tracking-wider">⚠ {squawkAlert}</span>
+                    </div>
+                  )}
+                </div>
 
-              {/* Stats grid — 2 rows */}
-              <div className="grid grid-cols-4 gap-1.5 mb-2">
-                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
-                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Altitude</p>
-                  <p className="text-white font-mono text-sm font-bold">{fAltFt.toLocaleString()}</p>
-                  <p className="text-gray-600 text-[8px]">ft</p>
+                <div className="grid grid-cols-4 gap-1.5 mb-2">
+                  {[
+                    { l: 'Altitude', v: fAltFt.toLocaleString(), u: 'ft' },
+                    { l: 'Speed', v: fSpeedKts, u: 'kts' },
+                    { l: 'Heading', v: `${fHeading}° ${hLabel}`, u: '' },
+                    { l: 'V/S', v: `${fVert > 0 ? '+' : ''}${Math.round(fVert * 196.85)}`, u: 'ft/min' },
+                  ].map((stat, i) => (
+                    <div key={i} className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                      <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">{stat.l}</p>
+                      <p className="text-white font-mono text-sm font-bold">{stat.v}</p>
+                      {stat.u && <p className="text-gray-600 text-[8px]">{stat.u}</p>}
+                    </div>
+                  ))}
                 </div>
-                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
-                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Speed</p>
-                  <p className="text-white font-mono text-sm font-bold">{fSpeedKts}</p>
-                  <p className="text-gray-600 text-[8px]">kts</p>
-                </div>
-                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
-                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Heading</p>
-                  <p className="text-white font-mono text-sm font-bold">{fHeading}°</p>
-                  <p className="text-gray-600 text-[8px]">{hLabel}</p>
-                </div>
-                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
-                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">V/S</p>
-                  <p className="text-white font-mono text-sm font-bold" style={{ color: fVert !== 0 ? vertColor : undefined }}>
-                    {fVert > 0 ? '+' : ''}{Math.round(fVert * 196.85)}
-                  </p>
-                  <p className="text-gray-600 text-[8px]">ft/min</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-4 gap-1.5 mb-3">
-                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
-                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">GS</p>
-                  <p className="text-white font-mono text-[11px] font-bold">{fSpeedKmh}</p>
-                  <p className="text-gray-600 text-[8px]">km/h</p>
-                </div>
-                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
-                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Alt (m)</p>
-                  <p className="text-white font-mono text-[11px] font-bold">{fAlt.toLocaleString()}</p>
-                  <p className="text-gray-600 text-[8px]">meters</p>
-                </div>
-                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
-                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Lat</p>
-                  <p className="text-white font-mono text-[11px] font-bold">{fLat.toFixed(2)}</p>
-                  <p className="text-gray-600 text-[8px]">{fLat >= 0 ? 'N' : 'S'}</p>
-                </div>
-                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
-                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Lon</p>
-                  <p className="text-white font-mono text-[11px] font-bold">{fLng.toFixed(2)}</p>
-                  <p className="text-gray-600 text-[8px]">{fLng >= 0 ? 'E' : 'W'}</p>
-                </div>
-              </div>
 
-              {/* Footer */}
-              <div className="flex items-center justify-between pt-2 border-t border-white/[0.04]">
-                <div className="flex items-center gap-3 text-[9px] text-gray-600 font-mono">
-                  <span>ICAO <span className="text-gray-400">{fIcao}</span></span>
-                  <span>SQK <span className="text-gray-400">{fSquawk || '—'}</span></span>
+                <div className="flex items-center justify-between pt-2 border-t border-white/[0.04]">
+                  <div className="flex items-center gap-3 text-[9px] text-gray-600 font-mono">
+                    <span>
+                      ICAO <span className="text-gray-400">{fIcao}</span>
+                    </span>
+                    <span>
+                      SQK <span className="text-gray-400">{fSquawk || '—'}</span>
+                    </span>
+                  </div>
+                  <span className="text-[8px] text-gray-600 uppercase tracking-wider">Live ADS-B</span>
                 </div>
-                <span className="text-[8px] text-gray-600 uppercase tracking-wider">Live ADS-B</span>
               </div>
             </div>
-          </div>
           );
         })()}
 
@@ -1011,103 +1122,103 @@ export default function CesiumGlobe() {
           const vLane = String(selectedVessel.lane ?? '');
           const vLat = Number(selectedVessel.latitude ?? 0);
           const vLng = Number(selectedVessel.longitude ?? 0);
-          // Heading label
+
           const headingLabels = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
           const headingLabel = headingLabels[Math.round(vCourse / 22.5) % 16];
-          // Speed status
+
           const speedStatus = vSpeed < 1 ? 'At Anchor' : vSpeed < 5 ? 'Slow Steaming' : vSpeed < 14 ? 'Cruising' : 'Full Speed';
           const speedColor = vSpeed < 1 ? '#f59e0b' : vSpeed < 5 ? '#eab308' : vSpeed < 14 ? '#34d399' : '#06b6d4';
-          // Vessel type icon
-          const typeIcon = vType === 'Tanker' ? '⛽' : vType === 'Container' ? '📦' : vType === 'Bulk Carrier' ? '🏗️' : vType === 'LNG/LPG' ? '🔥' : vType === 'Passenger' ? '🛳️' : vType === 'Fishing' ? '🎣' : vType === 'Military' ? '⚓' : '🚢';
+          const typeIcon =
+            vType === 'Tanker'
+              ? '⛽'
+              : vType === 'Container'
+                ? '📦'
+                : vType === 'Bulk Carrier'
+                  ? '🏗️'
+                  : vType === 'LNG/LPG'
+                    ? '🔥'
+                    : vType === 'Passenger'
+                      ? '🛳️'
+                      : vType === 'Fishing'
+                        ? '🎣'
+                        : vType === 'Military'
+                          ? '⚓'
+                          : '🚢';
 
           return (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#0B1120]/95 backdrop-blur-xl border border-emerald-500/20 rounded-2xl shadow-2xl shadow-black/50 w-[380px] animate-slide-up pointer-events-auto overflow-hidden">
+            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 bg-[#0B1120]/95 backdrop-blur-xl border border-emerald-500/20 rounded-2xl shadow-2xl shadow-black/50 w-[380px] animate-slide-up pointer-events-auto overflow-hidden">
+              <div className="h-1 w-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-500" />
 
-            {/* Top accent bar */}
-            <div className="h-1 w-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-500" />
-
-            <div className="p-4">
-              {/* Header */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-lg flex-shrink-0">
-                    {typeIcon}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-white font-bold text-[13px] tracking-wide truncate">{vName}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[9px] text-gray-500 font-mono">MMSI {vMmsi}</span>
-                      {vType && (
-                        <span className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/15">
-                          {vType}
-                        </span>
-                      )}
+              <div className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-lg flex-shrink-0">{typeIcon}</div>
+                    <div className="min-w-0">
+                      <p className="text-white font-bold text-[13px] tracking-wide truncate">{vName}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[9px] text-gray-500 font-mono">MMSI {vMmsi}</span>
+                        {vType && (
+                          <span className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/15">
+                            {vType}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  <button onClick={() => setSelectedVessel(null)} className="text-gray-500 hover:text-white text-xs w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/5 transition flex-shrink-0">
+                    ✕
+                  </button>
                 </div>
-                <button onClick={() => setSelectedVessel(null)}
-                  className="text-gray-500 hover:text-white text-xs w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/5 transition flex-shrink-0">✕</button>
-              </div>
 
-              {/* Status pill */}
-              <div className="flex items-center gap-2 mb-3">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border" style={{ backgroundColor: `${speedColor}10`, borderColor: `${speedColor}25` }}>
-                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: speedColor }} />
-                  <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: speedColor }}>{speedStatus}</span>
-                </div>
-                {vLane && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
-                    <span className="text-[9px] text-gray-400">📍 {vLane}</span>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border" style={{ backgroundColor: `${speedColor}10`, borderColor: `${speedColor}25` }}>
+                    <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: speedColor }} />
+                    <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: speedColor }}>
+                      {speedStatus}
+                    </span>
                   </div>
-                )}
-              </div>
+                  {vLane && (
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
+                      <span className="text-[9px] text-gray-400">📍 {vLane}</span>
+                    </div>
+                  )}
+                </div>
 
-              {/* Stats grid */}
-              <div className="grid grid-cols-4 gap-1.5 mb-3">
-                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
-                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Speed</p>
-                  <p className="text-white font-mono text-sm font-bold">{vSpeed.toFixed(1)}</p>
-                  <p className="text-gray-600 text-[8px]">knots</p>
+                <div className="grid grid-cols-4 gap-1.5 mb-3">
+                  {[
+                    { l: 'Speed', v: vSpeed.toFixed(1), u: 'knots' },
+                    { l: 'Course', v: `${vCourse}°`, u: headingLabel },
+                    { l: 'Lat', v: vLat.toFixed(2), u: vLat >= 0 ? 'N' : 'S' },
+                    { l: 'Lon', v: vLng.toFixed(2), u: vLng >= 0 ? 'E' : 'W' },
+                  ].map((stat, i) => (
+                    <div key={i} className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
+                      <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">{stat.l}</p>
+                      <p className="text-white font-mono text-sm font-bold">{stat.v}</p>
+                      <p className="text-gray-600 text-[8px]">{stat.u}</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
-                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Course</p>
-                  <p className="text-white font-mono text-sm font-bold">{vCourse}°</p>
-                  <p className="text-gray-600 text-[8px]">{headingLabel}</p>
-                </div>
-                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
-                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Lat</p>
-                  <p className="text-white font-mono text-sm font-bold">{vLat.toFixed(2)}</p>
-                  <p className="text-gray-600 text-[8px]">{vLat >= 0 ? 'N' : 'S'}</p>
-                </div>
-                <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/[0.04]">
-                  <p className="text-gray-500 text-[7px] uppercase tracking-widest mb-1 font-semibold">Lon</p>
-                  <p className="text-white font-mono text-sm font-bold">{vLng.toFixed(2)}</p>
-                  <p className="text-gray-600 text-[8px]">{vLng >= 0 ? 'E' : 'W'}</p>
-                </div>
-              </div>
 
-              {/* Destination bar */}
-              <div className="flex items-center gap-3 bg-emerald-500/[0.05] border border-emerald-500/10 rounded-xl px-3 py-2.5">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="text-[10px] text-gray-500 flex-shrink-0">DEST</span>
-                  <div className="flex-1 h-px bg-gradient-to-r from-emerald-500/30 via-emerald-500/10 to-transparent relative">
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <div className="flex items-center gap-3 bg-emerald-500/[0.05] border border-emerald-500/10 rounded-xl px-3 py-2.5">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-[10px] text-gray-500 flex-shrink-0">DEST</span>
+                    <div className="flex-1 h-px bg-gradient-to-r from-emerald-500/30 via-emerald-500/10 to-transparent relative">
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    </div>
+                    <span className="text-[11px] text-emerald-400 font-semibold flex-shrink-0 truncate max-w-[140px]">{vDest}</span>
                   </div>
-                  <span className="text-[11px] text-emerald-400 font-semibold flex-shrink-0 truncate max-w-[140px]">{vDest}</span>
                 </div>
-              </div>
 
-              {/* Footer */}
-              <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/[0.04]">
-                <div className="flex items-center gap-3 text-[9px] text-gray-600">
-                  <span className="font-mono">IMO —</span>
-                  <span>Flag —</span>
-                  <span>Draught —</span>
+                <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/[0.04]">
+                  <div className="flex items-center gap-3 text-[9px] text-gray-600">
+                    <span className="font-mono">IMO —</span>
+                    <span>Flag —</span>
+                    <span>Draught —</span>
+                  </div>
+                  <span className="text-[8px] text-gray-600 uppercase tracking-wider">Live Tracking</span>
                 </div>
-                <span className="text-[8px] text-gray-600 uppercase tracking-wider">Live Tracking</span>
               </div>
             </div>
-          </div>
           );
         })()}
 
@@ -1119,15 +1230,21 @@ export default function CesiumGlobe() {
                 <span className="text-base">🔥</span>
                 <div>
                   <p className="text-white font-bold text-sm tracking-wider">{String(selectedAcled.eventType ?? '')}</p>
-                  <p className="text-[9px] text-gray-400">{String(selectedAcled.subEventType ?? '')} · {String(selectedAcled.date ?? '')}</p>
+                  <p className="text-[9px] text-gray-400">
+                    {String(selectedAcled.subEventType ?? '')} · {String(selectedAcled.date ?? '')}
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setSelectedAcled(null)} className="text-gray-500 hover:text-white text-xs w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/5">✕</button>
+              <button onClick={() => setSelectedAcled(null)} className="text-gray-500 hover:text-white text-xs w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/5">
+                ✕
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="bg-black/30 rounded-lg p-2">
                 <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Location</p>
-                <p className="text-white text-xs">{String(selectedAcled.admin1 ?? '')}, {String(selectedAcled.country ?? '')}</p>
+                <p className="text-white text-xs">
+                  {String(selectedAcled.admin1 ?? '')}, {String(selectedAcled.country ?? '')}
+                </p>
               </div>
               <div className="bg-black/30 rounded-lg p-2">
                 <p className="text-gray-500 text-[8px] uppercase tracking-wider mb-0.5">Fatalities</p>
@@ -1149,20 +1266,16 @@ export default function CesiumGlobe() {
                 <p className="text-red-400 text-[10px] font-medium uppercase tracking-wider">⚠ Civilian targeting</p>
               </div>
             )}
-            {String(selectedAcled.notes ?? '') !== '' && (
-              <p className="text-[10px] text-gray-400 leading-relaxed line-clamp-3">{String(selectedAcled.notes)}</p>
-            )}
+            {String(selectedAcled.notes ?? '') !== '' && <p className="text-[10px] text-gray-400 leading-relaxed line-clamp-3">{String(selectedAcled.notes)}</p>}
             <p className="text-[8px] text-gray-600 mt-2 uppercase tracking-wider">Source: ACLED</p>
           </div>
         )}
 
         {/* Event modal */}
-        {showModal && selectedEvent && (
-          <EventCardModal
-            event={selectedEvent as EventData}
-            onClose={() => { setShowModal(false); setSelectedEvent(null); }}
-          />
-        )}
+        {showModal && selectedEvent && <EventCardModal event={selectedEvent as EventData} onClose={() => {
+          setShowModal(false);
+          setSelectedEvent(null);
+        }} />}
 
         {/* Bottom hint */}
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
@@ -1171,7 +1284,7 @@ export default function CesiumGlobe() {
 
         {/* Loading */}
         {isLoading && !loadError && (
-          <div className="absolute inset-0 bg-black z-20 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black z-30 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
               <p className="text-xs text-gray-600 tracking-wider uppercase">Loading 3D Globe…</p>
@@ -1179,41 +1292,64 @@ export default function CesiumGlobe() {
           </div>
         )}
         {loadError && (
-          <div className="absolute inset-0 bg-black z-20 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black z-30 flex items-center justify-center">
             <div className="text-center">
               <p className="text-red-400 text-sm font-semibold mb-2">Globe failed to load</p>
               <p className="text-gray-600 text-xs mb-4">Check browser console for details</p>
-              <button onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-500 pointer-events-auto">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-500 pointer-events-auto"
+              >
                 Retry
               </button>
             </div>
           </div>
         )}
+      </div>
 
-      </div>{/* end globe area */}
-
-      {/* ══ SIDEBAR — flex child, no absolute positioning ══ */}
+      {/* FLOATING SIDEBAR */}
       <MapSidebar
-        eventCount={eventCount} flightCount={flightCount} vesselCount={vesselCount} acledCount={acledCount}
-        showEvents={showEvents} onToggleEvents={() => setShowEvents(p => !p)}
-        showFlights={showFlights} onToggleFlights={() => setShowFlights(p => !p)}
-        showVessels={showVessels} onToggleVessels={() => setShowVessels(p => !p)}
-        showISS={showISS} onToggleISS={() => setShowISS(p => !p)}
-        showACLED={showACLED} onToggleACLED={() => setShowACLED(p => !p)}
-        timeWindow={timeWindow} onTimeWindowChange={setTimeWindow}
-        severity={severity} onSeverityChange={setSeverity}
-        category={category} onCategoryChange={setCategory}
-        region={region} onRegionChange={setRegion}
-        acledEventType={acledEventType} onAcledEventTypeChange={setAcledEventType}
-        acledDisorderType={acledDisorderType} onAcledDisorderTypeChange={setAcledDisorderType}
-        acledCountry={acledCountry} onAcledCountryChange={setAcledCountry}
-        acledRegion={acledRegion} onAcledRegionChange={setAcledRegion}
-        acledActor={acledActor} onAcledActorChange={setAcledActor}
-        acledFatalities={acledFatalities} onAcledFatalitiesChange={setAcledFatalities}
-        acledCivilianOnly={acledCivilianOnly} onAcledCivilianOnlyChange={() => setAcledCivilianOnly(p => !p)}
-        viewMode={mapMode} onViewModeChange={setMapMode}
-        selectedEvent={selectedEvent} selectedFlight={selectedFlight} selectedVessel={selectedVessel}
+        eventCount={eventCount}
+        flightCount={flightCount}
+        vesselCount={vesselCount}
+        acledCount={acledCount}
+        showEvents={showEvents}
+        onToggleEvents={() => setShowEvents((p) => !p)}
+        showFlights={showFlights}
+        onToggleFlights={() => setShowFlights((p) => !p)}
+        showVessels={showVessels}
+        onToggleVessels={() => setShowVessels((p) => !p)}
+        showISS={showISS}
+        onToggleISS={() => setShowISS((p) => !p)}
+        showACLED={showACLED}
+        onToggleACLED={() => setShowACLED((p) => !p)}
+        timeWindow={timeWindow}
+        onTimeWindowChange={setTimeWindow}
+        severity={severity}
+        onSeverityChange={setSeverity}
+        category={category}
+        onCategoryChange={setCategory}
+        region={region}
+        onRegionChange={setRegion}
+        acledEventType={acledEventType}
+        onAcledEventTypeChange={setAcledEventType}
+        acledDisorderType={acledDisorderType}
+        onAcledDisorderTypeChange={setAcledDisorderType}
+        acledCountry={acledCountry}
+        onAcledCountryChange={setAcledCountry}
+        acledRegion={acledRegion}
+        onAcledRegionChange={setAcledRegion}
+        acledActor={acledActor}
+        onAcledActorChange={setAcledActor}
+        acledFatalities={acledFatalities}
+        onAcledFatalitiesChange={setAcledFatalities}
+        acledCivilianOnly={acledCivilianOnly}
+        onAcledCivilianOnlyChange={() => setAcledCivilianOnly((p) => !p)}
+        viewMode={mapMode}
+        onViewModeChange={setMapMode}
+        selectedEvent={selectedEvent}
+        selectedFlight={selectedFlight}
+        selectedVessel={selectedVessel}
       />
     </div>
   );

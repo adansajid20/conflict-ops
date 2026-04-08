@@ -51,12 +51,16 @@ export default async function StatusPage() {
   return (
     <div style={{ background: '#070B11' }} className="min-h-screen">
       {/* Header */}
-      <div className="border-b border-white/[0.06]" style={{ background: '#070B11' }}>
-        <div className="max-w-4xl mx-auto px-6 py-8 lg:py-12">
-          <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-white mb-2">
+      <div className="border-b border-white/[0.08] relative" style={{ background: 'linear-gradient(180deg, #070B11 0%, rgba(7,11,17,0.9) 100%)' }}>
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute top-0 left-1/3 w-[500px] h-[300px] bg-green-600/[0.06] rounded-full blur-[120px]" />
+        </div>
+        <div className="max-w-4xl mx-auto px-6 py-12 lg:py-16 relative z-10">
+          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight text-white mb-3">
             System Status
           </h1>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-white/40 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
             Last checked: {new Date(status.lastChecked).toLocaleString('en-US', {
               month: 'short',
               day: 'numeric',

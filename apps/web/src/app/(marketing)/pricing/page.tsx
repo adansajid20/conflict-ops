@@ -3,19 +3,19 @@
 import Link from 'next/link'
 import { motion, useInView } from 'framer-motion'
 import { useRef, useState } from 'react'
-import { Shield, ArrowRight, Check } from 'lucide-react'
+import { Shield, ArrowRight, Check, Sparkles, Zap } from 'lucide-react'
 import { PLANS } from '@/lib/pricing/plans'
 
 function BlurIn({ children, delay = 0, className }: { children: React.ReactNode; delay?: number; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
-  const isInView = useInView(ref, { once: true, margin: '-40px' })
-  return <motion.div ref={ref} initial={{ opacity: 0, filter: 'blur(10px)', y: 16 }} animate={isInView ? { opacity: 1, filter: 'blur(0px)', y: 0 } : {}} transition={{ duration: 0.7, delay }} className={className}>{children}</motion.div>
+  const isInView = useInView(ref, { once: true, margin: '-50px' })
+  return <motion.div ref={ref} initial={{ opacity: 0, filter: 'blur(12px)', y: 20 }} animate={isInView ? { opacity: 1, filter: 'blur(0px)', y: 0 } : {}} transition={{ duration: 0.8, delay, ease: [0.16, 1, 0.3, 1] }} className={className}>{children}</motion.div>
 }
 
 function FadeUp({ children, delay = 0, className }: { children: React.ReactNode; delay?: number; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
   const isInView = useInView(ref, { once: true, margin: '-50px' })
-  return <motion.div ref={ref} initial={{ opacity: 0, y: 24 }} animate={isInView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5, delay }} className={className}>{children}</motion.div>
+  return <motion.div ref={ref} initial={{ opacity: 0, y: 28 }} animate={isInView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, delay, ease: [0.16, 1, 0.3, 1] }} className={className}>{children}</motion.div>
 }
 
 const COMPARISON = [
@@ -80,75 +80,101 @@ export default function PricingPage() {
       </nav>
 
       {/* Hero */}
-      <section className="pt-32 pb-20 px-6">
-        <BlurIn className="max-w-3xl mx-auto text-center">
-          <p className="text-sm font-medium text-blue-400 tracking-wide uppercase mb-5">Pricing</p>
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">
-            Simple, transparent pricing.
+      <section className="pt-32 pb-24 px-6 relative">
+        {/* Background accents */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute top-1/4 left-1/4 w-[600px] h-[400px] bg-blue-600/[0.08] rounded-full blur-[150px]" />
+          <div className="absolute bottom-0 right-1/3 w-[500px] h-[400px] bg-cyan-600/[0.06] rounded-full blur-[130px]" />
+        </div>
+
+        <BlurIn className="max-w-4xl mx-auto text-center relative z-10">
+          <motion.p className="text-sm font-bold text-blue-400 tracking-widest uppercase mb-6 flex items-center justify-center gap-2">
+            <Zap size={14} /> Transparent Pricing
+          </motion.p>
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-8 leading-tight">
+            <span className="bg-gradient-to-b from-white via-white/95 to-white/70 bg-clip-text text-transparent">
+              Simple, transparent pricing.
+            </span>
           </h1>
-          <p className="text-lg text-white/40 max-w-xl mx-auto leading-relaxed">
-            Start free. Upgrade when you need more. No enterprise procurement circus.
+          <p className="text-lg md:text-xl text-white/45 max-w-2xl mx-auto leading-relaxed">
+            Start free forever. Upgrade when you need more. No long-term contracts. No enterprise procurement circus.
           </p>
         </BlurIn>
       </section>
 
       {/* Pricing Cards */}
-      <section className="max-w-7xl mx-auto px-6 pb-24">
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+      <section className="max-w-7xl mx-auto px-6 pb-32">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((plan, i) => (
-            <FadeUp key={plan.id} delay={i * 0.08}>
+            <FadeUp key={plan.id} delay={i * 0.1}>
               <motion.div
-                whileHover={plan.popular ? { y: -6, boxShadow: '0 20px 50px rgba(59,130,246,0.15)' } : { y: -3 }}
-                className={`flex flex-col rounded-2xl border p-7 h-full transition-colors ${
+                whileHover={plan.popular ? { y: -8, boxShadow: '0 25px 60px rgba(59,130,246,0.2)' } : { y: -4 }}
+                transition={{ duration: 0.3, type: 'spring' as const, stiffness: 200 }}
+                className={`flex flex-col rounded-2xl border p-8 h-full transition-all relative overflow-hidden group ${
                   plan.popular
-                    ? 'border-blue-500/40 bg-blue-500/[0.05] relative'
-                    : 'border-white/[0.06] bg-white/[0.02]'
+                    ? 'border-blue-400/50 bg-gradient-to-br from-blue-500/15 to-blue-500/5'
+                    : 'border-white/[0.08] bg-gradient-to-br from-white/[0.03] to-white/[0.005] hover:border-white/[0.15]'
                 }`}
               >
+                {/* Background glow on popular */}
                 {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-blue-500 text-xs font-semibold text-white">
-                    Most Popular
-                  </div>
+                  <div className="absolute -top-20 -right-20 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl opacity-50 group-hover:opacity-100 transition-opacity" />
                 )}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-1">{plan.name}</h3>
-                  <p className="text-sm text-white/30 mb-5">{plan.desc}</p>
-                  <div className="mb-6">
-                    <span className="text-4xl font-bold text-white">{plan.price}</span>
-                    {plan.period && <span className="text-sm text-white/30 ml-1">{plan.period}</span>}
+
+                {plan.popular && (
+                  <motion.div
+                    className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-500 to-blue-400 text-xs font-bold text-white shadow-lg shadow-blue-500/30"
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    Most Popular
+                  </motion.div>
+                )}
+
+                <div className="relative z-10">
+                  <h3 className="text-xl font-bold text-white mb-2">{plan.name}</h3>
+                  <p className="text-sm text-white/40 mb-6">{plan.desc}</p>
+                  <div className="mb-8">
+                    <span className="text-5xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">{plan.price}</span>
+                    {plan.period && <span className="text-sm text-white/40 ml-2">{plan.period}</span>}
                   </div>
                 </div>
-                <ul className="flex-1 space-y-3 mb-8">
+
+                <ul className="flex-1 space-y-4 mb-8 relative z-10">
                   {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2.5 text-sm text-white/50">
-                      <Check size={15} className="mt-0.5 flex-shrink-0 text-blue-400/60" />
-                      <span>{f}</span>
+                    <li key={f} className="flex items-start gap-3 text-sm text-white/50">
+                      <Check size={16} className="mt-0.5 flex-shrink-0 text-blue-300" />
+                      <span className="font-medium">{f}</span>
                     </li>
                   ))}
                 </ul>
-                {!plan.stripePriceId ? (
-                  <a
-                    href="mailto:enterprise@conflictradar.co"
-                    className="block rounded-xl py-3 text-center text-sm font-semibold border border-white/[0.12] text-white/70 hover:text-white hover:border-white/25 transition-all"
-                  >
-                    Contact Sales
-                  </a>
-                ) : (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleCheckout(plan)}
-                    disabled={loading === plan.id}
-                    className={`block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all cursor-pointer ${
-                      plan.popular
-                        ? 'bg-white text-gray-900 hover:bg-gray-100'
-                        : 'border border-white/[0.12] text-white/70 hover:text-white hover:border-white/25'
-                    }`}
-                    style={{ opacity: loading === plan.id ? 0.6 : 1 }}
-                  >
-                    {loading === plan.id ? 'Redirecting...' : plan.price === '$0' ? 'Get Started Free' : 'Start 14-Day Trial'}
-                  </motion.button>
-                )}
+
+                <div className="relative z-10">
+                  {!plan.stripePriceId ? (
+                    <a
+                      href="mailto:enterprise@conflictradar.co"
+                      className="block rounded-xl py-3 text-center text-sm font-bold border-2 border-white/[0.15] text-white/70 hover:text-white hover:border-white/30 transition-all"
+                    >
+                      Contact Sales
+                    </a>
+                  ) : (
+                    <motion.button
+                      whileHover={{ scale: 1.03, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleCheckout(plan)}
+                      disabled={loading === plan.id}
+                      className={`block w-full rounded-xl py-3.5 text-center text-sm font-bold transition-all cursor-pointer ${
+                        plan.popular
+                          ? 'bg-gradient-to-r from-white to-blue-50 text-gray-900 hover:from-blue-50 hover:to-white shadow-lg shadow-white/20'
+                          : 'border-2 border-white/[0.15] text-white/70 hover:text-white hover:border-white/30 hover:bg-white/[0.05]'
+                      }`}
+                      style={{ opacity: loading === plan.id ? 0.6 : 1 }}
+                    >
+                      {loading === plan.id ? 'Redirecting...' : plan.price === '$0' ? 'Get Started Free' : 'Start 14-Day Trial'}
+                    </motion.button>
+                  )}
+                </div>
               </motion.div>
             </FadeUp>
           ))}

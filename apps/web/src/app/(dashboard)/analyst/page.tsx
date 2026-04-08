@@ -79,11 +79,11 @@ export default function AnalystPage() {
   ]
 
   return (
-    <div className="flex h-screen bg-gray-950 text-gray-100">
+    <div className="flex h-screen bg-[#070B11] text-gray-100">
       {/* Sidebar */}
       {sidebarOpen && (
-        <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
-          <div className="p-4 border-b border-gray-800">
+        <div className="w-64 bg-white/[0.03] border-r border-white/[0.05] flex flex-col backdrop-blur-sm">
+          <div className="p-4 border-b border-white/[0.05]">
             <div className="flex items-center gap-2 mb-3">
               <Bot className="w-5 h-5 text-blue-400" />
               <span className="font-semibold text-sm">Radar — Intel Analyst</span>
@@ -94,7 +94,7 @@ export default function AnalystPage() {
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {conversations.map(conv => (
-              <div key={conv.id} className={`group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm transition-colors ${activeConvId === conv.id ? 'bg-gray-700' : 'hover:bg-gray-800'}`} onClick={() => void openConversation(conv)}>
+              <div key={conv.id} className={`group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm transition-colors ${activeConvId === conv.id ? 'bg-white/[0.1]' : 'hover:bg-white/[0.05]'}`} onClick={() => void openConversation(conv)}>
                 {conv.pinned && <Pin className="w-3 h-3 text-yellow-400 shrink-0" />}
                 <span className="flex-1 truncate text-gray-300">{conv.title}</span>
                 <button onClick={e => { e.stopPropagation(); void deleteConversation(conv.id) }} className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400">
@@ -109,7 +109,7 @@ export default function AnalystPage() {
       {/* Main chat */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 bg-gray-900">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.05] bg-white/[0.02] backdrop-blur-sm">
           <button onClick={() => setSidebarOpen(v => !v)} className="text-gray-400 hover:text-white">
             <ChevronLeft className={`w-5 h-5 transition-transform ${sidebarOpen ? '' : 'rotate-180'}`} />
           </button>
@@ -148,7 +148,7 @@ export default function AnalystPage() {
               <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === 'assistant' ? 'bg-blue-600' : 'bg-gray-700'}`}>
                 {msg.role === 'assistant' ? <Bot className="w-4 h-4" /> : <span className="text-xs font-bold">U</span>}
               </div>
-              <div className={`px-4 py-3 rounded-xl text-sm leading-relaxed max-w-2xl ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-100'}`}>
+              <div className={`px-4 py-3 rounded-xl text-sm leading-relaxed max-w-2xl backdrop-blur-sm ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-white/[0.08] text-white/90 border border-white/[0.1]'}`}>
                 <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
               </div>
             </div>
@@ -168,7 +168,7 @@ export default function AnalystPage() {
         </div>
 
         {/* Input */}
-        <div className="p-4 border-t border-gray-800 bg-gray-900">
+        <div className="p-4 border-t border-white/[0.05] bg-white/[0.02] backdrop-blur-sm">
           {!userId && (
             <div className="flex items-center gap-2 text-yellow-400 text-sm mb-3">
               <AlertCircle className="w-4 h-4" /> Sign in to save conversations
@@ -180,7 +180,7 @@ export default function AnalystPage() {
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendMessage() } }}
               placeholder="Ask Radar anything about current intelligence..."
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 placeholder-gray-500"
+              className="flex-1 bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 placeholder-white/[0.3] backdrop-blur-sm text-white"
             />
             <button
               onClick={() => void sendMessage()}

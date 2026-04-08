@@ -14,7 +14,7 @@ const CesiumGlobe = dynamic(() => import('@/components/map/CesiumGlobe'), {
 
 export default function MapPage() {
   return (
-    <div className="w-full h-[calc(100vh-64px)]">
+    <div className="w-full h-[calc(100vh-64px)] bg-black overflow-hidden">
       <CesiumGlobe />
     </div>
   );

@@ -54,26 +54,26 @@ export default async function WirePage() {
   return (
     <div className="min-h-screen" style={{ background: '#070B11' }}>
       {/* Header Navigation */}
-      <div className="border-b sticky top-0 z-10" style={{ borderColor: 'rgba(255, 255, 255, 0.06)', background: 'rgba(7, 11, 17, 0.95)', backdropFilter: 'blur(12px)' }}>
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <div className="border-b sticky top-0 z-10 transition-all duration-300" style={{ borderColor: 'rgba(255, 255, 255, 0.08)', background: 'linear-gradient(135deg, rgba(7,11,17,0.97) 0%, rgba(7,11,17,0.92) 100%)', backdropFilter: 'blur(20px)' }}>
+        <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
             <div className="text-lg font-bold tracking-tight text-white">CONFLICTRADAR</div>
-            <div className="w-px h-5" style={{ background: 'rgba(255, 255, 255, 0.06)' }} />
-            <div className="text-sm font-medium text-white/50">Live Wire</div>
+            <div className="w-px h-6" style={{ background: 'rgba(255, 255, 255, 0.1)' }} />
+            <div className="text-sm font-semibold text-white/60">Live Wire</div>
           </div>
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <div className="relative flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs font-semibold text-white/60 tracking-wide">LIVE</span>
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-xs font-bold text-white/70 tracking-wider uppercase">LIVE</span>
               </div>
             </div>
             <a
               href="/sign-up"
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white/90 transition-all duration-200"
+              className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white/90 hover:text-white transition-all duration-200"
               style={{
-                background: 'rgba(96, 165, 250, 0.1)',
-                border: '1px solid rgba(96, 165, 250, 0.2)',
+                background: 'rgba(96, 165, 250, 0.12)',
+                border: '1px solid rgba(96, 165, 250, 0.25)',
               }}
             >
               Sign Up
@@ -83,21 +83,25 @@ export default async function WirePage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-6 py-12">
+      <div className="max-w-6xl mx-auto px-6 py-16">
         {/* Page Header */}
         <div className="mb-12">
-          <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">Global Events Feed</h1>
-          <p className="text-white/50 text-lg">Real-time monitoring of international conflict and geopolitical developments</p>
+          <h1 className="text-5xl md:text-6xl font-bold text-white mb-4 tracking-tight leading-tight">
+            <span className="bg-gradient-to-b from-white to-white/70 bg-clip-text text-transparent">
+              Global Events Feed
+            </span>
+          </h1>
+          <p className="text-lg md:text-xl text-white/45">Real-time monitoring of international conflict and geopolitical developments</p>
         </div>
 
         {/* Info Banner */}
-        <div className="mb-8 p-6 rounded-2xl border" style={{ borderColor: 'rgba(255, 255, 255, 0.06)', background: 'rgba(255, 255, 255, 0.02)' }}>
-          <p className="text-sm text-white/60 leading-relaxed">
+        <div className="mb-12 p-8 rounded-2xl border backdrop-blur" style={{ borderColor: 'rgba(96, 165, 250, 0.2)', background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%)' }}>
+          <p className="text-sm md:text-base text-white/60 leading-relaxed">
             Public preview showing the last 50 events.{' '}
-            <a href="/sign-up" className="text-blue-400 font-medium hover:text-blue-300 transition-colors">
+            <a href="/sign-up" className="text-blue-300 font-semibold hover:text-blue-200 transition-colors">
               Sign up free
             </a>{' '}
-            for full access: forecasts, alerts, vessel tracking, AI analysis, and more.
+            for full access: forecasts, predictive alerts, vessel & flight tracking, AI-powered analysis, and more.
           </p>
         </div>
 

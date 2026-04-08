@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { AlertsManager } from '@/components/alerts/AlertsManager'
+import AlertsManager from '@/components/alerts/AlertsManager'
 
 export default function AlertsSettingsPage() {
   return (

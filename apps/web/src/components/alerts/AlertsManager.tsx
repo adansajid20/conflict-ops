@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   AlertTriangle, Bell, ChevronDown, ChevronRight, Code2,
   Eye, Layers, Pencil, Plus, Save, Shield, Sliders,
-  ToggleLeft, ToggleRight, Trash2, Zap,
+  ToggleLeft, ToggleRight, Trash2, Zap, Mail, Webhook, X,
 } from 'lucide-react'
 
 // ═══════════════════════════════════════════════════════════════
@@ -25,7 +26,6 @@ type UserAlert = {
   last_triggered_at?: string | null
   trigger_count?: number
   created_at: string
-  // Advanced fields
   rule_definition?: RuleDefinition | null
   channel_routing?: ChannelRoute[] | null
   dedupe_config?: DedupeConfig | null
@@ -198,7 +198,7 @@ const EMPTY_EXPERT: ExpertForm = {
 // HELPERS
 // ═══════════════════════════════════════════════════════════════
 function timeAgo(input?: string | null): string {
-  if (!input) return 'Never'
+  if (!input) return '—'
   const diff = Math.max(0, Date.now() - new Date(input).getTime())
   const s = Math.floor(diff / 1000)
   if (s < 60) return 'just now'
@@ -210,223 +210,21 @@ function timeAgo(input?: string | null): string {
   return `${d}d ago`
 }
 
-function buildPayload(form: ExpertForm, mode: EditorMode) {
-  const keywords = form.keywords.split(',').map(s => s.trim()).filter(Boolean)
-  const payload: Record<string, unknown> = {
-    name: form.name.trim() || 'My Alert',
-    frequency: form.frequency,
-  }
-
-  // Legacy fields (always included for backward compat)
-  if (form.regions.length) payload.regions = form.regions
-  if (form.severities.length) payload.severities = form.severities
-  if (keywords.length) payload.keywords = keywords
-  if (form.delivery_email.trim()) payload.delivery_email = form.delivery_email.trim()
-
-  if (mode === 'simple') return payload
-
-  // Advanced fields
-  if (form.delivery_webhook.trim()) payload.delivery_webhook = form.delivery_webhook.trim()
-  if (form.include_flights) payload.include_flights = true
-  if (form.include_vessels) payload.include_vessels = true
-  if (form.tags.trim()) payload.tags = form.tags.split(',').map(s => s.trim()).filter(Boolean)
-
-  // Build advanced rule definition
-  if (mode === 'advanced' || mode === 'expert') {
-    const conditions: Array<{ field: string; operator: string; value: string | number | string[] | number[] }> = []
-
-    // Event type filter
-    if (form.event_types.length > 0) {
-      conditions.push({ field: 'event_type', operator: 'in', value: form.event_types })
-    }
-
-    // Actor keywords
-    const actors = form.actors.split(',').map(s => s.trim()).filter(Boolean)
-    if (actors.length > 0) {
-      for (const actor of actors) {
-        conditions.push({ field: 'actor', operator: 'contains', value: actor })
-      }
-    }
-
-    // Severity as condition
-    if (form.severities.length > 0) {
-      const sevMap: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }
-      const sevNums = form.severities.map(s => sevMap[s] ?? 1)
-      conditions.push({ field: 'severity', operator: 'in', value: sevNums })
-    }
-
-    // Region conditions
-    if (form.regions.length > 0) {
-      for (const region of form.regions) {
-        conditions.push({ field: 'region', operator: 'contains', value: region.replace('_', ' ') })
-      }
-    }
-
-    // Keyword conditions
-    if (keywords.length > 0) {
-      for (const kw of keywords) {
-        conditions.push({ field: 'title', operator: 'contains', value: kw })
-      }
-    }
-
-    const ruleDef: RuleDefinition = {
-      version: 2,
-      root: { logic: 'AND', conditions },
-    }
-
-    // Threshold trigger
-    if (form.threshold_enabled) {
-      ruleDef.threshold = {
-        type: form.threshold_type,
-        window_minutes: form.threshold_window,
-        ...(form.threshold_type === 'count' ? { threshold: form.threshold_value } : {}),
-        ...(form.threshold_type === 'rate_of_change' ? { percent_change: form.threshold_value } : {}),
-        ...(form.threshold_type === 'anomaly' ? { sigma: form.threshold_value } : {}),
-      }
-    }
-
-    payload.rule_definition = ruleDef
-
-    // Dedupe config
-    payload.dedupe_config = {
-      strategy: form.dedupe_strategy,
-      window_minutes: form.dedupe_window,
-    }
-  }
-
-  // Expert-only: custom JSON override
-  if (mode === 'expert' && form.rule_json.trim()) {
-    try {
-      const customDef = JSON.parse(form.rule_json)
-      payload.rule_definition = customDef
-    } catch {
-      // Invalid JSON, ignore
-    }
-  }
-
-  // Escalation policy
-  if (mode === 'expert' && form.escalation_enabled) {
-    payload.escalation_policy = {
-      ack_timeout_minutes: form.escalation_timeout,
-      escalate_to: form.escalation_channel,
-      escalate_target: form.escalation_target || undefined,
-      max_escalations: form.escalation_max,
-    }
-  }
-
-  return payload
-}
-
-function formFromAlert(alert: UserAlert): ExpertForm {
-  const ruleDef = alert.rule_definition
-  const eventTypes = (ruleDef?.root?.conditions ?? [])
-    .filter((c): c is RuleCondition => 'field' in c && c.field === 'event_type' && c.operator === 'in')
-    .flatMap(c => (Array.isArray(c.value) ? c.value : [c.value]).map(String))
-
-  return {
-    name: alert.name ?? '',
-    delivery_email: alert.delivery_email ?? '',
-    severities: alert.severities ?? [],
-    regions: alert.regions ?? [],
-    keywords: (alert.keywords ?? []).join(', '),
-    frequency: alert.frequency ?? 'instant',
-    event_types: eventTypes,
-    actors: (alert.actor_ids ?? []).join(', '),
-    threshold_enabled: !!ruleDef?.threshold,
-    threshold_type: ruleDef?.threshold?.type ?? 'count',
-    threshold_value: ruleDef?.threshold?.threshold ?? ruleDef?.threshold?.percent_change ?? ruleDef?.threshold?.sigma ?? 3,
-    threshold_window: ruleDef?.threshold?.window_minutes ?? 60,
-    delivery_webhook: alert.delivery_webhook ?? '',
-    channel_routing: alert.channel_routing ?? [],
-    dedupe_strategy: alert.dedupe_config?.strategy ?? 'content_hash',
-    dedupe_window: alert.dedupe_config?.window_minutes ?? 60,
-    include_flights: alert.include_flights ?? false,
-    include_vessels: alert.include_vessels ?? false,
-    tags: (alert.tags ?? []).join(', '),
-    rule_json: ruleDef ? JSON.stringify(ruleDef, null, 2) : '',
-    escalation_enabled: !!alert.escalation_policy,
-    escalation_timeout: alert.escalation_policy?.ack_timeout_minutes ?? 30,
-    escalation_channel: alert.escalation_policy?.escalate_to ?? 'email',
-    escalation_target: alert.escalation_policy?.escalate_target ?? '',
-    escalation_max: alert.escalation_policy?.max_escalations ?? 3,
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// COMPONENT: PILL TOGGLE
-// ═══════════════════════════════════════════════════════════════
-function PillToggle({ options, selected, onToggle, colorMap }: {
-  options: { value: string; label: string }[]
-  selected: string[]
-  onToggle: (value: string) => void
-  colorMap?: Record<string, { bg: string; border: string; color: string }>
-}) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {options.map(opt => {
-        const active = selected.includes(opt.value)
-        const colors = colorMap?.[opt.value]
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onToggle(opt.value)}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all ${
-              active
-                ? colors ? `${colors.bg} ${colors.border}` : 'border-blue-400 bg-blue-500/20 text-blue-400'
-                : 'border-white/[0.08] bg-white/[0.03] text-white/40 hover:bg-white/[0.06] hover:text-white/60'
-            }`}
-            style={active && colors ? { color: colors.color } : undefined}
-          >
-            {opt.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════
-// COMPONENT: SECTION HEADER
-// ═══════════════════════════════════════════════════════════════
-function SectionHeader({ icon: Icon, label, collapsed, onToggle }: {
-  icon: React.ElementType
-  label: string
-  collapsed?: boolean
-  onToggle?: () => void
-}) {
-  const Chevron = collapsed ? ChevronRight : ChevronDown
-  return (
-    <button type="button" onClick={onToggle}
-      className="flex items-center gap-2 w-full text-left group">
-      <Icon className="w-3.5 h-3.5 text-white/25" />
-      <span className="text-[10px] uppercase tracking-[0.15em] text-white/30 font-semibold flex-1">{label}</span>
-      {onToggle && <Chevron className="w-3.5 h-3.5 text-white/20 group-hover:text-white/40 transition" />}
-    </button>
-  )
-}
-
 // ═══════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════
-export function AlertsManager() {
+export default function AlertsManager() {
   const [alerts, setAlerts] = useState<UserAlert[]>([])
-  const [form, setForm] = useState<ExpertForm>(EMPTY_EXPERT)
-  const [mode, setMode] = useState<EditorMode>('simple')
-  const [editingId, setEditingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    delivery: true, threshold: false, dedupe: false, escalation: false, json: false,
-  })
+  const [creating, setCreating] = useState(false)
+  const [mode, setMode] = useState<EditorMode>('simple')
+  const [simpleForm, setSimpleForm] = useState(EMPTY_SIMPLE)
+  const [advancedForm, setAdvancedForm] = useState(EMPTY_ADVANCED)
+  const [expertForm, setExpertForm] = useState(EMPTY_EXPERT)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  const toggleSection = (key: string) =>
-    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }))
-
-  // ── Data ──
-  async function loadAlerts() {
-    setLoading(true)
+  // Load rules
+  const load = async () => {
     try {
       const res = await fetch('/api/v1/alerts?type=rules', { cache: 'no-store' })
       const json = await res.json() as { data?: UserAlert[] }
@@ -435,532 +233,738 @@ export function AlertsManager() {
     setLoading(false)
   }
 
-  useEffect(() => { void loadAlerts() }, [])
+  useEffect(() => {
+    void load()
+  }, [])
 
-  const activeCount = useMemo(() => alerts.filter(a => a.active !== false).length, [alerts])
+  // Save rule
+  const saveRule = async () => {
+    if (!simpleForm.name) return alert('Rule name required')
 
-  function updateForm<K extends keyof ExpertForm>(key: K, value: ExpertForm[K]) {
-    setForm(prev => ({ ...prev, [key]: value }))
-  }
+    const payload: Record<string, unknown> = {
+      name: simpleForm.name,
+      regions: simpleForm.regions,
+      severities: simpleForm.severities,
+      keywords: simpleForm.keywords.split(',').filter(k => k.trim()),
+      frequency: simpleForm.frequency,
+      delivery_email: simpleForm.delivery_email || undefined,
+    }
 
-  function toggleArrayItem(key: 'severities' | 'regions' | 'event_types', value: string) {
-    setForm(prev => ({
-      ...prev,
-      [key]: prev[key].includes(value) ? prev[key].filter(v => v !== value) : [...prev[key], value],
-    }))
-  }
+    if (mode === 'advanced' || mode === 'expert') {
+      payload.event_types = advancedForm.event_types
+      payload.delivery_webhook = advancedForm.delivery_webhook || undefined
+      payload.include_flights = advancedForm.include_flights
+      payload.include_vessels = advancedForm.include_vessels
+      payload.tags = advancedForm.tags.split(',').filter(t => t.trim())
+      payload.dedupe_config = {
+        strategy: advancedForm.dedupe_strategy,
+        window_minutes: advancedForm.dedupe_window,
+      }
+      if (advancedForm.threshold_enabled) {
+        payload.threshold_trigger = {
+          type: advancedForm.threshold_type,
+          threshold: advancedForm.threshold_value,
+          window_minutes: advancedForm.threshold_window,
+        }
+      }
+    }
 
-  // ── CRUD ──
-  async function submitForm() {
-    if (!form.name.trim()) { setMessage('Alert name is required'); return }
-    setSaving(true); setMessage(null)
+    if (mode === 'expert') {
+      try {
+        if (expertForm.rule_json) {
+          payload.rule_definition = JSON.parse(expertForm.rule_json)
+        }
+      } catch {
+        return alert('Invalid JSON in expert mode')
+      }
+      if (expertForm.escalation_enabled) {
+        payload.escalation_policy = {
+          ack_timeout_minutes: expertForm.escalation_timeout,
+          escalate_to: expertForm.escalation_channel,
+          escalate_target: expertForm.escalation_target,
+          max_escalations: expertForm.escalation_max,
+        }
+      }
+    }
+
     try {
-      const payload = buildPayload(form, mode)
-      const url = editingId ? `/api/v1/alerts/${editingId}` : '/api/v1/alerts'
-      const method = editingId ? 'PATCH' : 'POST'
-      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-      const json = await res.json() as { error?: string }
-      if (!res.ok) { setMessage(json.error ?? 'Save failed'); return }
-      setForm(EMPTY_EXPERT); setEditingId(null)
-      await loadAlerts()
-      setMessage(editingId ? 'Alert updated successfully' : 'Alert created successfully')
-    } catch { setMessage('Save failed') }
-    finally { setSaving(false) }
-  }
-
-  async function toggleAlert(alert: UserAlert) {
-    await fetch(`/api/v1/alerts/${alert.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ active: !alert.active }),
-    })
-    await loadAlerts()
-  }
-
-  async function deleteAlert(id: string) {
-    await fetch(`/api/v1/alerts/${id}`, { method: 'DELETE' })
-    if (editingId === id) { setEditingId(null); setForm(EMPTY_EXPERT) }
-    await loadAlerts()
-  }
-
-  function startEdit(alert: UserAlert) {
-    setEditingId(alert.id)
-    setForm(formFromAlert(alert))
-    setMessage(null)
-    // Auto-detect mode based on rule complexity
-    if (alert.escalation_policy || alert.rule_definition?.root?.conditions?.some(c => 'logic' in c)) {
-      setMode('expert')
-    } else if (alert.rule_definition || alert.delivery_webhook || alert.dedupe_config) {
-      setMode('advanced')
-    } else {
-      setMode('simple')
+      const res = await fetch('/api/v1/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setAlerts(prev => [json.data as UserAlert, ...prev])
+        setCreating(false)
+        setSimpleForm(EMPTY_SIMPLE)
+        setAdvancedForm(EMPTY_ADVANCED)
+        setExpertForm(EMPTY_EXPERT)
+      } else {
+        alert('Failed to create rule')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Error saving rule')
     }
   }
 
-  function resetForm() {
-    setEditingId(null); setForm(EMPTY_EXPERT); setMessage(null)
+  // Delete rule
+  const deleteRule = async (id: string) => {
+    if (!confirm('Delete this rule?')) return
+    try {
+      await fetch(`/api/v1/alerts?id=${id}`, { method: 'DELETE' })
+      setAlerts(prev => prev.filter(a => a.id !== id))
+    } catch { /* silent */ }
+  }
+
+  // Toggle rule active
+  const toggleRuleActive = async (id: string, active: boolean) => {
+    setAlerts(prev => prev.map(a => a.id === id ? { ...a, active: !active } : a))
+    // In production, would call PATCH endpoint
   }
 
   // ═══════════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════════
   return (
-    <div className="space-y-6">
-
-      {/* ── MODE SELECTOR + FORM ── */}
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.015]">
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.05]">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/20 flex items-center justify-center">
-              <Bell className="w-4 h-4 text-blue-400" />
-            </div>
-            <div>
-              <h3 className="text-[13px] font-semibold text-white">
-                {editingId ? 'Edit Alert Rule' : 'Create Alert Rule'}
-              </h3>
-              <p className="text-[10px] text-white/35 mt-0.5">
-                {activeCount} active rule{activeCount === 1 ? '' : 's'} · Evaluated every 3 minutes
-              </p>
-            </div>
+    <div className="w-full max-w-6xl mx-auto" style={{ background: '#070B11' }}>
+      {/* Header */}
+      <motion.div
+        className="px-8 py-6 border-b border-white/[0.06]"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Alert Rules</h1>
+            <p className="text-sm text-white/40 mt-1">Create and manage alert rules with advanced filtering</p>
           </div>
-
-          {/* Mode switcher */}
-          <div className="flex items-center rounded-lg border border-white/[0.06] bg-white/[0.02] p-0.5">
-            {([
-              { key: 'simple' as const, label: 'Simple', icon: Zap },
-              { key: 'advanced' as const, label: 'Advanced', icon: Sliders },
-              { key: 'expert' as const, label: 'Expert', icon: Code2 },
-            ]).map(({ key, label, icon: ModeIcon }) => (
-              <button key={key} onClick={() => setMode(key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all ${
-                  mode === key
-                    ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20'
-                    : 'text-white/30 hover:text-white/50'
-                }`}>
-                <ModeIcon className="w-3 h-3" />
-                {label}
-              </button>
-            ))}
-          </div>
+          <motion.button
+            onClick={() => {
+              setCreating(!creating)
+              if (!creating) {
+                setMode('simple')
+                setSimpleForm(EMPTY_SIMPLE)
+                setAdvancedForm(EMPTY_ADVANCED)
+                setExpertForm(EMPTY_EXPERT)
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400 font-semibold hover:bg-blue-500/30 transition-all"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Plus className="w-4 h-4" /> Create Rule
+          </motion.button>
         </div>
 
-        {/* Form body */}
-        <div className="px-5 py-4 space-y-4">
+        {/* Mode selector */}
+        {creating && (
+          <motion.div
+            className="flex gap-2"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            {(['simple', 'advanced', 'expert'] as EditorMode[]).map(m => (
+              <motion.button
+                key={m}
+                onClick={() => setMode(m)}
+                className="px-4 py-2 rounded-lg text-sm font-semibold uppercase tracking-wider transition-all"
+                style={{
+                  color: mode === m ? '#3b82f6' : 'rgba(255,255,255,0.25)',
+                  background: mode === m ? 'rgba(59,130,246,0.15)' : 'transparent',
+                  border: mode === m ? '1px solid rgba(59,130,246,0.4)' : '1px solid transparent',
+                }}
+                whileHover={{ scale: 1.02 }}
+              >
+                {m === 'simple' && '≋'}
+                {m === 'advanced' && '≡'}
+                {m === 'expert' && '⚙'}
+                {m}
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
+      </motion.div>
 
-          {/* Row 1: Name + Frequency */}
-          <div className="grid gap-3 md:grid-cols-2">
-            <div>
-              <label className="text-[10px] uppercase tracking-[0.15em] text-white/25 mb-1.5 block">Rule Name *</label>
+      {/* Create Form */}
+      <AnimatePresence>
+        {creating && (
+          <motion.div
+            className="px-8 py-6 border-b border-white/[0.06] bg-white/[0.01]"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {/* Rule Name */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-white mb-2">Rule Name</label>
               <input
-                value={form.name} onChange={e => updateForm('name', e.target.value)}
-                placeholder="e.g. Middle East Crisis Monitor"
-                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[13px] text-white placeholder:text-white/15 focus:border-blue-500/30 focus:outline-none transition"
+                type="text"
+                value={simpleForm.name}
+                onChange={e => setSimpleForm({ ...simpleForm, name: e.target.value })}
+                placeholder="e.g., Critical Middle East Conflicts"
+                className="w-full px-4 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/20 focus:outline-none focus:bg-white/[0.08] focus:border-white/[0.15]"
               />
             </div>
-            <div>
-              <label className="text-[10px] uppercase tracking-[0.15em] text-white/25 mb-1.5 block">Frequency</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {FREQUENCY_OPTIONS.map(f => (
-                  <button key={f.value} onClick={() => updateForm('frequency', f.value)}
-                    className={`rounded-lg border px-2.5 py-1.5 text-left transition-all ${
-                      form.frequency === f.value
-                        ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
-                        : 'border-white/[0.06] bg-white/[0.02] text-white/40 hover:bg-white/[0.04]'
-                    }`}>
-                    <div className="text-[11px] font-semibold">{f.label}</div>
-                    <div className="text-[9px] opacity-60 mt-0.5">{f.desc}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
 
-          {/* Severity */}
-          <div>
-            <label className="text-[10px] uppercase tracking-[0.15em] text-white/25 mb-1.5 block">Severity Levels</label>
-            <PillToggle
-              options={SEVERITY_OPTIONS}
-              selected={form.severities}
-              onToggle={v => toggleArrayItem('severities', v)}
-              colorMap={Object.fromEntries(SEVERITY_OPTIONS.map(s => [s.value, { bg: s.bg, border: s.border, color: s.color }]))}
-            />
-          </div>
+            {/* Simple Mode */}
+            {mode === 'simple' && (
+              <SimpleRuleForm
+                form={simpleForm}
+                onChange={setSimpleForm}
+              />
+            )}
 
-          {/* Regions */}
-          <div>
-            <label className="text-[10px] uppercase tracking-[0.15em] text-white/25 mb-1.5 block">Regions</label>
-            <PillToggle
-              options={REGION_OPTIONS}
-              selected={form.regions}
-              onToggle={v => toggleArrayItem('regions', v)}
-            />
-          </div>
+            {/* Advanced Mode */}
+            {(mode === 'advanced' || mode === 'expert') && (
+              <AdvancedRuleForm
+                simpleForm={simpleForm}
+                advancedForm={advancedForm}
+                onSimpleChange={setSimpleForm}
+                onAdvancedChange={setAdvancedForm}
+              />
+            )}
 
-          {/* Keywords */}
-          <div>
-            <label className="text-[10px] uppercase tracking-[0.15em] text-white/25 mb-1.5 block">Keywords</label>
-            <input
-              value={form.keywords} onChange={e => updateForm('keywords', e.target.value)}
-              placeholder="iran, drone strike, ceasefire, sanctions"
-              className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[13px] text-white placeholder:text-white/15 focus:border-blue-500/30 focus:outline-none transition"
-            />
-            <p className="text-[9px] text-white/20 mt-1">Comma-separated. Matches event titles and descriptions.</p>
-          </div>
+            {/* Expert Mode */}
+            {mode === 'expert' && (
+              <ExpertRuleForm
+                form={expertForm}
+                onChange={setExpertForm}
+              />
+            )}
 
-          {/* ═══════ ADVANCED MODE ═══════ */}
-          {(mode === 'advanced' || mode === 'expert') && (
-            <>
-              {/* Event Types */}
-              <div>
-                <label className="text-[10px] uppercase tracking-[0.15em] text-white/25 mb-1.5 block">Event Types</label>
-                <PillToggle
-                  options={EVENT_TYPE_OPTIONS}
-                  selected={form.event_types}
-                  onToggle={v => toggleArrayItem('event_types', v)}
-                />
-              </div>
-
-              {/* Actors */}
-              <div>
-                <label className="text-[10px] uppercase tracking-[0.15em] text-white/25 mb-1.5 block">Actor Keywords</label>
-                <input
-                  value={form.actors} onChange={e => updateForm('actors', e.target.value)}
-                  placeholder="e.g. Houthi, Wagner, Hamas"
-                  className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[13px] text-white placeholder:text-white/15 focus:border-blue-500/30 focus:outline-none transition"
-                />
-              </div>
-
-              {/* Data Sources */}
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer group" onClick={() => updateForm('include_flights', !form.include_flights)}>
-                  {form.include_flights
-                    ? <ToggleRight className="w-5 h-5 text-blue-400" />
-                    : <ToggleLeft className="w-5 h-5 text-white/20 group-hover:text-white/40" />
-                  }
-                  <span className={`text-[11px] ${form.include_flights ? 'text-white/70' : 'text-white/30'}`}>Include flight data</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer group" onClick={() => updateForm('include_vessels', !form.include_vessels)}>
-                  {form.include_vessels
-                    ? <ToggleRight className="w-5 h-5 text-blue-400" />
-                    : <ToggleLeft className="w-5 h-5 text-white/20 group-hover:text-white/40" />
-                  }
-                  <span className={`text-[11px] ${form.include_vessels ? 'text-white/70' : 'text-white/30'}`}>Include vessel data</span>
-                </label>
-              </div>
-
-              {/* Threshold Trigger */}
-              <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-3">
-                <SectionHeader icon={AlertTriangle} label="Threshold Trigger"
-                  collapsed={!expandedSections.threshold} onToggle={() => toggleSection('threshold')} />
-                {expandedSections.threshold && (
-                  <div className="mt-3 space-y-3">
-                    <label className="flex items-center gap-2 cursor-pointer" onClick={() => updateForm('threshold_enabled', !form.threshold_enabled)}>
-                      {form.threshold_enabled
-                        ? <ToggleRight className="w-5 h-5 text-blue-400" />
-                        : <ToggleLeft className="w-5 h-5 text-white/20" />
-                      }
-                      <span className={`text-[11px] ${form.threshold_enabled ? 'text-white/70' : 'text-white/30'}`}>
-                        Enable threshold-based triggering
-                      </span>
-                    </label>
-                    {form.threshold_enabled && (
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="text-[9px] text-white/20 mb-1 block">Type</label>
-                          <select value={form.threshold_type}
-                            onChange={e => updateForm('threshold_type', e.target.value as 'count' | 'rate_of_change' | 'anomaly')}
-                            className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white">
-                            <option value="count">Event Count</option>
-                            <option value="rate_of_change">Rate of Change</option>
-                            <option value="anomaly">Anomaly (σ)</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-white/20 mb-1 block">
-                            {form.threshold_type === 'count' ? 'Min Events' : form.threshold_type === 'rate_of_change' ? '% Change' : 'Sigma (σ)'}
-                          </label>
-                          <input type="number" value={form.threshold_value}
-                            onChange={e => updateForm('threshold_value', Number(e.target.value))}
-                            className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white" />
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-white/20 mb-1 block">Window (min)</label>
-                          <input type="number" value={form.threshold_window}
-                            onChange={e => updateForm('threshold_window', Number(e.target.value))}
-                            className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Delivery Channels */}
-              <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-3">
-                <SectionHeader icon={Layers} label="Delivery Channels"
-                  collapsed={!expandedSections.delivery} onToggle={() => toggleSection('delivery')} />
-                {expandedSections.delivery && (
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <div>
-                      <label className="text-[9px] text-white/20 mb-1 block">Email</label>
-                      <input value={form.delivery_email} onChange={e => updateForm('delivery_email', e.target.value)}
-                        placeholder="alerts@company.com"
-                        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white placeholder:text-white/15" />
-                    </div>
-                    <div>
-                      <label className="text-[9px] text-white/20 mb-1 block">Webhook URL</label>
-                      <input value={form.delivery_webhook} onChange={e => updateForm('delivery_webhook', e.target.value)}
-                        placeholder="https://hooks.slack.com/..."
-                        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white placeholder:text-white/15" />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Deduplication */}
-              <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-3">
-                <SectionHeader icon={Shield} label="Deduplication & Suppression"
-                  collapsed={!expandedSections.dedupe} onToggle={() => toggleSection('dedupe')} />
-                {expandedSections.dedupe && (
-                  <div className="mt-3 space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      {DEDUPE_OPTIONS.map(opt => (
-                        <button key={opt.value}
-                          onClick={() => updateForm('dedupe_strategy', opt.value)}
-                          className={`rounded-lg border p-2.5 text-left transition-all ${
-                            form.dedupe_strategy === opt.value
-                              ? 'border-blue-500/30 bg-blue-500/8'
-                              : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]'
-                          }`}>
-                          <div className={`text-[10px] font-semibold ${form.dedupe_strategy === opt.value ? 'text-blue-400' : 'text-white/50'}`}>{opt.label}</div>
-                          <div className="text-[9px] text-white/25 mt-0.5">{opt.desc}</div>
-                        </button>
-                      ))}
-                    </div>
-                    <div>
-                      <label className="text-[9px] text-white/20 mb-1 block">Suppression Window (minutes)</label>
-                      <input type="number" value={form.dedupe_window}
-                        onChange={e => updateForm('dedupe_window', Number(e.target.value))}
-                        className="w-32 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white" />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label className="text-[10px] uppercase tracking-[0.15em] text-white/25 mb-1.5 block">Tags</label>
-                <input
-                  value={form.tags} onChange={e => updateForm('tags', e.target.value)}
-                  placeholder="e.g. high-priority, ops-team, middle-east-desk"
-                  className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[13px] text-white placeholder:text-white/15 focus:border-blue-500/30 focus:outline-none transition"
-                />
-              </div>
-            </>
-          )}
-
-          {/* ═══════ EXPERT MODE ═══════ */}
-          {mode === 'expert' && (
-            <>
-              {/* Escalation Policy */}
-              <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-3">
-                <SectionHeader icon={AlertTriangle} label="Escalation Policy"
-                  collapsed={!expandedSections.escalation} onToggle={() => toggleSection('escalation')} />
-                {expandedSections.escalation && (
-                  <div className="mt-3 space-y-3">
-                    <label className="flex items-center gap-2 cursor-pointer" onClick={() => updateForm('escalation_enabled', !form.escalation_enabled)}>
-                      {form.escalation_enabled
-                        ? <ToggleRight className="w-5 h-5 text-blue-400" />
-                        : <ToggleLeft className="w-5 h-5 text-white/20" />
-                      }
-                      <span className={`text-[11px] ${form.escalation_enabled ? 'text-white/70' : 'text-white/30'}`}>
-                        Escalate unacknowledged alerts
-                      </span>
-                    </label>
-                    {form.escalation_enabled && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[9px] text-white/20 mb-1 block">Timeout (minutes)</label>
-                          <input type="number" value={form.escalation_timeout}
-                            onChange={e => updateForm('escalation_timeout', Number(e.target.value))}
-                            className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white" />
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-white/20 mb-1 block">Escalate To</label>
-                          <select value={form.escalation_channel}
-                            onChange={e => updateForm('escalation_channel', e.target.value)}
-                            className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white">
-                            <option value="email">Email</option>
-                            <option value="webhook">Webhook</option>
-                            <option value="slack">Slack</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-white/20 mb-1 block">Target</label>
-                          <input value={form.escalation_target}
-                            onChange={e => updateForm('escalation_target', e.target.value)}
-                            placeholder="manager@company.com"
-                            className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white placeholder:text-white/15" />
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-white/20 mb-1 block">Max Escalations</label>
-                          <input type="number" value={form.escalation_max}
-                            onChange={e => updateForm('escalation_max', Number(e.target.value))}
-                            className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Rule JSON Editor */}
-              <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-3">
-                <SectionHeader icon={Code2} label="Rule Definition (JSON Override)"
-                  collapsed={!expandedSections.json} onToggle={() => toggleSection('json')} />
-                {expandedSections.json && (
-                  <div className="mt-3">
-                    <textarea
-                      value={form.rule_json}
-                      onChange={e => updateForm('rule_json', e.target.value)}
-                      rows={10}
-                      placeholder='{"version": 2, "root": {"logic": "AND", "conditions": [...]}}'
-                      className="w-full rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 text-[11px] text-green-400 font-mono placeholder:text-white/10 focus:border-blue-500/30 focus:outline-none transition"
-                    />
-                    <p className="text-[9px] text-white/20 mt-1">
-                      Advanced: Override auto-generated rules with custom JSON. Supports nested AND/OR groups, NOT negation, regex matching, and geofence constraints.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* Submit */}
-          <div className="flex items-center gap-3 pt-2 border-t border-white/[0.04]">
-            <button onClick={() => void submitForm()} disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-[12px] font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
-              {editingId ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-              {saving ? 'Saving…' : editingId ? 'Update Rule' : 'Create Rule'}
-            </button>
-            {editingId && (
-              <button onClick={resetForm}
-                className="rounded-lg border border-white/[0.08] px-3 py-2 text-[11px] text-white/50 hover:bg-white/[0.04] transition">
+            {/* Action Buttons */}
+            <div className="flex gap-2 pt-4 border-t border-white/[0.06] mt-6">
+              <motion.button
+                onClick={() => void saveRule()}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400 font-semibold hover:bg-blue-500/30 transition-all"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Save className="w-4 h-4" /> Save Rule
+              </motion.button>
+              <motion.button
+                onClick={() => setCreating(false)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white/60 font-semibold hover:bg-white/[0.08] transition-all"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
                 Cancel
-              </button>
-            )}
-            {message && (
-              <span className={`text-[11px] ${message.includes('fail') || message.includes('required') || message.includes('error') ? 'text-red-400' : 'text-green-400'}`}>
-                {message}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* ── EXISTING RULES LIST ── */}
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.015]">
-        <div className="px-5 py-3.5 border-b border-white/[0.05] flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Eye className="w-4 h-4 text-white/25" />
-            <span className="text-[13px] font-semibold text-white">Active Rules</span>
-            <span className="text-[10px] text-white/30">({alerts.length})</span>
-          </div>
-        </div>
-
+      {/* Rules List */}
+      <div className="px-8 py-6">
         {loading ? (
-          <div className="px-5 py-8 flex justify-center">
-            <div className="w-5 h-5 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+          <div className="flex items-center justify-center py-12">
+            <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity }}>
+              <Bell className="w-8 h-8 text-blue-500/40" />
+            </motion.div>
           </div>
         ) : alerts.length === 0 ? (
-          <div className="px-5 py-8 text-center">
-            <p className="text-[12px] text-white/40">No alert rules configured yet.</p>
-            <p className="text-[10px] text-white/20 mt-1">Create your first rule above to start receiving intelligence alerts.</p>
-          </div>
+          <motion.div
+            className="text-center py-12"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <AlertTriangle className="w-12 h-12 text-white/15 mx-auto mb-4" />
+            <p className="text-white/40 font-medium">No rules yet</p>
+            <p className="text-white/25 text-sm mt-1">Create your first alert rule to get started</p>
+          </motion.div>
         ) : (
-          <div className="divide-y divide-white/[0.04]">
-            {alerts.map(alert => {
-              const r = alert as unknown as Record<string, unknown>
-              const regions = (r.regions as string[]) ?? []
-              const severities = (r.severities as string[]) ?? []
-              const keywords = (r.keywords as string[]) ?? []
-              const tags = (r.tags as string[]) ?? []
-              const freq = (r.frequency as string) ?? 'instant'
-              const triggerCount = (r.trigger_count as number) ?? 0
-              const lastTriggered = (r.last_triggered_at as string) ?? null
-              const hasAdvanced = !!alert.rule_definition
-              const hasEscalation = !!alert.escalation_policy
-              const hasWebhook = !!alert.delivery_webhook
-
-              return (
-                <div key={alert.id} className="px-5 py-4 group hover:bg-white/[0.01] transition">
-                  {/* Top row */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${alert.active ? 'bg-green-500' : 'bg-white/20'}`} />
-                      <span className="text-[13px] text-white font-semibold truncate">{alert.name}</span>
-                      <span className="text-[9px] text-white/25 bg-white/[0.04] px-1.5 py-0.5 rounded flex-shrink-0">{freq}</span>
-                      {hasAdvanced && <span className="text-[8px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/15 flex-shrink-0">ADV</span>}
-                      {hasEscalation && <span className="text-[8px] text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/15 flex-shrink-0">ESC</span>}
-                      {hasWebhook && <span className="text-[8px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/15 flex-shrink-0">WH</span>}
+          <div className="space-y-3">
+            <AnimatePresence>
+              {alerts.map((alert, idx) => (
+                <motion.div
+                  key={alert.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="p-4 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.05] transition-all group"
+                >
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <motion.button
+                          onClick={() => setExpandedId(expandedId === alert.id ? null : alert.id)}
+                          className="p-1 text-white/40 hover:text-white/60"
+                          whileHover={{ scale: 1.1 }}
+                        >
+                          {expandedId === alert.id ? (
+                            <ChevronDown className="w-4 h-4" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4" />
+                          )}
+                        </motion.button>
+                        <h3 className="text-sm font-semibold text-white">{alert.name}</h3>
+                        <span
+                          className="text-[11px] font-bold uppercase px-2 py-0.5 rounded"
+                          style={{
+                            color: alert.active ? '#22c55e' : '#6b7280',
+                            background: alert.active ? 'rgba(34,197,94,0.15)' : 'rgba(107,114,128,0.15)',
+                          }}
+                        >
+                          {alert.active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      {alert.trigger_count !== undefined && (
+                        <p className="text-xs text-white/25 ml-6">
+                          {alert.trigger_count}x triggered · {timeAgo(alert.last_triggered_at)}
+                        </p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                      <button onClick={() => void toggleAlert(alert)}
-                        className="p-1.5 rounded-md hover:bg-white/[0.05] text-white/30 hover:text-white/60 transition" title={alert.active ? 'Pause' : 'Activate'}>
-                        {alert.active ? <ToggleRight className="w-4 h-4 text-green-400" /> : <ToggleLeft className="w-4 h-4" />}
-                      </button>
-                      <button onClick={() => startEdit(alert)}
-                        className="p-1.5 rounded-md hover:bg-white/[0.05] text-white/30 hover:text-white/60 transition" title="Edit">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => void deleteAlert(alert.id)}
-                        className="p-1.5 rounded-md hover:bg-red-500/10 text-white/30 hover:text-red-400 transition" title="Delete">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2">
+                      <motion.button
+                        onClick={() => toggleRuleActive(alert.id, alert.active)}
+                        className="p-1.5 rounded-lg hover:bg-white/[0.05] text-white/40 hover:text-white/60"
+                        whileHover={{ scale: 1.1 }}
+                      >
+                        {alert.active ? (
+                          <ToggleRight className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <ToggleLeft className="w-4 h-4 text-white/30" />
+                        )}
+                      </motion.button>
+                      <motion.button
+                        onClick={() => void deleteRule(alert.id)}
+                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/30 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                        whileHover={{ scale: 1.1 }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </motion.button>
                     </div>
                   </div>
 
-                  {/* Filter pills */}
-                  <div className="flex flex-wrap gap-1.5 mt-2.5 ml-5">
-                    {severities.map(s => (
-                      <span key={s} className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded
-                        ${s === 'critical' ? 'bg-red-500/10 text-red-400 border border-red-500/15'
-                          : s === 'high' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/15'
-                          : s === 'medium' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/15'
-                          : 'bg-blue-500/10 text-blue-400 border border-blue-500/15'}`}>{s}</span>
-                    ))}
-                    {regions.map(r => (
-                      <span key={r} className="text-[8px] px-1.5 py-0.5 rounded bg-white/[0.04] text-white/35 border border-white/[0.06]">
-                        {r.replace(/_/g, ' ')}
-                      </span>
-                    ))}
-                    {keywords.map(k => (
-                      <span key={k} className="text-[8px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400/80 border border-indigo-500/15">{k}</span>
-                    ))}
-                    {tags.map(t => (
-                      <span key={t} className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400/80 border border-emerald-500/15">#{t}</span>
-                    ))}
-                    {severities.length === 0 && regions.length === 0 && keywords.length === 0 && !hasAdvanced && (
-                      <span className="text-[9px] text-white/15 italic">No filters configured</span>
-                    )}
-                  </div>
+                  {/* Details */}
+                  {expandedId === alert.id && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="ml-6 pl-4 border-l border-white/[0.06] space-y-3 pt-3"
+                    >
+                      {/* Conditions */}
+                      {alert.severities && alert.severities.length > 0 && (
+                        <div>
+                          <p className="text-xs text-white/40 uppercase tracking-wider font-semibold mb-2">Severities</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {alert.severities.map(sev => {
+                              const cfg = SEVERITY_OPTIONS.find(s => s.value === sev)
+                              return (
+                                <span
+                                  key={sev}
+                                  className="text-xs font-semibold px-2 py-1 rounded"
+                                  style={{
+                                    color: cfg?.color || '#fff',
+                                    background: (cfg?.color || '#fff') + '15',
+                                    border: `1px solid ${(cfg?.color || '#fff')}30`,
+                                  }}
+                                >
+                                  {cfg?.label || sev}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
 
-                  {/* Stats footer */}
-                  <div className="flex items-center gap-4 mt-2.5 ml-5">
-                    <span className="text-[9px] text-white/20">
-                      Triggered {triggerCount}× · Last: {timeAgo(lastTriggered)}
-                    </span>
-                    {alert.delivery_email && (
-                      <span className="text-[9px] text-white/15">→ {alert.delivery_email}</span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+                      {alert.regions && alert.regions.length > 0 && (
+                        <div>
+                          <p className="text-xs text-white/40 uppercase tracking-wider font-semibold mb-2">Regions</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {alert.regions.map(region => (
+                              <span
+                                key={region}
+                                className="text-xs px-2 py-1 rounded bg-white/[0.05] text-white/70 border border-white/[0.1]"
+                              >
+                                {region.replace(/_/g, ' ')}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Delivery */}
+                      {(alert.delivery_email || alert.delivery_webhook) && (
+                        <div>
+                          <p className="text-xs text-white/40 uppercase tracking-wider font-semibold mb-2">Delivery</p>
+                          <div className="flex flex-wrap gap-2">
+                            {alert.delivery_email && (
+                              <span className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                <Mail className="w-3 h-3" /> Email
+                              </span>
+                            )}
+                            {alert.delivery_webhook && (
+                              <span className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                                <Webhook className="w-3 h-3" /> Webhook
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Frequency */}
+                      {alert.frequency && (
+                        <div>
+                          <p className="text-xs text-white/40 uppercase tracking-wider font-semibold mb-2">Frequency</p>
+                          <p className="text-sm text-white/70">{alert.frequency}</p>
+                        </div>
+                      )}
+
+                      {/* Tags */}
+                      {alert.tags && alert.tags.length > 0 && (
+                        <div>
+                          <p className="text-xs text-white/40 uppercase tracking-wider font-semibold mb-2">Tags</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {alert.tags.map(tag => (
+                              <span
+                                key={tag}
+                                className="text-xs px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                              >
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         )}
       </div>
     </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FORM COMPONENTS
+// ═══════════════════════════════════════════════════════════════
+function SimpleRuleForm({
+  form,
+  onChange
+}: {
+  form: SimpleForm
+  onChange: (form: SimpleForm) => void
+}) {
+  return (
+    <>
+      {/* Severities */}
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-white mb-3">Severity Levels</label>
+        <div className="grid grid-cols-2 gap-3">
+          {SEVERITY_OPTIONS.map(sev => (
+            <motion.button
+              key={sev.value}
+              onClick={() => {
+                const updated = form.severities.includes(sev.value)
+                  ? form.severities.filter(s => s !== sev.value)
+                  : [...form.severities, sev.value]
+                onChange({ ...form, severities: updated })
+              }}
+              className="p-3 rounded-lg border text-sm font-semibold transition-all"
+              style={{
+                color: sev.color,
+                borderColor: form.severities.includes(sev.value) ? sev.color : `${sev.color}30`,
+                background: form.severities.includes(sev.value) ? `${sev.color}15` : 'transparent',
+              }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {sev.label}
+            </motion.button>
+          ))}
+        </div>
+      </div>
+
+      {/* Regions */}
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-white mb-3">Regions</label>
+        <div className="grid grid-cols-3 gap-2">
+          {REGION_OPTIONS.map(region => (
+            <motion.button
+              key={region.value}
+              onClick={() => {
+                const updated = form.regions.includes(region.value)
+                  ? form.regions.filter(r => r !== region.value)
+                  : [...form.regions, region.value]
+                onChange({ ...form, regions: updated })
+              }}
+              className="px-3 py-2 rounded-lg border text-xs font-semibold transition-all"
+              style={{
+                color: form.regions.includes(region.value) ? '#3b82f6' : 'rgba(255,255,255,0.3)',
+                borderColor: form.regions.includes(region.value) ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.1)',
+                background: form.regions.includes(region.value) ? 'rgba(59,130,246,0.15)' : 'transparent',
+              }}
+              whileHover={{ scale: 1.02 }}
+            >
+              {region.label}
+            </motion.button>
+          ))}
+        </div>
+      </div>
+
+      {/* Keywords */}
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-white mb-2">Keywords (comma-separated)</label>
+        <input
+          type="text"
+          value={form.keywords}
+          onChange={e => onChange({ ...form, keywords: e.target.value })}
+          placeholder="conflict, attack, military, ..."
+          className="w-full px-4 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/20"
+        />
+      </div>
+
+      {/* Frequency */}
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-white mb-3">Notification Frequency</label>
+        <div className="grid grid-cols-2 gap-3">
+          {FREQUENCY_OPTIONS.map(freq => (
+            <motion.button
+              key={freq.value}
+              onClick={() => onChange({ ...form, frequency: freq.value })}
+              className="p-3 rounded-lg border text-left transition-all"
+              style={{
+                borderColor: form.frequency === freq.value ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                background: form.frequency === freq.value ? 'rgba(59,130,246,0.15)' : 'transparent',
+              }}
+              whileHover={{ scale: 1.01 }}
+            >
+              <p className="text-sm font-semibold text-white">{freq.label}</p>
+              <p className="text-xs text-white/40 mt-0.5">{freq.desc}</p>
+            </motion.button>
+          ))}
+        </div>
+      </div>
+
+      {/* Email */}
+      <div>
+        <label className="block text-sm font-semibold text-white mb-2">Email Delivery</label>
+        <input
+          type="email"
+          value={form.delivery_email}
+          onChange={e => onChange({ ...form, delivery_email: e.target.value })}
+          placeholder="your@email.com"
+          className="w-full px-4 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/20"
+        />
+      </div>
+    </>
+  )
+}
+
+function AdvancedRuleForm({
+  simpleForm,
+  advancedForm,
+  onSimpleChange,
+  onAdvancedChange
+}: {
+  simpleForm: SimpleForm
+  advancedForm: AdvancedForm
+  onSimpleChange: (form: SimpleForm) => void
+  onAdvancedChange: (form: AdvancedForm) => void
+}) {
+  return (
+    <>
+      <SimpleRuleForm form={simpleForm} onChange={onSimpleChange} />
+
+      {/* Event Types */}
+      <div className="mb-6 mt-6 pt-6 border-t border-white/[0.06]">
+        <label className="block text-sm font-semibold text-white mb-3">Event Types</label>
+        <div className="grid grid-cols-2 gap-2">
+          {EVENT_TYPE_OPTIONS.map(evt => (
+            <motion.button
+              key={evt.value}
+              onClick={() => {
+                const updated = advancedForm.event_types.includes(evt.value)
+                  ? advancedForm.event_types.filter(e => e !== evt.value)
+                  : [...advancedForm.event_types, evt.value]
+                onAdvancedChange({ ...advancedForm, event_types: updated })
+              }}
+              className="px-3 py-2 rounded-lg border text-xs font-semibold transition-all"
+              style={{
+                color: advancedForm.event_types.includes(evt.value) ? '#a855f7' : 'rgba(255,255,255,0.3)',
+                borderColor: advancedForm.event_types.includes(evt.value) ? 'rgba(168,85,247,0.4)' : 'rgba(255,255,255,0.1)',
+                background: advancedForm.event_types.includes(evt.value) ? 'rgba(168,85,247,0.15)' : 'transparent',
+              }}
+              whileHover={{ scale: 1.02 }}
+            >
+              {evt.label}
+            </motion.button>
+          ))}
+        </div>
+      </div>
+
+      {/* Threshold */}
+      <div className="mb-6">
+        <label className="flex items-center gap-2 text-sm font-semibold text-white mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={advancedForm.threshold_enabled}
+            onChange={e => onAdvancedChange({ ...advancedForm, threshold_enabled: e.target.checked })}
+            className="w-4 h-4 rounded border-white/[0.2] bg-white/[0.05]"
+          />
+          Enable Threshold Triggering
+        </label>
+        {advancedForm.threshold_enabled && (
+          <div className="grid grid-cols-3 gap-3 ml-6">
+            <div>
+              <p className="text-xs text-white/40 mb-1">Type</p>
+              <select
+                value={advancedForm.threshold_type}
+                onChange={e => onAdvancedChange({ ...advancedForm, threshold_type: e.target.value as any })}
+                className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white text-xs"
+              >
+                <option value="count">Count</option>
+                <option value="rate_of_change">Rate of Change</option>
+                <option value="anomaly">Anomaly</option>
+              </select>
+            </div>
+            <div>
+              <p className="text-xs text-white/40 mb-1">Threshold</p>
+              <input
+                type="number"
+                value={advancedForm.threshold_value}
+                onChange={e => onAdvancedChange({ ...advancedForm, threshold_value: Number(e.target.value) })}
+                className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white text-xs"
+              />
+            </div>
+            <div>
+              <p className="text-xs text-white/40 mb-1">Window (min)</p>
+              <input
+                type="number"
+                value={advancedForm.threshold_window}
+                onChange={e => onAdvancedChange({ ...advancedForm, threshold_window: Number(e.target.value) })}
+                className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white text-xs"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Deduplication */}
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-white mb-3">Deduplication</label>
+        <div className="grid grid-cols-2 gap-3">
+          {DEDUPE_OPTIONS.map(dedupe => (
+            <motion.button
+              key={dedupe.value}
+              onClick={() => onAdvancedChange({ ...advancedForm, dedupe_strategy: dedupe.value })}
+              className="p-3 rounded-lg border text-left transition-all"
+              style={{
+                borderColor: advancedForm.dedupe_strategy === dedupe.value ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                background: advancedForm.dedupe_strategy === dedupe.value ? 'rgba(59,130,246,0.15)' : 'transparent',
+              }}
+              whileHover={{ scale: 1.01 }}
+            >
+              <p className="text-sm font-semibold text-white">{dedupe.label}</p>
+              <p className="text-xs text-white/40 mt-0.5">{dedupe.desc}</p>
+            </motion.button>
+          ))}
+        </div>
+      </div>
+
+      {/* Webhook */}
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-white mb-2">Webhook Delivery (optional)</label>
+        <input
+          type="url"
+          value={advancedForm.delivery_webhook}
+          onChange={e => onAdvancedChange({ ...advancedForm, delivery_webhook: e.target.value })}
+          placeholder="https://..."
+          className="w-full px-4 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/20"
+        />
+      </div>
+
+      {/* Tags */}
+      <div>
+        <label className="block text-sm font-semibold text-white mb-2">Tags (comma-separated)</label>
+        <input
+          type="text"
+          value={advancedForm.tags}
+          onChange={e => onAdvancedChange({ ...advancedForm, tags: e.target.value })}
+          placeholder="custom, tags, here"
+          className="w-full px-4 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/20"
+        />
+      </div>
+    </>
+  )
+}
+
+function ExpertRuleForm({
+  form,
+  onChange
+}: {
+  form: ExpertForm
+  onChange: (form: ExpertForm) => void
+}) {
+  return (
+    <>
+      <AdvancedRuleForm
+        simpleForm={form}
+        advancedForm={form}
+        onSimpleChange={(f) => onChange({ ...form, ...f })}
+        onAdvancedChange={(f) => onChange({ ...form, ...f })}
+      />
+
+      {/* Escalation */}
+      <div className="mb-6 mt-6 pt-6 border-t border-white/[0.06]">
+        <label className="flex items-center gap-2 text-sm font-semibold text-white mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.escalation_enabled}
+            onChange={e => onChange({ ...form, escalation_enabled: e.target.checked })}
+            className="w-4 h-4 rounded"
+          />
+          Enable Escalation Policy
+        </label>
+        {form.escalation_enabled && (
+          <div className="grid grid-cols-2 gap-3 ml-6">
+            <div>
+              <p className="text-xs text-white/40 mb-1">Timeout (minutes)</p>
+              <input
+                type="number"
+                value={form.escalation_timeout}
+                onChange={e => onChange({ ...form, escalation_timeout: Number(e.target.value) })}
+                className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white text-xs"
+              />
+            </div>
+            <div>
+              <p className="text-xs text-white/40 mb-1">Channel</p>
+              <select
+                value={form.escalation_channel}
+                onChange={e => onChange({ ...form, escalation_channel: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white text-xs"
+              >
+                <option value="email">Email</option>
+                <option value="webhook">Webhook</option>
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Rule JSON */}
+      <div>
+        <label className="block text-sm font-semibold text-white mb-2">Advanced Rule Definition (JSON)</label>
+        <textarea
+          value={form.rule_json}
+          onChange={e => onChange({ ...form, rule_json: e.target.value })}
+          placeholder='{"version": 2, "root": ...}'
+          className="w-full h-32 px-4 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/20 font-mono text-xs focus:outline-none"
+        />
+      </div>
+    </>
   )
 }

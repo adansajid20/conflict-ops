@@ -6,18 +6,19 @@ import { useRef } from 'react'
 import {
   Shield, ArrowRight, Globe, Zap, BarChart3, Bell, Eye, Users,
   Lock, Radio, TrendingUp, Map, Brain, FileText, Crosshair, Plane,
+  Sparkles, Rocket,
 } from 'lucide-react'
 
 function BlurIn({ children, delay = 0, className }: { children: React.ReactNode; delay?: number; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
-  const isInView = useInView(ref, { once: true, margin: '-40px' })
-  return <motion.div ref={ref} initial={{ opacity: 0, filter: 'blur(10px)', y: 16 }} animate={isInView ? { opacity: 1, filter: 'blur(0px)', y: 0 } : {}} transition={{ duration: 0.7, delay }} className={className}>{children}</motion.div>
+  const isInView = useInView(ref, { once: true, margin: '-50px' })
+  return <motion.div ref={ref} initial={{ opacity: 0, filter: 'blur(12px)', y: 20 }} animate={isInView ? { opacity: 1, filter: 'blur(0px)', y: 0 } : {}} transition={{ duration: 0.8, delay, ease: [0.16, 1, 0.3, 1] }} className={className}>{children}</motion.div>
 }
 
 function FadeUp({ children, delay = 0, className }: { children: React.ReactNode; delay?: number; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
   const isInView = useInView(ref, { once: true, margin: '-50px' })
-  return <motion.div ref={ref} initial={{ opacity: 0, y: 24 }} animate={isInView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5, delay }} className={className}>{children}</motion.div>
+  return <motion.div ref={ref} initial={{ opacity: 0, y: 28 }} animate={isInView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, delay, ease: [0.16, 1, 0.3, 1] }} className={className}>{children}</motion.div>
 }
 
 const MODULES = [
@@ -133,26 +134,35 @@ export default function FeaturesPage() {
       </nav>
 
       {/* Hero */}
-      <section className="pt-32 pb-20 px-6">
-        <div className="max-w-4xl mx-auto text-center">
+      <section className="pt-32 pb-24 px-6 relative">
+        {/* Background accents */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute top-0 left-1/3 w-[600px] h-[400px] bg-blue-600/[0.08] rounded-full blur-[150px]" />
+          <div className="absolute bottom-0 right-1/4 w-[500px] h-[400px] bg-cyan-600/[0.06] rounded-full blur-[130px]" />
+        </div>
+
+        <div className="max-w-4xl mx-auto text-center relative z-10">
           <BlurIn>
-            <p className="text-sm font-medium text-blue-400 tracking-wide uppercase mb-5">Platform Capabilities</p>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">
-              14 integrated intelligence modules.
+            <motion.p className="text-sm font-bold text-blue-400 tracking-widest uppercase mb-6 flex items-center justify-center gap-2">
+              <Sparkles size={14} /> Platform Capabilities
+            </motion.p>
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-8 leading-tight">
+              <span className="bg-gradient-to-b from-white via-white/95 to-white/70 bg-clip-text text-transparent">
+                14 integrated intelligence modules.
+              </span>
             </h1>
-            <p className="text-lg text-white/40 max-w-2xl mx-auto mb-10 leading-relaxed">
-              Every tool a serious analyst needs — from real-time event feeds to AI-powered prediction engines.
-              No vendor lock-in. No six-month procurement cycle.
+            <p className="text-lg md:text-xl text-white/45 max-w-3xl mx-auto mb-12 leading-relaxed">
+              Every tool a serious analyst needs — from real-time event feeds to AI-powered prediction engines. No vendor lock-in. No procurement circus.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                <Link href="/sign-up" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-[15px] font-semibold bg-white text-gray-900 hover:bg-gray-100 transition-colors">
-                  Start Free <ArrowRight size={16} />
+              <motion.div whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }}>
+                <Link href="/sign-up" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl text-[15px] font-bold bg-gradient-to-r from-white to-blue-50 text-gray-900 hover:from-blue-50 hover:to-white transition-all shadow-lg shadow-white/20">
+                  Start Free <Rocket size={16} />
                 </Link>
               </motion.div>
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Link href="/pricing" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-[15px] font-medium border border-white/[0.12] text-white/70 hover:text-white hover:border-white/25 transition-all">
-                  View Pricing
+              <motion.div whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.95 }}>
+                <Link href="/pricing" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl text-[15px] font-semibold border-2 border-white/[0.15] text-white/70 hover:text-white hover:border-white/30 transition-all backdrop-blur">
+                  View Pricing <ArrowRight size={16} />
                 </Link>
               </motion.div>
             </div>
@@ -161,34 +171,46 @@ export default function FeaturesPage() {
       </section>
 
       {/* Module Grid */}
-      <section className="max-w-7xl mx-auto px-6 pb-32">
-        <div className="space-y-5">
+      <section className="max-w-7xl mx-auto px-6 pb-40">
+        <div className="space-y-6">
           {MODULES.map((mod, i) => {
             const Icon = mod.icon
             const isEven = i % 2 === 0
             return (
-              <FadeUp key={mod.title} delay={0}>
+              <FadeUp key={mod.title} delay={i * 0.05}>
                 <motion.div
-                  whileHover={{ borderColor: 'rgba(255,255,255,0.1)' }}
-                  className="rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden"
+                  whileHover={{ borderColor: 'rgba(255,255,255,0.15)', y: -2 }}
+                  transition={{ duration: 0.3 }}
+                  className="rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.03] to-white/[0.005] hover:from-white/[0.06] hover:to-white/[0.01] overflow-hidden transition-all duration-300"
                 >
                   <div className={`flex flex-col ${isEven ? 'md:flex-row' : 'md:flex-row-reverse'} items-stretch`}>
                     {/* Icon side */}
-                    <div className="flex-shrink-0 w-full md:w-48 p-8 flex items-center justify-center bg-white/[0.02]">
-                      <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${mod.color} flex items-center justify-center`}>
-                        <Icon size={28} className="text-white" />
-                      </div>
-                    </div>
+                    <motion.div
+                      className="flex-shrink-0 w-full md:w-56 p-10 flex items-center justify-center bg-gradient-to-br from-white/[0.03] to-transparent"
+                      whileHover={{ scale: 1.05 }}
+                    >
+                      <motion.div
+                        className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${mod.color} flex items-center justify-center shadow-lg shadow-black/30`}
+                        whileHover={{ scale: 1.1, rotate: 5 }}
+                        transition={{ type: 'spring' as const, stiffness: 400 }}
+                      >
+                        <Icon size={32} className="text-white" />
+                      </motion.div>
+                    </motion.div>
                     {/* Content side */}
-                    <div className="flex-1 p-8">
-                      <h3 className="text-xl font-semibold text-white mb-3">{mod.title}</h3>
-                      <p className="text-sm text-white/40 leading-relaxed mb-5">{mod.desc}</p>
-                      <div className="flex flex-wrap gap-2">
+                    <div className="flex-1 p-10 flex flex-col justify-center">
+                      <h3 className="text-2xl font-bold text-white mb-4">{mod.title}</h3>
+                      <p className="text-sm md:text-base text-white/50 leading-relaxed mb-6">{mod.desc}</p>
+                      <div className="flex flex-wrap gap-2.5">
                         {mod.highlights.map((h) => (
-                          <span key={h} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border border-white/[0.08] text-white/50 bg-white/[0.02]">
-                            <span className="w-1 h-1 rounded-full bg-blue-400/60" />
+                          <motion.span
+                            key={h}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold border border-white/[0.1] text-white/60 bg-white/[0.03] hover:bg-white/[0.08] transition-colors"
+                            whileHover={{ scale: 1.05 }}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400/80" />
                             {h}
-                          </span>
+                          </motion.span>
                         ))}
                       </div>
                     </div>
@@ -201,13 +223,17 @@ export default function FeaturesPage() {
       </section>
 
       {/* Bottom CTA */}
-      <section className="border-t border-white/[0.04] py-24 px-6">
-        <BlurIn className="text-center max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight mb-4">Ready to see it in action?</h2>
-          <p className="text-lg text-white/40 mb-8">Free tier includes the intel feed, conflict map, and 3 alerts. No card required.</p>
-          <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="inline-block">
-            <Link href="/sign-up" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl text-base font-semibold bg-white text-gray-900 hover:bg-gray-100 transition-colors shadow-[0_0_40px_rgba(255,255,255,0.06)]">
-              Start Free <ArrowRight size={16} />
+      <section className="border-t border-white/[0.08] py-32 px-6 relative overflow-hidden">
+        {/* Background glow */}
+        <div className="absolute inset-0 bg-gradient-to-t from-blue-600/[0.05] via-transparent to-transparent" />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-blue-500/[0.04] rounded-full blur-[140px]" />
+
+        <BlurIn className="text-center max-w-4xl mx-auto relative z-10">
+          <h2 className="text-4xl md:text-5xl font-bold text-white tracking-tight mb-6">Ready to see it in action?</h2>
+          <p className="text-lg text-white/40 mb-10 leading-relaxed">Free tier includes the real-time intel feed, interactive conflict map, and 3 custom alerts. No credit card required.</p>
+          <motion.div whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="inline-block">
+            <Link href="/sign-up" className="inline-flex items-center gap-2.5 px-10 py-4.5 rounded-xl text-base font-bold bg-gradient-to-r from-white to-blue-50 text-gray-900 hover:from-blue-50 hover:to-white transition-all shadow-[0_0_60px_rgba(255,255,255,0.1)]">
+              Start Free <Rocket size={18} />
             </Link>
           </motion.div>
         </BlurIn>
