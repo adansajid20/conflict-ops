@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback, MouseEvent } from 'react'
 import { motion, AnimatePresence, useInView, useSpring, useTransform, useMotionValue, MotionValue } from 'framer-motion'
 
 /* ------------------------------------------------------------------ */
@@ -180,26 +180,363 @@ function Reveal({ children, delay = 0, className = '' }: { children: React.React
 }
 
 /* ------------------------------------------------------------------ */
-/*  Glass card                                                         */
+/*  TiltCard — 3D Parallax Hover (PREMIUM #1)                         */
 /* ------------------------------------------------------------------ */
-function GlassCard({ children, className = '', delay = 0, glow }: { children: React.ReactNode; className?: string; delay?: number; glow?: string }) {
+function TiltCard({ children, className = '', delay = 0, glow }: { children: React.ReactNode; className?: string; delay?: number; glow?: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
+  const rotateX = useTransform(y, [-100, 100], [4, -4])
+  const rotateY = useTransform(x, [-100, 100], [-4, 4])
+  const [gradientPos, setGradientPos] = useState({ x: 50, y: 50 })
+
+  const handleMouseMove = useCallback((e: MouseEvent<HTMLDivElement>) => {
+    if (!ref.current) return
+    const rect = ref.current.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const px = e.clientX - cx
+    const py = e.clientY - cy
+    x.set(px)
+    y.set(py)
+    setGradientPos({
+      x: ((e.clientX - rect.left) / rect.width) * 100,
+      y: ((e.clientY - rect.top) / rect.height) * 100,
+    })
+  }, [x, y])
+
+  const handleMouseLeave = useCallback(() => {
+    x.set(0)
+    y.set(0)
+    setGradientPos({ x: 50, y: 50 })
+  }, [x, y])
+
   return (
     <Reveal delay={delay} className={className}>
       <motion.div
-        className="relative rounded-2xl overflow-hidden"
+        ref={ref}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        className="relative rounded-2xl overflow-hidden cursor-pointer"
         style={{
           background: 'linear-gradient(135deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%)',
           border: '1px solid rgba(255,255,255,0.06)',
           padding: '22px',
+          perspective: '800px',
+          rotateX,
+          rotateY,
         }}
         whileHover={{ y: -2, borderColor: 'rgba(255,255,255,0.12)', transition: { duration: 0.25 } }}>
+
         {/* top edge highlight */}
         <div className="absolute top-0 inset-x-0 h-px" style={{ background: 'linear-gradient(90deg, transparent 10%, rgba(255,255,255,0.08) 50%, transparent 90%)' }} />
+
+        {/* radial gradient highlight following cursor */}
+        <motion.div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(600px circle at ${gradientPos.x}% ${gradientPos.y}%, rgba(255,255,255,0.08), transparent 80%)`,
+          }}
+        />
+
         {/* optional colored glow */}
         {glow && <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full opacity-[0.03] pointer-events-none" style={{ background: `radial-gradient(circle, ${glow}, transparent)` }} />}
-        {children}
+
+        <motion.div style={{ position: 'relative', zIndex: 10 }}>
+          {children}
+        </motion.div>
       </motion.div>
     </Reveal>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  InteractiveAreaChart — Stacked Area SVG (PREMIUM #2)              */
+/* ------------------------------------------------------------------ */
+function InteractiveAreaChart({ data }: { data: DayVolume[] }) {
+  const ref = useRef<SVGSVGElement>(null)
+  const inView = useInView(ref, { once: true, margin: '-20px' })
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
+
+  const w = Math.max(data.length * 10, 200)
+  const h = 130
+  const maxTotal = Math.max(...data.map(d => d.total), 1)
+  const px = (i: number) => (i / Math.max(data.length - 1, 1)) * w
+  const py = (val: number) => h - (val / maxTotal) * (h - 10)
+
+  const buildPath = (getter: (d: DayVolume) => number, baselineGetter: (d: DayVolume) => number): string => {
+    let path = `M${px(0)},${py(baselineGetter(data[0]!))}`
+    for (let i = 0; i < data.length; i++) {
+      const xp = px(i)
+      const yp = py(getter(data[i]!) + baselineGetter(data[i]!))
+      path += ` L${xp},${yp}`
+    }
+    for (let i = data.length - 1; i >= 0; i--) {
+      const xp = px(i)
+      const yp = py(baselineGetter(data[i]!))
+      path += ` L${xp},${yp}`
+    }
+    return path + ' Z'
+  }
+
+  const baseline = (d: DayVolume) => 0
+  const lowBaseline = (d: DayVolume) => d.low
+  const mediumBaseline = (d: DayVolume) => d.low + d.medium
+  const highBaseline = (d: DayVolume) => d.low + d.medium + d.high
+
+  const areas = [
+    { path: buildPath(d => d.low, baseline), color: '#22c55e', label: 'Low' },
+    { path: buildPath(d => d.medium, lowBaseline), color: '#eab308', label: 'Medium' },
+    { path: buildPath(d => d.high, mediumBaseline), color: '#f97316', label: 'High' },
+    { path: buildPath(d => d.critical, highBaseline), color: '#ef4444', label: 'Critical' },
+  ]
+
+  return (
+    <div className="relative">
+      <svg ref={ref} width={w + 20} height={h + 40} className="overflow-visible" style={{ maxWidth: '100%', height: 'auto' }}>
+        <defs>
+          {areas.map((a, i) => (
+            <linearGradient key={i} id={`grad-${i}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={a.color} stopOpacity="0.3" />
+              <stop offset="100%" stopColor={a.color} stopOpacity="0" />
+            </linearGradient>
+          ))}
+        </defs>
+
+        {areas.map((a, i) => (
+          <motion.path
+            key={i}
+            d={a.path}
+            fill={`url(#grad-${i})`}
+            initial={{ opacity: 0 }}
+            animate={inView ? { opacity: 1 } : {}}
+            transition={{ duration: 0.8, delay: i * 0.15 }}
+          />
+        ))}
+
+        {areas.map((a, i) => (
+          <motion.path
+            key={`stroke-${i}`}
+            d={a.path.replace('Z', '')}
+            fill="none"
+            stroke={a.color}
+            strokeWidth="2"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={inView ? { pathLength: 1, opacity: 1 } : {}}
+            transition={{ duration: 1.2, delay: i * 0.1 }}
+          />
+        ))}
+
+        {hoveredIndex !== null && (
+          <motion.line
+            x1={px(hoveredIndex)}
+            y1="0"
+            x2={px(hoveredIndex)}
+            y2={h}
+            stroke="rgba(255,255,255,0.2)"
+            strokeWidth="1"
+            strokeDasharray="4,4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          />
+        )}
+
+        <rect
+          width={w}
+          height={h}
+          fill="transparent"
+          onMouseMove={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            const relX = e.clientX - rect.left
+            const idx = Math.round((relX / w) * (data.length - 1))
+            setHoveredIndex(Math.max(0, Math.min(idx, data.length - 1)))
+            setTooltipPos({ x: relX, y: e.clientY - rect.top })
+          }}
+          onMouseLeave={() => setHoveredIndex(null)}
+        />
+      </svg>
+
+      {hoveredIndex !== null && data[hoveredIndex] && (
+        <motion.div
+          className="absolute bg-black/90 text-white text-xs rounded-lg p-3 pointer-events-none z-50"
+          style={{
+            left: `${(hoveredIndex / Math.max(data.length - 1, 1)) * 100}%`,
+            top: '-60px',
+            transform: 'translateX(-50%)',
+          }}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}>
+          <div className="font-semibold">{data[hoveredIndex]!.date}</div>
+          <div className="text-white/70 text-[11px]">Total: {data[hoveredIndex]!.total}</div>
+          <div className="text-red-400/70 text-[11px]">{data[hoveredIndex]!.fatalities} fatalities</div>
+          <div className="text-[10px] mt-1 space-y-0.5">
+            <div className="text-emerald-400">Low: {data[hoveredIndex]!.low}</div>
+            <div className="text-yellow-400">Med: {data[hoveredIndex]!.medium}</div>
+            <div className="text-orange-400">High: {data[hoveredIndex]!.high}</div>
+            <div className="text-red-400">Crit: {data[hoveredIndex]!.critical}</div>
+          </div>
+        </motion.div>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  AnimatedDonut — SVG Circle Segments (PREMIUM #3)                  */
+/* ------------------------------------------------------------------ */
+function AnimatedDonut({ segments, radius = 60, cx = 70, cy = 70, label = '' }: {
+  segments: { value: number; max: number; color: string; label?: string }[]
+  radius?: number
+  cx?: number
+  cy?: number
+  label?: string
+}) {
+  const ref = useRef<SVGSVGElement>(null)
+  const inView = useInView(ref, { once: true, margin: '-20px' })
+  const circumference = 2 * Math.PI * radius
+
+  let currentOffset = 0
+  const normalizedSegments = segments.map(seg => {
+    const ratio = seg.value / seg.max
+    const length = ratio * circumference
+    const offset = currentOffset
+    currentOffset += length
+    return { ...seg, length, offset }
+  })
+
+  const pct = segments.length > 0 ? Math.round((segments[0]!.value / segments[0]!.max) * 100) : 0
+
+  return (
+    <svg ref={ref} width={cx * 2} height={cy * 2} viewBox={`0 0 ${cx * 2} ${cy * 2}`} className="overflow-visible">
+      {normalizedSegments.map((seg, i) => (
+        <motion.circle
+          key={i}
+          cx={cx}
+          cy={cy}
+          r={radius}
+          fill="none"
+          stroke={seg.color}
+          strokeWidth="12"
+          strokeDasharray={seg.length}
+          strokeDashoffset={circumference}
+          strokeLinecap="round"
+          initial={{ strokeDashoffset: circumference }}
+          animate={inView ? { strokeDashoffset: circumference - seg.length } : {}}
+          transition={{ ...SPRING_SMOOTH, delay: i * 0.1 }}
+          style={{ transform: `rotate(-90deg)`, transformOrigin: `${cx}px ${cy}px` }}
+        />
+      ))}
+      {label && (
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" className="text-xs font-bold" fill="rgba(255,255,255,0.7)">
+          {label}
+        </text>
+      )}
+    </svg>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  HeatmapGrid — Color-intensity grid (PREMIUM #4)                   */
+/* ------------------------------------------------------------------ */
+function HeatmapGrid({ rows, metrics }: {
+  rows: { label: string; values: number[] }[]
+  metrics: { label: string; color: string }[]
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const inView = useInView(ref, { once: true, margin: '-20px' })
+
+  // Normalize each column to 0-1
+  const normalized = rows.map(row => ({
+    ...row,
+    values: row.values.map((v, colIdx) => {
+      const colValues = rows.map(r => r.values[colIdx] ?? 0)
+      const max = Math.max(...colValues, 1)
+      return max > 0 ? v / max : 0
+    }),
+  }))
+
+  return (
+    <div ref={ref} className="overflow-x-auto">
+      <div className="inline-block min-w-full">
+        {/* Header */}
+        <div className="flex mb-1">
+          <div className="w-32 flex-shrink-0 text-[9px] uppercase tracking-[0.15em] text-white/12 font-medium py-2 px-2" />
+          {metrics.map((m, i) => (
+            <div key={i} className="w-24 flex-shrink-0 text-[9px] uppercase tracking-[0.15em] text-white/12 font-medium py-2 px-2 text-center">
+              {m.label}
+            </div>
+          ))}
+        </div>
+
+        {/* Rows */}
+        {normalized.map((row, rowIdx) => (
+          <motion.div
+            key={rowIdx}
+            className="flex mb-1 rounded-lg overflow-hidden hover:bg-white/[0.04] transition-colors"
+            initial={{ opacity: 0, x: -20 }}
+            animate={inView ? { opacity: 1, x: 0 } : {}}
+            transition={{ ...SPRING_SMOOTH, delay: rowIdx * 0.04 }}>
+            <div className="w-32 flex-shrink-0 text-[11px] text-white/50 py-2 px-2 truncate font-medium">
+              {row.label}
+            </div>
+            {row.values.map((normVal, colIdx) => (
+              <motion.div
+                key={colIdx}
+                className="w-24 flex-shrink-0 py-2 px-2 flex items-center justify-center text-[12px] font-semibold text-white/70 rounded-sm relative"
+                style={{
+                  backgroundColor: `rgba(${
+                    metrics[colIdx]!.color === '#3b82f6' ? '59,130,246' :
+                    metrics[colIdx]!.color === '#ef4444' ? '239,68,68' :
+                    metrics[colIdx]!.color === '#f97316' ? '249,115,22' :
+                    metrics[colIdx]!.color === '#eab308' ? '234,179,8' :
+                    metrics[colIdx]!.color === '#a78bfa' ? '167,139,250' :
+                    '100,116,139'
+                  },${0.02 + normVal * 0.58})`,
+                }}
+                initial={{ opacity: 0 }}
+                animate={inView ? { opacity: 1 } : {}}
+                transition={{ delay: (rowIdx * metrics.length + colIdx) * 0.02 }}>
+                {rows[rowIdx]!.values[colIdx]}
+              </motion.div>
+            ))}
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  LivePulse — Data Freshness Indicator (PREMIUM #5)                 */
+/* ------------------------------------------------------------------ */
+function LivePulse({ generatedAt }: { generatedAt: string }) {
+  const [minAgo, setMinAgo] = useState(0)
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date()
+      const gen = new Date(generatedAt)
+      const diff = Math.floor((now.getTime() - gen.getTime()) / 60000)
+      setMinAgo(Math.max(0, diff))
+    }
+    updateTime()
+    const iv = setInterval(updateTime, 30000)
+    return () => clearInterval(iv)
+  }, [generatedAt])
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative w-2 h-2">
+        <motion.div
+          className="absolute inset-0 rounded-full bg-emerald-400"
+          animate={{ scale: [1, 2.5], opacity: [1, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        />
+        <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-lg shadow-emerald-400/50" />
+      </div>
+      <span className="text-[10px] text-white/40 font-medium">Live · Updated {minAgo}m ago</span>
+    </div>
   )
 }
 
@@ -347,19 +684,22 @@ export function TrendsClient() {
                 <span className="mx-2 text-white/[0.06]">|</span>{new Date(data.generated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
-            <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}>
-              {[7, 30, 90].map(d => (
-                <motion.button key={d} onClick={() => setDays(d)}
-                  className={`px-4 py-2 rounded-lg text-[12px] font-semibold cursor-pointer relative ${days === d ? 'text-blue-400' : 'text-white/25'}`}
-                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
-                  {days === d && (
-                    <motion.div layoutId="dayPill" className="absolute inset-0 rounded-lg"
-                      style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.2)', boxShadow: '0 0 20px rgba(59,130,246,0.1)' }}
-                      transition={SPRING_SNAPPY} />
-                  )}
-                  <span className="relative z-10">{d}d</span>
-                </motion.button>
-              ))}
+            <div className="flex items-center gap-4">
+              <LivePulse generatedAt={data.generated_at} />
+              <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                {[7, 30, 90].map(d => (
+                  <motion.button key={d} onClick={() => setDays(d)}
+                    className={`px-4 py-2 rounded-lg text-[12px] font-semibold cursor-pointer relative ${days === d ? 'text-blue-400' : 'text-white/25'}`}
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
+                    {days === d && (
+                      <motion.div layoutId="dayPill" className="absolute inset-0 rounded-lg"
+                        style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.2)', boxShadow: '0 0 20px rgba(59,130,246,0.1)' }}
+                        transition={SPRING_SNAPPY} />
+                    )}
+                    <span className="relative z-10">{d}d</span>
+                  </motion.button>
+                ))}
+              </div>
             </div>
           </div>
         </Reveal>
@@ -400,26 +740,10 @@ export function TrendsClient() {
 
         {/* ========== 2. EVENT VOLUME + ESCALATION ========== */}
         <div className="grid grid-cols-[1.5fr_1fr] gap-4">
-          <GlassCard delay={0.1} glow="#3b82f6">
+          <TiltCard delay={0.1} glow="#3b82f6">
             <SH title="Event Volume by Severity" sub={`Daily breakdown — ${days}-day window`} />
             <div className="overflow-x-auto">
-              <div className="flex items-end gap-[3px]" style={{ height: 130, minWidth: Math.max(dv.length * 10, 200) }}>
-                {dv.map((day, di) => {
-                  const max = Math.max(...dv.map(d => d.total), 1)
-                  const bw = Math.max(Math.floor(560 / Math.max(dv.length, 1)), 4)
-                  const stacks = (['critical', 'high', 'medium', 'low'] as const).map(s => ({ sev: s, h: Math.round((day[s] / max) * 130) })).filter(s => s.h > 0)
-                  let cumDelay = di * 0.012
-                  return (
-                    <div key={day.date} className="flex flex-col justify-end" style={{ width: bw }}
-                      title={`${day.date}\n${day.total} events · ${day.fatalities} fatalities`}>
-                      {stacks.map(s => {
-                        cumDelay += 0.01
-                        return <AnimBar key={s.sev} height={s.h} color={SEV[s.sev]} delay={cumDelay} />
-                      })}
-                    </div>
-                  )
-                })}
-              </div>
+              <InteractiveAreaChart data={dv} />
             </div>
             <div className="flex gap-5 mt-4 pt-3 border-t border-white/[0.04]">
               {(['critical', 'high', 'medium', 'low'] as const).map(s => (
@@ -429,9 +753,9 @@ export function TrendsClient() {
                 </div>
               ))}
             </div>
-          </GlassCard>
+          </TiltCard>
 
-          <GlassCard delay={0.15} glow="#f97316">
+          <TiltCard delay={0.15} glow="#f97316">
             <SH title="Escalation Monitor" sub="Country threat levels from event data" />
             <div className="space-y-1.5 max-h-[310px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
               {et.length > 0 ? et.slice(0, 12).map((entry, i) => (
@@ -455,11 +779,11 @@ export function TrendsClient() {
                 </Reveal>
               )) : <p className="text-white/10 text-[11px] text-center py-6">No escalation data</p>}
             </div>
-          </GlassCard>
+          </TiltCard>
         </div>
 
         {/* ========== 3. CASUALTY TRACKER ========== */}
-        <GlassCard delay={0.1} glow="#ef4444">
+        <TiltCard delay={0.1} glow="#ef4444">
           <SH title="Casualty & Impact Tracker" sub="Fatality estimates and humanitarian indicators extracted from event data" />
           <div className="grid grid-cols-4 gap-6">
             <div>
@@ -512,10 +836,10 @@ export function TrendsClient() {
               </div>
             </div>
           )}
-        </GlassCard>
+        </TiltCard>
 
         {/* ========== 4. ATTACK PATTERNS ========== */}
-        <GlassCard delay={0.1} glow="#f97316">
+        <TiltCard delay={0.1} glow="#f97316">
           <SH title="Attack Pattern Analysis" sub="Event type breakdown with trend comparison vs prior period" />
           <div className="grid grid-cols-[1fr_1fr] gap-8">
             <div>
@@ -553,50 +877,29 @@ export function TrendsClient() {
               })}
             </div>
           </div>
-        </GlassCard>
+        </TiltCard>
 
-        {/* ========== 5. REGIONAL THREAT MATRIX ========== */}
-        <GlassCard delay={0.1} glow="#eab308">
+        {/* ========== 5. REGIONAL THREAT MATRIX (HEATMAP) ========== */}
+        <TiltCard delay={0.1} glow="#eab308">
           <SH title="Regional Threat Matrix" sub="Multi-dimensional threat assessment across severity, escalation, casualties, and displacement" />
-          <div className="overflow-x-auto">
-            <div className="grid grid-cols-[1fr_60px_60px_65px_60px_60px_50px_55px_85px] gap-2 mb-3 text-[9px] uppercase tracking-[0.15em] text-white/12 font-medium pb-2 border-b border-white/[0.04]">
-              <div>Region</div><div className="text-right">Events</div><div className="text-right">Critical</div>
-              <div className="text-right">Fatalities</div><div className="text-right">Escal.</div>
-              <div className="text-right">Displac.</div><div className="text-right">Types</div>
-              <div className="text-right">Countries</div><div className="text-right">Threat</div>
-            </div>
-            {rtm.map((row, ri) => {
-              const sc = row.threat_score >= 70 ? '#ef4444' : row.threat_score >= 40 ? '#f97316' : row.threat_score >= 20 ? '#eab308' : '#22c55e'
-              return (
-                <Reveal key={row.region} delay={ri * 0.04}>
-                  <motion.div className="grid grid-cols-[1fr_60px_60px_65px_60px_60px_50px_55px_85px] gap-2 py-[7px] px-2 rounded-lg items-center"
-                    whileHover={{ backgroundColor: 'rgba(255,255,255,0.025)' }}>
-                    <span className="text-[12px] text-white/55 truncate font-medium">{row.region.replace(/_/g, ' ')}</span>
-                    <span className="text-[12px] text-white/45 text-right font-mono">{row.events}</span>
-                    <span className="text-[12px] text-red-400/60 text-right font-mono">{row.critical}</span>
-                    <span className="text-[12px] text-red-400/40 text-right font-mono">{row.fatalities}</span>
-                    <span className="text-[12px] text-orange-400/40 text-right font-mono">{row.escalation_events}</span>
-                    <span className="text-[12px] text-purple-400/40 text-right font-mono">{row.displacement_events}</span>
-                    <span className="text-[12px] text-white/25 text-right font-mono">{row.attack_types}</span>
-                    <span className="text-[12px] text-white/25 text-right font-mono">{row.countries}</span>
-                    <div className="flex items-center gap-2 justify-end">
-                      <div className="w-14 h-[5px] bg-white/[0.03] rounded-full overflow-hidden">
-                        <AnimProgress pct={row.threat_score} color={sc} delay={ri * 0.05} />
-                      </div>
-                      <motion.span className="text-[12px] font-bold font-mono w-6 text-right" style={{ color: sc }}
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: ri * 0.05 + 0.3 }}>
-                        {row.threat_score}
-                      </motion.span>
-                    </div>
-                  </motion.div>
-                </Reveal>
-              )
-            })}
-          </div>
-        </GlassCard>
+          <HeatmapGrid
+            rows={rtm.map(r => ({
+              label: r.region.replace(/_/g, ' '),
+              values: [r.events, r.critical, r.fatalities, r.escalation_events, r.displacement_events, r.threat_score],
+            }))}
+            metrics={[
+              { label: 'Events', color: '#3b82f6' },
+              { label: 'Critical', color: '#ef4444' },
+              { label: 'Fatalities', color: '#f97316' },
+              { label: 'Escal.', color: '#eab308' },
+              { label: 'Displac.', color: '#a78bfa' },
+              { label: 'Threat', color: '#ef4444' },
+            ]}
+          />
+        </TiltCard>
 
         {/* ========== 6. ACTOR INTELLIGENCE ========== */}
-        <GlassCard delay={0.1} glow="#a78bfa">
+        <TiltCard delay={0.1} glow="#a78bfa">
           <SH title="Actor Intelligence" sub="Key actors extracted from event data — frequency, severity, regional activity, and trending" />
           <div className="grid grid-cols-[1.2fr_0.8fr] gap-8">
             <div>
@@ -658,20 +961,28 @@ export function TrendsClient() {
               </div>
             </div>
           </div>
-        </GlassCard>
+        </TiltCard>
 
-        {/* ========== 7. PREDICTIONS ========== */}
+        {/* ========== 7. PREDICTIONS (with AnimatedDonut) ========== */}
         <div className="grid grid-cols-2 gap-4">
-          <GlassCard delay={0.1} glow="#a78bfa">
+          <TiltCard delay={0.1} glow="#a78bfa">
             <SH title="Prediction Accuracy" sub="Forecast vs actual outcomes" />
             <div className="flex items-center gap-8 mb-6">
-              <div className="text-center">
-                <div className="text-[40px] font-bold text-purple-400 tracking-tight leading-none">
-                  {pp.accuracy_pct != null ? <><SpringNumber value={pp.accuracy_pct} />%</> : 'N/A'}
-                </div>
-                <div className="text-[10px] text-white/15 uppercase tracking-wider mt-1">Accuracy</div>
+              <div className="flex flex-col items-center justify-center">
+                <AnimatedDonut
+                  segments={[
+                    { value: pp.confirmed, max: pp.total, color: '#22c55e', label: 'Confirmed' },
+                    { value: pp.denied, max: pp.total, color: '#ef4444', label: 'Denied' },
+                    { value: pp.active, max: pp.total, color: '#f97316', label: 'Active' },
+                  ]}
+                  radius={45}
+                  cx={55}
+                  cy={55}
+                  label={pp.accuracy_pct != null ? `${Math.round(pp.accuracy_pct)}%` : 'N/A'}
+                />
+                <div className="text-[10px] text-white/15 uppercase tracking-wider mt-2">Accuracy</div>
               </div>
-              <div className="flex-1 grid grid-cols-4 gap-2">
+              <div className="flex-1 grid grid-cols-2 gap-2">
                 {[
                   { l: 'Confirmed', v: pp.confirmed, c: '#22c55e' },
                   { l: 'Active', v: pp.active, c: '#f97316' },
@@ -702,9 +1013,9 @@ export function TrendsClient() {
                 ))}
               </div>
             )}
-          </GlassCard>
+          </TiltCard>
 
-          <GlassCard delay={0.15} glow="#f97316">
+          <TiltCard delay={0.15} glow="#f97316">
             <SH title="High-Confidence Predictions" sub="Active forecasts ≥70% probability" />
             <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
               {pp.high_confidence.length > 0 ? pp.high_confidence.map((pred, pi) => (
@@ -728,12 +1039,12 @@ export function TrendsClient() {
                 </Reveal>
               )) : <p className="text-white/10 text-[11px] text-center py-8">No high-confidence predictions</p>}
             </div>
-          </GlassCard>
+          </TiltCard>
         </div>
 
         {/* ========== 8. COMPARATIVE ========== */}
         <div className="grid grid-cols-3 gap-4">
-          <GlassCard delay={0.1}>
+          <TiltCard delay={0.1}>
             <SH title="Week-over-Week" />
             <div className="grid grid-cols-2 gap-3 mb-4">
               {[{ l: 'This Week', v: ca.this_week.total, c: ca.this_week.critical, active: true }, { l: 'Last Week', v: ca.last_week.total, c: ca.last_week.critical, active: false }].map(w => (
@@ -751,9 +1062,9 @@ export function TrendsClient() {
               <div className="flex justify-between items-center"><span className="text-[11px] text-white/20">Weekly</span><Delta value={ca.week_change_pct} /></div>
               <div className="flex justify-between items-center"><span className="text-[11px] text-white/20">Period</span><Delta value={ca.period_change_pct} /></div>
             </div>
-          </GlassCard>
+          </TiltCard>
 
-          <GlassCard delay={0.15} glow="#ef4444">
+          <TiltCard delay={0.15} glow="#ef4444">
             <SH title="Anomaly Detection" sub={`σ-threshold: ${ca.anomaly_threshold}/day`} />
             <div className="text-[10px] text-white/10 mb-3 font-mono">μ={ca.mean_daily} · σ={ca.stddev_daily}</div>
             {ca.anomaly_days.length > 0 ? ca.anomaly_days.slice(0, 5).map((ad, i) => (
@@ -773,9 +1084,9 @@ export function TrendsClient() {
                 </motion.div>
               </Reveal>
             )) : <p className="text-white/10 text-[11px] text-center py-6">No anomalies detected</p>}
-          </GlassCard>
+          </TiltCard>
 
-          <GlassCard delay={0.2}>
+          <TiltCard delay={0.2}>
             <SH title="Regional Movement" sub="Largest changes vs prior period" />
             {ca.region_comparison.slice(0, 6).map((rc, ri) => (
               <Reveal key={rc.region} delay={ri * 0.04}>
@@ -789,11 +1100,11 @@ export function TrendsClient() {
                 </motion.div>
               </Reveal>
             ))}
-          </GlassCard>
+          </TiltCard>
         </div>
 
         {/* ========== 9. VELOCITY ========== */}
-        <GlassCard delay={0.1} glow="#3b82f6">
+        <TiltCard delay={0.1} glow="#3b82f6">
           <SH title="Event Velocity (48h)" sub="Hourly ingestion rate with σ-based anomaly detection" />
           <div className="grid grid-cols-[1fr_180px] gap-6">
             <div>
@@ -835,11 +1146,11 @@ export function TrendsClient() {
               )}
             </div>
           </div>
-        </GlassCard>
+        </TiltCard>
 
         {/* ========== FORECAST + COUNTRY RISK ========== */}
         <div className="grid grid-cols-2 gap-4">
-          <GlassCard delay={0.1} glow="#22c55e">
+          <TiltCard delay={0.1} glow="#22c55e">
             <SH title="Forecast Signals" sub="Active intelligence signals" />
             <div className="space-y-1.5 max-h-[250px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
               {data.forecast_signals.length > 0 ? data.forecast_signals.slice(0, 12).map((sig, si) => (
@@ -860,9 +1171,9 @@ export function TrendsClient() {
                 </Reveal>
               )) : <p className="text-white/10 text-[11px] text-center py-6">No active signals</p>}
             </div>
-          </GlassCard>
+          </TiltCard>
 
-          <GlassCard delay={0.15} glow="#3b82f6">
+          <TiltCard delay={0.15} glow="#3b82f6">
             <SH title="Country Risk Scores" sub="Composite risk assessment" />
             <div className="space-y-1 max-h-[250px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
               {data.country_risks.map((cr, ci) => {
@@ -893,7 +1204,7 @@ export function TrendsClient() {
               })}
               {data.country_risks.length === 0 && <p className="text-white/10 text-[11px] text-center py-6">No data</p>}
             </div>
-          </GlassCard>
+          </TiltCard>
         </div>
 
       </motion.div>
