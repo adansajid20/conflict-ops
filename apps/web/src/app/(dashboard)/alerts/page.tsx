@@ -75,29 +75,22 @@ function getSev(value?: number | string | null) {
 export default function AlertsPage() {
   // ── State ──
   const [alerts, setAlerts] = useState<AlertItem[]>([])
-  const [pirs, setPirs] = useState<PIR[]>([])
   const [rules, setRules] = useState<UserRule[]>([])
   const [filter, setFilter] = useState<Filter>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [sidebarTab, setSidebarTab] = useState<'pir' | 'rules'>('pir')
   const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  // PIR form removed — creation is in Settings only
 
   // ── Data Loading ──
   const load = useCallback(async () => {
     try {
-      const [alertsRes, pirRes, rulesRes] = await Promise.all([
+      const [alertsRes, rulesRes] = await Promise.all([
         fetch('/api/v1/alerts?limit=200', { cache: 'no-store' }),
-        fetch('/api/v1/pir', { cache: 'no-store' }),
         fetch('/api/v1/alerts?type=rules', { cache: 'no-store' }),
       ])
       const alertsJson = await alertsRes.json() as { data?: AlertItem[] }
-      const pirJson = await pirRes.json() as { data?: PIR[] }
       const rulesJson = await rulesRes.json() as { data?: UserRule[] }
       setAlerts(alertsJson.data ?? [])
-      setPirs(pirJson.data ?? [])
       setRules(rulesJson.data ?? [])
     } catch { /* silent */ }
     setLoading(false)
@@ -144,11 +137,6 @@ export default function AlertsPage() {
   const dismissAlert = async (id: string) => {
     setAlerts(prev => prev.filter(a => a.id !== id))
     await fetch(`/api/v1/alerts?id=${id}`, { method: 'DELETE' })
-  }
-
-  const deletePir = async (id: string) => {
-    setPirs(prev => prev.filter(p => p.id !== id))
-    await fetch(`/api/v1/pir?id=${id}`, { method: 'DELETE' })
   }
 
   const deleteRule = async (id: string) => {
@@ -331,6 +319,7 @@ export default function AlertsPage() {
       </div>
 
       {/* ════════════ RIGHT — CONFIGURATION SIDEBAR ════════════ */}
+      {/* ════════════ RIGHT — ACTIVE RULES SIDEBAR ════════════ */}
       <div className="w-full lg:w-[380px] flex-shrink-0 flex flex-col lg:h-full bg-[#060A10]">
 
         {/* Configure Alerts CTA */}
@@ -343,13 +332,12 @@ export default function AlertsPage() {
             <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center flex-shrink-0
               group-hover:bg-blue-500/25 transition-all">
               <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-semibold text-white group-hover:text-blue-300 transition">Configure Alerts</p>
-              <p className="text-[10px] text-white/35 mt-0.5">Create and manage alert rules in Settings</p>
+              <p className="text-[12px] font-semibold text-white group-hover:text-blue-300 transition">Create Alert Rule</p>
+              <p className="text-[10px] text-white/35 mt-0.5">Set up new rules in Settings</p>
             </div>
             <svg className="w-4 h-4 text-white/20 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -359,148 +347,92 @@ export default function AlertsPage() {
 
         <div className="h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
 
-        {/* Sidebar header with tabs */}
-        <div className="px-5 pt-4 pb-3">
-          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-white/[0.03] border border-white/[0.05]">
-            {(['pir', 'rules'] as const).map(tab => (
-              <button key={tab} onClick={() => setSidebarTab(tab)}
-                className={`flex-1 py-2 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all
-                  ${sidebarTab === tab ? 'bg-white/[0.06] text-white shadow-sm' : 'text-white/30 hover:text-white/50'}`}>
-                {tab === 'pir' ? 'Intel Requirements' : 'Alert Rules'}
-              </button>
-            ))}
-          </div>
+        {/* Active Rules header */}
+        <div className="px-5 pt-4 pb-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">
+            Active Rules ({rules.length})
+          </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto cr-scrollbar p-5">
-
-          {/* ── PIR TAB ── */}
-          {sidebarTab === 'pir' && (
-            <>
-              {pirs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-3">
-                    <svg className="w-5 h-5 text-white/15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                    </svg>
-                  </div>
-                  <p className="text-[11px] text-white/40 mb-1">No PIRs configured</p>
-                  <p className="text-[9px] text-white/20 max-w-[200px]">
-                    Priority Intelligence Requirements help focus your alert pipeline on what matters most.
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">Active PIRs ({pirs.length})</p>
-                  <div className="flex flex-col gap-2">
-                    {pirs.map((pir) => (
-                      <div key={pir.id} className="rounded-xl border border-indigo-500/10 bg-indigo-500/[0.03] p-3.5 group">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <div className="w-1.5 h-1.5 rounded-full" style={{ background: pir.active !== false ? '#818cf8' : '#555' }} />
-                              <p className="text-[11px] text-white font-semibold truncate">{pir.name}</p>
-                            </div>
-                            <p className="text-[9px] text-white/25 leading-relaxed">
-                              {(pir.conditions ?? []).map(c => `${c.type}: ${c.value}`).join(' · ') || 'No conditions'}
-                            </p>
-                          </div>
-                          <button onClick={() => void deletePir(pir.id)}
-                            className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md flex items-center justify-center text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all">
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                        <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-white/[0.04]">
-                          <span className="text-[9px] text-white/20">
-                            Last triggered: {pir.last_triggered_at ? timeAgo(pir.last_triggered_at) : 'never'}
-                          </span>
-                          <span className={`text-[8px] font-semibold uppercase tracking-wider ${pir.active !== false ? 'text-indigo-400' : 'text-white/20'}`}>
-                            {pir.active !== false ? 'Active' : 'Paused'}
-                          </span>
-                        </div>
+        <div className="flex-1 overflow-y-auto cr-scrollbar px-5 pb-5">
+          {rules.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-white/15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                </svg>
+              </div>
+              <p className="text-[12px] text-white/50 font-medium mb-1">No rules yet</p>
+              <p className="text-[10px] text-white/25 max-w-[220px] leading-relaxed">
+                Create an alert rule to start receiving notifications when events match your criteria.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5 mt-2">
+              {rules.map((rule) => {
+                const r = rule as unknown as Record<string, unknown>
+                const regions = (r.regions as string[]) ?? []
+                const severities = (r.severities as string[]) ?? []
+                const keywords = (r.keywords as string[]) ?? []
+                const freq = (r.frequency as string) ?? 'instant'
+                const triggerCount = (r.trigger_count as number) ?? 0
+                const lastTriggered = (r.last_triggered_at as string) ?? (r.last_triggered as string) ?? null
+                return (
+                  <div key={rule.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 group hover:bg-white/[0.03] transition">
+                    <div className="flex items-start justify-between gap-2 mb-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: rule.active !== false ? '#22c55e' : '#555' }} />
+                        <p className="text-[12px] text-white font-semibold truncate">{rule.name}</p>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ── RULES TAB ── */}
-          {sidebarTab === 'rules' && (
-            <>
-              {rules.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-3">
-                    <svg className="w-5 h-5 text-white/15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                    </svg>
-                  </div>
-                  <p className="text-[11px] text-white/40 mb-1">No alert rules configured</p>
-                  <p className="text-[9px] text-white/20 max-w-[200px]">
-                    Head to Settings to create alert rules that auto-match against incoming events.
-                  </p>
-                  <a href="/settings/alerts"
-                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/15 transition">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                    </svg>
-                    Create Rule
-                  </a>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Active Rules ({rules.length})</p>
-                    <a href="/settings/alerts"
-                      className="text-[9px] text-blue-400/60 hover:text-blue-400 transition flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                      </svg>
-                      Add Rule
-                    </a>
-                  </div>
-                  {rules.map((rule) => (
-                    <div key={rule.id} className="rounded-xl border border-cyan-500/10 bg-cyan-500/[0.03] p-3.5 group">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/15">
-                              {rule.alert_type}
-                            </span>
-                            <p className="text-[11px] text-white font-semibold truncate">{rule.name}</p>
-                          </div>
-                          <p className="text-[9px] text-white/25">
-                            Channels: {(rule.channels ?? ['in_app']).join(', ')} · Triggered {rule.trigger_count ?? 0}×
-                          </p>
-                        </div>
-                        <button onClick={() => void deleteRule(rule.id)}
-                          className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md flex items-center justify-center text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all">
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-white/[0.04]">
-                        <span className="text-[9px] text-white/20">Last: {rule.last_triggered ? timeAgo(rule.last_triggered) : 'never'}</span>
-                        <span className={`text-[8px] font-semibold uppercase tracking-wider ${rule.active !== false ? 'text-cyan-400' : 'text-white/20'}`}>
-                          {rule.active !== false ? 'Active' : 'Paused'}
-                        </span>
-                      </div>
+                      <span className="text-[9px] text-white/25 flex-shrink-0">{freq}</span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </>
+
+                    {/* Filters summary */}
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {severities.map(s => (
+                        <span key={s} className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded
+                          ${s === 'critical' ? 'bg-red-500/10 text-red-400 border border-red-500/15'
+                            : s === 'high' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/15'
+                            : s === 'medium' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/15'
+                            : 'bg-blue-500/10 text-blue-400 border border-blue-500/15'}`}>
+                          {s}
+                        </span>
+                      ))}
+                      {regions.map(r => (
+                        <span key={r} className="text-[8px] px-1.5 py-0.5 rounded bg-white/[0.04] text-white/40 border border-white/[0.06]">
+                          {r.replace('_', ' ')}
+                        </span>
+                      ))}
+                      {keywords.map(k => (
+                        <span key={k} className="text-[8px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/15">
+                          {k}
+                        </span>
+                      ))}
+                      {severities.length === 0 && regions.length === 0 && keywords.length === 0 && (
+                        <span className="text-[8px] text-white/20">No filters</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2.5 border-t border-white/[0.04]">
+                      <span className="text-[9px] text-white/25">
+                        Triggered {triggerCount}× · {lastTriggered ? timeAgo(lastTriggered) : 'never'}
+                      </span>
+                      <button onClick={() => void deleteRule(rule.id)}
+                        className="opacity-0 group-hover:opacity-100 text-[9px] text-red-400/60 hover:text-red-400 transition">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
 
         {/* Sidebar footer */}
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <p className="text-[8px] text-white/15 text-center uppercase tracking-widest">
-            {pirs.length} PIRs · {rules.length} Rules · Evaluated every 5min
+            {rules.length} Rules · Evaluated every 3min
           </p>
         </div>
       </div>
