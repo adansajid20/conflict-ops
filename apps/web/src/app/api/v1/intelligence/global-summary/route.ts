@@ -99,14 +99,19 @@ export async function GET(req: NextRequest): Promise<NextResponse<GlobalSummaryR
       else if (severity === 'medium') severityBreakdown.medium++
       else severityBreakdown.low++
 
-      const code = event.country_code || 'XX'
-      countryEventMap.set(code, (countryEventMap.get(code) || 0) + 1)
+      // Skip events with no/invalid country code for country-level stats
+      const code = event.country_code
+      if (code && code.length === 2 && code !== 'XX' && /^[A-Z]{2}$/.test(code)) {
+        countryEventMap.set(code, (countryEventMap.get(code) || 0) + 1)
+      }
     }
 
     // Process previous events
     for (const event of previousEvents || []) {
-      const code = event.country_code || 'XX'
-      countryPreviousMap.set(code, (countryPreviousMap.get(code) || 0) + 1)
+      const code = event.country_code
+      if (code && code.length === 2 && code !== 'XX' && /^[A-Z]{2}$/.test(code)) {
+        countryPreviousMap.set(code, (countryPreviousMap.get(code) || 0) + 1)
+      }
     }
 
     // Get top 5 countries
@@ -128,15 +133,27 @@ export async function GET(req: NextRequest): Promise<NextResponse<GlobalSummaryR
       .slice(0, 5)
 
     // Calculate global threat level (0-100 scale)
-    // Weighted by severity: critical=4, high=2, medium=1, low=0.25
-    const totalEventWeight =
-      severityBreakdown.critical * 4 +
-      severityBreakdown.high * 2 +
-      severityBreakdown.medium * 1 +
-      severityBreakdown.low * 0.25
+    // Uses logarithmic scaling so the score is meaningful across wide event ranges.
+    // The formula uses severity concentration (% of critical+high) and volume together.
+    const totalEvents = (recentEvents || []).length
+    const critHighPct = totalEvents > 0
+      ? (severityBreakdown.critical + severityBreakdown.high) / totalEvents
+      : 0
 
-    // Normalize to 0-100 scale (assume max expected weight in 7 days is around 500)
-    const globalThreatLevel = Math.min(100, Math.round((totalEventWeight / 500) * 100))
+    // Volume component: logarithmic scale — 10 events ≈ 20, 100 ≈ 40, 1000 ≈ 60
+    const volumeScore = totalEvents > 0
+      ? Math.min(60, Math.round(Math.log10(totalEvents) * 20))
+      : 0
+
+    // Severity component: percentage of critical+high events, scaled 0-40
+    const severityScore = Math.round(critHighPct * 40)
+
+    // Bonus for extreme critical concentration (>10% critical = extra points)
+    const criticalBonus = totalEvents > 0
+      ? Math.min(10, Math.round((severityBreakdown.critical / totalEvents) * 50))
+      : 0
+
+    const globalThreatLevel = Math.min(100, volumeScore + severityScore + criticalBonus)
 
     const totalEventCount = (recentEvents || []).length
 

@@ -385,50 +385,100 @@ function LiveThreatMapMini({ events }: { events: OverviewEvent[] }) {
       </div>
 
       <div className="relative aspect-[16/9] bg-white/[0.01] overflow-hidden">
-        {/* Simplified SVG world map outline */}
-        <svg viewBox="0 0 800 500" className="absolute inset-0 w-full h-full opacity-20">
-          {/* Simple continent outlines */}
-          <path d="M 50 100 L 100 90 L 120 130 L 80 150 Z" stroke="white" strokeWidth="0.5" fill="none" opacity="0.3" />
-          <path d="M 150 80 L 200 70 L 210 140 L 160 150 Z" stroke="white" strokeWidth="0.5" fill="none" opacity="0.3" />
-          <path d="M 350 150 L 450 140 L 480 250 L 380 270 Z" stroke="white" strokeWidth="0.5" fill="none" opacity="0.3" />
-          <path d="M 500 200 L 600 190 L 620 300 L 520 310 Z" stroke="white" strokeWidth="0.5" fill="none" opacity="0.3" />
-          <path d="M 650 250 L 750 240 L 760 350 L 680 360 Z" stroke="white" strokeWidth="0.5" fill="none" opacity="0.3" />
-          <path d="M 100 350 L 250 340 L 280 450 L 150 460 Z" stroke="white" strokeWidth="0.5" fill="none" opacity="0.3" />
+        {/* World map outline — simplified continents */}
+        <svg viewBox="0 0 800 500" className="absolute inset-0 w-full h-full opacity-15">
+          {/* North America */}
+          <path d="M60,80 L130,60 L180,70 L200,110 L190,150 L170,180 L140,200 L100,170 L70,130 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
+          {/* Central America */}
+          <path d="M140,200 L170,210 L160,260 L140,280 L120,250 Z" stroke="white" strokeWidth="0.6" fill="white" fillOpacity="0.03" />
+          {/* South America */}
+          <path d="M170,280 L220,260 L260,300 L270,380 L250,460 L200,470 L160,420 L150,340 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
+          {/* Europe */}
+          <path d="M340,80 L400,60 L440,80 L460,120 L440,160 L400,170 L360,150 L340,120 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
+          {/* Africa */}
+          <path d="M370,180 L430,170 L470,210 L480,300 L460,380 L420,420 L380,400 L360,320 L350,240 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
+          {/* Middle East */}
+          <path d="M470,160 L540,150 L570,200 L550,250 L500,240 L470,210 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
+          {/* South Asia */}
+          <path d="M570,200 L630,180 L660,240 L640,300 L590,290 L570,250 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
+          {/* East Asia */}
+          <path d="M620,80 L700,60 L740,120 L730,200 L680,220 L640,180 L630,120 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
+          {/* Southeast Asia */}
+          <path d="M650,260 L710,240 L740,300 L720,360 L680,350 L660,310 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
+          {/* Australia */}
+          <path d="M680,380 L750,370 L770,420 L740,450 L690,440 Z" stroke="white" strokeWidth="0.6" fill="white" fillOpacity="0.03" />
+        </svg>
+
+        {/* Region labels */}
+        <svg viewBox="0 0 800 500" className="absolute inset-0 w-full h-full">
+          {Object.entries({
+            'Middle East': [520, 190],
+            'Eastern Europe': [450, 110],
+            'Sub-Saharan Africa': [420, 360],
+            'South Asia': [610, 260],
+            'East Asia': [680, 140],
+            'Southeast Asia': [690, 300],
+            'Latin America': [200, 380],
+          } as Record<string, [number, number]>).map(([region, [x, y]]) => {
+            const regionDots = dots.filter(d => {
+              const coords: Record<string, [number, number]> = {
+                'Middle East': [550, 280], 'Eastern Europe': [480, 220], 'Sub-Saharan Africa': [440, 450],
+                'South Asia': [620, 350], 'East Asia': [700, 300], 'Southeast Asia': [680, 400], 'Latin America': [200, 450],
+              }
+              const [rx, ry] = coords[region] || [0, 0]
+              return Math.abs(d.x - rx) < 40 && Math.abs(d.y - ry) < 40
+            })
+            if (regionDots.length === 0) return null
+            return (
+              <text key={region} x={x} y={y} fill="white" opacity="0.25" fontSize="9" fontWeight="500" textAnchor="middle">
+                {region}
+              </text>
+            )
+          })}
         </svg>
 
         {/* Threat dots */}
         <svg viewBox="0 0 800 500" className="absolute inset-0 w-full h-full">
-          {dots.map((dot, idx) => {
+          {dots.map((dot) => {
             const pulseSpeed = dot.severity >= 4 ? 0.6 : dot.severity >= 3 ? 0.8 : 1.2
             const dotSize = dot.severity >= 4 ? 5 : dot.severity >= 3 ? 3.5 : 2.5
+            const dotColor = dot.severity >= 4 ? '#ef4444' : dot.severity >= 3 ? '#f97316' : '#eab308'
 
             return (
               <g key={dot.id}>
-                {/* Pulsing background */}
                 <motion.circle
-                  cx={dot.x}
-                  cy={dot.y}
-                  r={dotSize}
-                  fill="#ef4444"
-                  opacity="0.1"
+                  cx={dot.x} cy={dot.y} r={dotSize}
+                  fill={dotColor} opacity="0.1"
                   animate={{ r: dotSize * 2.5 }}
                   transition={{ duration: pulseSpeed, repeat: Infinity, ease: 'easeOut' }}
                 />
-                {/* Main dot */}
-                <circle
-                  cx={dot.x}
-                  cy={dot.y}
-                  r={dotSize}
-                  fill={dot.severity >= 4 ? '#ef4444' : dot.severity >= 3 ? '#f97316' : '#eab308'}
-                  opacity="0.8"
-                />
+                <circle cx={dot.x} cy={dot.y} r={dotSize} fill={dotColor} opacity="0.8" />
+                <title>{dot.title} — Severity {dot.severity}</title>
               </g>
             )
           })}
         </svg>
 
+        {/* Legend */}
+        <div className="absolute bottom-3 left-4 flex items-center gap-4 z-10">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" />
+            <span className="text-[9px] text-white/40 font-medium">Critical</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-[#f97316]" />
+            <span className="text-[9px] text-white/40 font-medium">High</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#eab308]" />
+            <span className="text-[9px] text-white/40 font-medium">Medium</span>
+          </div>
+          <span className="text-[9px] text-white/20">•</span>
+          <span className="text-[9px] text-white/25">{dots.length} events plotted</span>
+        </div>
+
         {/* Gradient overlay bottom */}
-        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#070B11] to-transparent pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[#070B11] to-transparent pointer-events-none" />
       </div>
     </motion.section>
   )
@@ -528,7 +578,27 @@ function HotRegionsPanel({ regions }: { regions: HotRegion[] }) {
 // ============================================================================
 
 function RecentCriticalEvents({ events, onSelect }: { events: OverviewEvent[]; onSelect: (event: OverviewEvent) => void }) {
-  const criticalEvents = events.filter((e) => e.severity && e.severity >= 3).slice(0, 10)
+  const [fetchedCritical, setFetchedCritical] = useState<OverviewEvent[]>([])
+
+  useEffect(() => {
+    // Fetch critical (4) and high (3) events separately to ensure we show enough
+    Promise.all([
+      fetch('/api/v1/events?severity=4&limit=6&window=7d').then(r => r.json()),
+      fetch('/api/v1/events?severity=3&limit=6&window=7d').then(r => r.json()),
+    ])
+      .then(([critRes, highRes]: [{ data?: OverviewEvent[] }, { data?: OverviewEvent[] }]) => {
+        const combined = [...(critRes.data ?? []), ...(highRes.data ?? [])]
+          .sort((a, b) => new Date(b.occurred_at ?? 0).getTime() - new Date(a.occurred_at ?? 0).getTime())
+          .slice(0, 10)
+        if (combined.length > 0) setFetchedCritical(combined)
+      })
+      .catch(() => { /* fallback to prop-based events */ })
+  }, [])
+
+  // Use fetched critical events if available, otherwise fall back to filtering props
+  const criticalEvents = fetchedCritical.length > 0
+    ? fetchedCritical.slice(0, 10)
+    : events.filter((e) => e.severity && e.severity >= 3).slice(0, 10)
 
   return (
     <motion.section
