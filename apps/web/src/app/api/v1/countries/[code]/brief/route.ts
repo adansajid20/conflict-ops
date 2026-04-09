@@ -197,8 +197,8 @@ export async function GET(
       let score = 0
       if (relevantEvents.length > 0) {
         const avgSeverity = relevantEvents.reduce((sum, e) => sum + (e.severity || 0), 0) / relevantEvents.length
-        const recency = relevantEvents.length > 0 ? (4 - Math.max(1, (now.getTime() - new Date(relevantEvents[0]?.occurred_at || now).getTime()) / (1000 * 60 * 60 * 24))) / 3 : 0
-        score = Math.min(100, (relevantEvents.length * 5 + avgSeverity * 15 + Math.max(0, recency) * 20))
+        const recency = relevantEvents.length > 0 ? Math.max(0, (4 - Math.max(1, (now.getTime() - new Date(relevantEvents[0]?.occurred_at || now).getTime()) / (1000 * 60 * 60 * 24))) / 3) : 0
+        score = Math.min(100, (relevantEvents.length * 5 + avgSeverity * 15 + recency * 20))
       }
       riskBreakdown[category] = Math.round(score)
     }

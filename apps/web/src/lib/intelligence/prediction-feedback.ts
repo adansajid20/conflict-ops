@@ -132,10 +132,44 @@ export async function calculateAccuracyMetrics(): Promise<PredictionAccuracy> {
  * If we underpredicted, generate boosting factors
  */
 export async function calculateAdjustmentFactors(): Promise<PredictionAdjustmentFactors> {
+  const supabase = createServiceClient()
   const metrics = await calculateAccuracyMetrics()
+  const since90d = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: predictions } = await supabase
+    .from('predictions')
+    .select('prediction_type, region, probability, outcome')
+    .gte('created_at', since90d)
+    .not('outcome', 'is', null)
 
   const region: Record<string, number> = {}
   const type: Record<string, number> = {}
+
+  // Calculate average predicted prob by region
+  const avgPredByRegion: Record<string, number> = {}
+  const regionCounts: Record<string, number> = {}
+  for (const pred of predictions ?? []) {
+    const regionName = (pred.region as string) ?? 'unknown'
+    avgPredByRegion[regionName] = (avgPredByRegion[regionName] ?? 0) + ((pred.probability as number) ?? 0.5)
+    regionCounts[regionName] = (regionCounts[regionName] ?? 0) + 1
+  }
+  for (const regionName of Object.keys(avgPredByRegion)) {
+    const count = regionCounts[regionName]
+    if (count) avgPredByRegion[regionName]! /= count
+  }
+
+  // Calculate average predicted prob by type
+  const avgPredByType: Record<string, number> = {}
+  const typeCounts: Record<string, number> = {}
+  for (const pred of predictions ?? []) {
+    const typeName = (pred.prediction_type as string) ?? 'unknown'
+    avgPredByType[typeName] = (avgPredByType[typeName] ?? 0) + ((pred.probability as number) ?? 0.5)
+    typeCounts[typeName] = (typeCounts[typeName] ?? 0) + 1
+  }
+  for (const typeName of Object.keys(avgPredByType)) {
+    const count = typeCounts[typeName]
+    if (count) avgPredByType[typeName]! /= count
+  }
 
   // Regional factors: actual_accuracy / predicted_average_prob
   // If we predicted 0.7 but actual hit rate is 0.3, factor = 0.3/0.7 = 0.43 (dampen)
@@ -143,9 +177,7 @@ export async function calculateAdjustmentFactors(): Promise<PredictionAdjustment
     if (accuracy === 0) {
       region[regionName] = 0.5 // Conservative dampening for 0% accuracy
     } else {
-      // Use calibration curve to find average predicted prob for this region
-      // Simplified: use overall if no specific calibration
-      const avgPredicted = 0.6 // baseline assumption
+      const avgPredicted = avgPredByRegion[regionName] ?? 0.6
       region[regionName] = Math.min(2.0, Math.max(0.3, accuracy / avgPredicted))
     }
   }
@@ -155,7 +187,7 @@ export async function calculateAdjustmentFactors(): Promise<PredictionAdjustment
     if (accuracy === 0) {
       type[typeName] = 0.5
     } else {
-      const avgPredicted = 0.6
+      const avgPredicted = avgPredByType[typeName] ?? 0.6
       type[typeName] = Math.min(2.0, Math.max(0.3, accuracy / avgPredicted))
     }
   }

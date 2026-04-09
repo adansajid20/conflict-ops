@@ -40,9 +40,9 @@ async function statisticalModel(
 
   const { data: events } = await supabase
     .from('events')
-    .select('ingested_at, severity, escalation_indicator')
+    .select('occurred_at, severity, escalation_indicator')
     .eq('country_code', countryCode)
-    .gte('ingested_at', new Date(now - timeWindow).toISOString())
+    .gte('occurred_at', new Date(now - timeWindow).toISOString())
 
   if (!events || events.length === 0) {
     return {
@@ -57,7 +57,7 @@ async function statisticalModel(
   const dailyEscalations = new Map<string, number>()
 
   for (const event of events) {
-    const day = new Date(event.ingested_at as string).toISOString().split('T')[0] || ''
+    const day = new Date(event.occurred_at as string).toISOString().split('T')[0] || ''
     if (!day) continue
     const entry = dailyCounts.get(day) ?? { count: 0, severity_sum: 0 }
     entry.count += 1
@@ -227,10 +227,10 @@ async function momentumModel(countryCode: string): Promise<ModelPrediction> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
   const { data: events } = await supabase
     .from('events')
-    .select('ingested_at, severity')
+    .select('occurred_at, severity')
     .eq('country_code', countryCode)
-    .gte('ingested_at', thirtyDaysAgo)
-    .order('ingested_at', { ascending: true })
+    .gte('occurred_at', thirtyDaysAgo)
+    .order('occurred_at', { ascending: true })
 
   if (!events || events.length < 7) {
     return {
@@ -245,7 +245,7 @@ async function momentumModel(countryCode: string): Promise<ModelPrediction> {
   const alpha = 0.3
 
   for (const event of events) {
-    const day = new Date(event.ingested_at as string).toISOString().split('T')[0] || ''
+    const day = new Date(event.occurred_at as string).toISOString().split('T')[0] || ''
     if (!day) continue
     dailyCounts.set(day, (dailyCounts.get(day) ?? 0) + 1)
   }
@@ -308,10 +308,10 @@ async function historicalAnalogueModel(countryCode: string): Promise<ModelPredic
   // Get last 30 days of data (current pattern)
   const { data: currentEvents } = await supabase
     .from('events')
-    .select('ingested_at, severity')
+    .select('occurred_at, severity')
     .eq('country_code', countryCode)
-    .gte('ingested_at', thirtyDaysAgo)
-    .order('ingested_at', { ascending: true })
+    .gte('occurred_at', thirtyDaysAgo)
+    .order('occurred_at', { ascending: true })
 
   if (!currentEvents || currentEvents.length === 0) {
     return {
@@ -324,7 +324,7 @@ async function historicalAnalogueModel(countryCode: string): Promise<ModelPredic
   // Create feature vector for current window (daily event counts)
   const currentDailyCounts = new Map<string, number>()
   for (const event of currentEvents) {
-    const day = new Date(event.ingested_at as string).toISOString().split('T')[0] || ''
+    const day = new Date(event.occurred_at as string).toISOString().split('T')[0] || ''
     if (!day) continue
     currentDailyCounts.set(day, (currentDailyCounts.get(day) ?? 0) + 1)
   }
@@ -332,11 +332,11 @@ async function historicalAnalogueModel(countryCode: string): Promise<ModelPredic
   // Get historical data (180 days ago up to 30 days ago)
   const { data: historicalEvents } = await supabase
     .from('events')
-    .select('ingested_at, severity')
+    .select('occurred_at, severity')
     .eq('country_code', countryCode)
-    .gte('ingested_at', oneEightyDaysAgo)
-    .lt('ingested_at', thirtyDaysAgo)
-    .order('ingested_at', { ascending: true })
+    .gte('occurred_at', oneEightyDaysAgo)
+    .lt('occurred_at', thirtyDaysAgo)
+    .order('occurred_at', { ascending: true })
 
   if (!historicalEvents || historicalEvents.length === 0) {
     return {
@@ -352,7 +352,7 @@ async function historicalAnalogueModel(countryCode: string): Promise<ModelPredic
     outcomeScore: number
   }> = []
 
-  const historicalDates = historicalEvents.map((e) => new Date(e.ingested_at as string))
+  const historicalDates = historicalEvents.map((e) => new Date(e.occurred_at as string))
   const minDate = historicalDates[0] ?? new Date()
   const maxDate = historicalDates[historicalDates.length - 1] ?? new Date()
 
@@ -365,7 +365,7 @@ async function historicalAnalogueModel(countryCode: string): Promise<ModelPredic
     const windowEnd = new Date(ts + windowMs).toISOString()
 
     const windowEvents = historicalEvents.filter(
-      (e) => (e.ingested_at as string) >= windowStart && (e.ingested_at as string) < windowEnd
+      (e) => (e.occurred_at as string) >= windowStart && (e.occurred_at as string) < windowEnd
     )
 
     if (windowEvents.length === 0) continue
@@ -373,7 +373,7 @@ async function historicalAnalogueModel(countryCode: string): Promise<ModelPredic
     // Build daily counts for this historical window
     const historicalDailyCounts = new Map<string, number>()
     for (const event of windowEvents) {
-      const day = new Date(event.ingested_at as string).toISOString().split('T')[0] || ''
+      const day = new Date(event.occurred_at as string).toISOString().split('T')[0] || ''
       if (!day) continue
       historicalDailyCounts.set(day, (historicalDailyCounts.get(day) ?? 0) + 1)
     }
@@ -401,7 +401,7 @@ async function historicalAnalogueModel(countryCode: string): Promise<ModelPredic
       const afterWindowEnd = new Date(ts + windowMs + 14 * 24 * 60 * 60 * 1000).toISOString()
 
       const afterEvents = historicalEvents.filter(
-        (e) => (e.ingested_at as string) >= afterWindowStart && (e.ingested_at as string) < afterWindowEnd
+        (e) => (e.occurred_at as string) >= afterWindowStart && (e.occurred_at as string) < afterWindowEnd
       )
 
       if (afterEvents.length > 0) {

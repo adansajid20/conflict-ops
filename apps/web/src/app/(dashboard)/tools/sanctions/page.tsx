@@ -163,7 +163,7 @@ export default function SanctionsPage() {
           <CheckCircle className="w-5 h-5 text-green-400 shrink-0" />
           <div>
             <div className="text-green-400 font-medium text-sm">No matches found</div>
-            <div className="text-green-300/60 text-xs">&ldquo;{query}&rdquo; is clean across all sanctions lists.</div>
+            <div className="text-green-300/60 text-xs">{'"'}{query}{'"'} is clean across all sanctions lists.</div>
           </div>
         </motion.div>
       )}
@@ -242,7 +242,7 @@ export default function SanctionsPage() {
           className="text-center py-16 text-white/50"
         >
           <Shield className="w-16 h-16 mx-auto mb-4 text-white/20" />
-          <p className="text-sm">Search for an entity name to check against all sanctions lists,<br />or click &ldquo;View All&rdquo; to see flagged entities in ConflictRadar data.</p>
+          <p className="text-sm">Search for an entity name to check against all sanctions lists,<br />or click {'"'}View All{'"'} to see flagged entities in ConflictRadar data.</p>
           <p className="text-xs mt-4 text-white/30">Data updated daily from OFAC SDN, EU Consolidated List, UN Security Council, and UK OFSI</p>
         </motion.div>
       )}

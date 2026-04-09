@@ -41,7 +41,7 @@ export async function calculateCountryBaseline(country: string): Promise<Baselin
   const { data: events, error } = await supabase
     .from('events')
     .select('occurred_at, severity')
-    .ilike('country_code', `%${country}%`)
+    .eq('country_code', country)
     .gte('occurred_at', since90d)
     .order('occurred_at')
 
@@ -130,7 +130,7 @@ export async function detectAnomaliesForCountry(country: string, date?: string):
   const { data: dayEvents, error } = await supabase
     .from('events')
     .select('severity')
-    .ilike('country_code', `%${country}%`)
+    .eq('country_code', country)
     .gte('occurred_at', dateStart)
     .lte('occurred_at', dateEnd)
 
@@ -178,7 +178,7 @@ export async function detectChangepoint(country: string, window_days: number = 3
   const { data: events, error } = await supabase
     .from('events')
     .select('occurred_at')
-    .ilike('country_code', `%${country}%`)
+    .eq('country_code', country)
     .gte('occurred_at', since)
     .order('occurred_at')
 

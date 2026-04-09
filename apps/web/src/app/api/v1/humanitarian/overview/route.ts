@@ -265,7 +265,8 @@ export async function GET(req: NextRequest) {
       .map(data => {
         // Calculate country-level trend vs prior
         const priorCountryEvents = priorEventsList.filter(e => e.country_code === data.country_code)
-        const countryTrend = getTrend(data.humanitarian_events, priorCountryEvents.length, data.estimated_casualties, 0)
+        const priorCountryCasualties = priorCountryEvents.reduce((sum, e) => sum + ((e.casualty_estimate as number) ?? 0), 0)
+        const countryTrend = getTrend(data.humanitarian_events, priorCountryEvents.length, data.estimated_casualties, priorCountryCasualties)
 
         const severityDist: Record<number, number> = {}
         for (const [sev, count] of data.severity_distribution) {

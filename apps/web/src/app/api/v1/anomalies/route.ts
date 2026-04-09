@@ -27,6 +27,12 @@ export async function GET(req: NextRequest) {
       query = query.ilike('region', `%${country}%`)
     }
 
+    // Filter by severity if provided
+    if (severity) {
+      const confidenceThreshold = severity === 'extreme' ? 4.0 : severity === 'significant' ? 3.0 : 2.0
+      query = query.gte('confidence', confidenceThreshold)
+    }
+
     const { data: signals, error, count } = await query.range(offset, offset + limit - 1)
 
     if (error) {
@@ -64,11 +70,6 @@ export async function GET(req: NextRequest) {
           detected_at: signal.detected_at,
           resolved: signal.resolved,
         }
-      })
-      .filter(a => {
-        // Filter by severity if provided
-        if (!severity) return true
-        return a.anomaly_level === severity
       })
 
     return NextResponse.json({

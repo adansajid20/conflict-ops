@@ -202,6 +202,7 @@ export async function GET(request: NextRequest) {
       .select('id, country_code, occurred_at, severity, event_type, category, is_humanitarian_report, escalation_indicator, significance_score')
       .gte('occurred_at', h14d)
       .not('country_code', 'is', null)
+      .order('occurred_at', { ascending: false })
 
     if (!events || events.length === 0) {
       return NextResponse.json({

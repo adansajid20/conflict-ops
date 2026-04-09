@@ -311,7 +311,7 @@ export function ActorDetailClient({ id }: { id: string }) {
                             initial={{ opacity: 0 }}
                             whileInView={{ opacity: 1 }}
                           >
-                            &ldquo;{m.context}&rdquo;
+                            {'"'}{m.context}{'"'}
                           </motion.p>
                         )}
                       </div>
