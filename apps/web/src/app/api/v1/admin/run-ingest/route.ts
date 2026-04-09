@@ -14,6 +14,13 @@ export async function POST(req: Request) {
     const { auth } = await import('@clerk/nextjs/server')
     const { userId } = await auth()
     if (!userId) return Response.json({ error: 'Forbidden' }, { status: 403 })
+
+    // Check that user has admin or owner role
+    const supabase = (await import('@/lib/supabase/server')).createServiceClient()
+    const { data: user, error } = await supabase.from('users').select('role').eq('id', userId).single()
+    if (error || !user || !['admin', 'owner'].includes(user.role)) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 })
+    }
   }
 
   // HEARTBEAT FIRST — write last_ingest_at to system_flags immediately so freshness

@@ -96,8 +96,14 @@ export async function GET(req: NextRequest) {
 
   for (const [name, lamin, lamax, lomin, lomax] of CONFLICT_ZONES) {
     try {
-      const url = `https://${process.env.OPENSKY_USERNAME}:${process.env.OPENSKY_PASSWORD}@opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`
-      const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
+      const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`
+      const credentials = Buffer.from(`${process.env.OPENSKY_USERNAME}:${process.env.OPENSKY_PASSWORD}`).toString('base64')
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(10000),
+        headers: {
+          'Authorization': `Basic ${credentials}`
+        }
+      })
       if (!res.ok) continue
       const data = await res.json() as { states?: unknown[] }
 

@@ -124,53 +124,65 @@ const TOOLS = [
 async function executeTool(name: string, input: ToolInput): Promise<string> {
   const supabase = createServiceClient()
 
+  // Helper to escape SQL wildcards and limit query length
+  const sanitizeQuery = (q: string): string => {
+    if (!q) return ''
+    // Limit to 100 characters
+    const limited = q.slice(0, 100)
+    // Escape SQL wildcards
+    return limited.replace(/[%_]/g, '\\$&')
+  }
+
   switch (name) {
     case 'search_events': {
       let query = supabase.from('events').select('id,title,severity,category,region,source,summary,occurred_at')
-      if (input.region) query = query.ilike('region', `%${input.region}%`)
+      if (input.region) query = query.ilike('region', `%${sanitizeQuery(input.region as string)}%`)
       if (input.severity) query = query.eq('severity', input.severity)
-      if (input.category) query = query.ilike('category', `%${input.category}%`)
+      if (input.category) query = query.ilike('category', `%${sanitizeQuery(input.category as string)}%`)
       if (input.hours_ago) query = query.gte('occurred_at', new Date(Date.now() - (input.hours_ago as number) * 3600000).toISOString())
-      if (input.query) query = query.ilike('title', `%${input.query}%`)
+      if (input.query) query = query.ilike('title', `%${sanitizeQuery(input.query as string)}%`)
       const { data } = await query.order('occurred_at', { ascending: false }).limit((input.limit as number) || 20)
       return JSON.stringify(data ?? [])
     }
     case 'get_risk_scores': {
       let query = supabase.from('region_risk_scores').select('*')
-      if (input.region) query = query.ilike('region', `%${input.region}%`)
+      if (input.region) query = query.ilike('region', `%${sanitizeQuery(input.region as string)}%`)
       const { data } = await query.order('score', { ascending: false }).limit((input.limit as number) || 15)
       return JSON.stringify(data ?? [])
     }
     case 'get_predictions': {
       let query = supabase.from('predictions').select('*').gt('expires_at', new Date().toISOString()).is('outcome', null)
-      if (input.region) query = query.ilike('region', `%${input.region}%`)
+      if (input.region) query = query.ilike('region', `%${sanitizeQuery(input.region as string)}%`)
       if (input.min_probability) query = query.gte('probability', input.min_probability)
       const { data } = await query.order('probability', { ascending: false }).limit(10)
       return JSON.stringify(data ?? [])
     }
     case 'get_correlations': {
       let query = supabase.from('correlation_signals').select('*').gt('detected_at', new Date(Date.now() - 24 * 3600000).toISOString())
-      if (input.region) query = query.ilike('region', `%${input.region}%`)
-      if (input.pattern_type) query = query.eq('pattern_type', input.pattern_type)
+      if (input.region) query = query.ilike('region', `%${sanitizeQuery(input.region as string)}%`)
+      if (input.pattern_type) query = query.eq('pattern_type', sanitizeQuery(input.pattern_type as string))
       const { data } = await query.order('detected_at', { ascending: false }).limit(10)
       return JSON.stringify(data ?? [])
     }
     case 'get_actors': {
       let query = supabase.from('actors').select('id,name,display_name,actor_type,type,region,country_code,event_count,influence_score,threat_level')
-      if (input.name) query = query.ilike('name', `%${input.name}%`)
-      if (input.actor_type) query = query.eq('actor_type', input.actor_type)
-      if (input.region) query = query.or(`region.ilike.%${input.region}%,country_code.ilike.%${input.region}%`)
+      if (input.name) query = query.ilike('name', `%${sanitizeQuery(input.name as string)}%`)
+      if (input.actor_type) query = query.eq('actor_type', sanitizeQuery(input.actor_type as string))
+      if (input.region) {
+        const safe = sanitizeQuery(input.region as string)
+        query = query.or(`region.ilike.%${safe}%,country_code.ilike.%${safe}%`)
+      }
       const { data } = await query.order('event_count', { ascending: false }).limit(20)
       return JSON.stringify(data ?? [])
     }
     case 'get_situation_clusters': {
       let query = supabase.from('event_clusters').select('*')
-      if (input.region) query = query.ilike('location', `%${input.region}%`)
+      if (input.region) query = query.ilike('location', `%${sanitizeQuery(input.region as string)}%`)
       const { data } = await query.order('source_count', { ascending: false }).limit(10)
       return JSON.stringify(data ?? [])
     }
     case 'get_country_profile': {
-      const { data } = await supabase.from('country_profiles').select('*').ilike('country_name', `%${input.country}%`).limit(1).single()
+      const { data } = await supabase.from('country_profiles').select('*').ilike('country_name', `%${sanitizeQuery(input.country as string)}%`).limit(1).single()
       return JSON.stringify(data ?? {})
     }
     case 'get_commodity_prices': {
@@ -250,9 +262,14 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
   try {
     const body = await req.json() as { message?: string; conversation_id?: string; user_id?: string }
-    const { message, conversation_id } = body
+    let { message, conversation_id } = body
     const user_id = authUserId // Always use authenticated user, ignore body.user_id
     if (!message) return NextResponse.json({ error: 'message required' }, { status: 400 })
+
+    // Limit message length to 2000 characters
+    if (message.length > 2000) {
+      return NextResponse.json({ error: 'Message exceeds 2000 character limit' }, { status: 400 })
+    }
 
     // Load conversation history
     let history: Msg[] = []

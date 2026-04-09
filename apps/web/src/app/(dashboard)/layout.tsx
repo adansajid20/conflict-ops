@@ -263,10 +263,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const isAdminMode = useMemo(() => {
     const envAdmin = process.env['NEXT_PUBLIC_ADMIN_MODE'] === 'true'
-    const paramAdmin = searchParams?.get('admin') === '1'
     const onAdminRoute = pathname.startsWith('/admin')
-    return envAdmin || paramAdmin || onAdminRoute
-  }, [searchParams, pathname])
+    return envAdmin || onAdminRoute
+  }, [pathname])
 
   useEffect(() => {
     const stored = localStorage.getItem('sidebar-collapsed')

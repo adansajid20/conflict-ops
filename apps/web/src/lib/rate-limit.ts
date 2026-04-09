@@ -1,6 +1,6 @@
 /**
  * Simple rate limiter using Upstash Redis.
- * Falls back to allow requests if Redis is unavailable (fail-open).
+ * Falls back to deny requests if Redis is unavailable (fail-closed).
  */
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
@@ -41,7 +41,7 @@ export type RateLimitResult = { allowed: boolean; remaining: number; reset: numb
 
 /**
  * Check rate limit for a given identifier.
- * Returns { allowed: true } if Redis unavailable (fail-open).
+ * Returns { allowed: false } if Redis unavailable (fail-closed).
  */
 export async function checkRateLimit(
   identifier: string,
@@ -51,12 +51,12 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   try {
     const limiter = getLimiter(prefix, maxRequests, windowSeconds)
-    if (!limiter) return { allowed: true, remaining: maxRequests, reset: 0 }
+    if (!limiter) return { allowed: false, remaining: 0, reset: 0 }
     const { success, remaining, reset } = await limiter.limit(identifier)
     return { allowed: success, remaining, reset }
   } catch {
-    // Fail open if Redis errors
-    return { allowed: true, remaining: maxRequests, reset: 0 }
+    // Fail closed if Redis errors
+    return { allowed: false, remaining: 0, reset: 0 }
   }
 }
 
