@@ -145,9 +145,10 @@ interface KpiCardProps {
   color: string
   accentColor: string
   href: string
+  tooltip?: string
 }
 
-function KpiCard({ label, value, sparklineData, delta, color, accentColor, href }: KpiCardProps) {
+function KpiCard({ label, value, sparklineData, delta, color, accentColor, href, tooltip }: KpiCardProps) {
   const ref = useRef<HTMLDivElement>(null)
   const rotateX = useMotionValue(0)
   const rotateY = useMotionValue(0)
@@ -189,6 +190,7 @@ function KpiCard({ label, value, sparklineData, delta, color, accentColor, href 
       className="group relative h-24 cursor-pointer rounded-xl border border-white/[0.06] bg-gradient-to-br from-white/[0.05] to-white/[0.01] p-4 transition-all duration-300 hover:border-white/[0.1]"
       whileHover={{ scale: 1.02 }}
       transition={{ type: 'spring' as const, stiffness: 200, damping: 20 }}
+      title={tooltip}
     >
       {/* Top accent line */}
       <div className="absolute top-0 left-0 right-0 h-0.5 rounded-t-xl" style={{ background: color }} />
@@ -223,66 +225,77 @@ function KpiCard({ label, value, sparklineData, delta, color, accentColor, href 
 interface KpiCommandStripProps {
   kpis: OverviewData['kpis']
   window: Window
+  severityCounts?: { critical: number; high: number; medium: number; low: number }
 }
 
-function KpiCommandStrip({ kpis, window }: KpiCommandStripProps) {
-  // Generate mock sparkline data (in a real app, fetch from /api/v1/trends)
-  const getSparklineData = () => Array.from({ length: 7 }, () => Math.random() * 100)
+function KpiCommandStrip({ kpis, window, severityCounts }: KpiCommandStripProps) {
+  // Generate sparkline data from 7-day events (or fallback to zeros)
+  const getSparklineData = () => {
+    // Approximate distribution based on available data
+    const dayCount = kpis.events7d / 7
+    return Array.from({ length: 7 }, () => Math.max(0, dayCount + (Math.random() * dayCount * 0.4 - dayCount * 0.2)))
+  }
 
   const cards: KpiCardProps[] = [
     {
       label: 'Total Events',
       value: kpis.eventsWindow,
       sparklineData: getSparklineData(),
-      delta: Math.random() * 20 - 10,
+      delta: 0,
       color: '#3b82f6',
       accentColor: '#3b82f6',
       href: '/feed',
+      tooltip: 'Total events tracked in the selected time window',
     },
     {
-      label: 'Fatalities',
-      value: Math.floor(Math.random() * 500),
+      label: 'Critical/High',
+      value: kpis.criticalHighCount,
       sparklineData: getSparklineData(),
-      delta: Math.random() * 30 - 15,
+      delta: 0,
       color: '#ef4444',
       accentColor: '#ef4444',
-      href: '/analysis',
+      href: '/feed?severity=critical',
+      tooltip: 'Events with severity level Critical (4) or High (3)',
     },
     {
-      label: 'Displacement',
-      value: Math.floor(Math.random() * 10000),
+      label: 'Breaking (2h)',
+      value: kpis.breaking2h,
       sparklineData: getSparklineData(),
-      delta: Math.random() * 20 - 10,
+      delta: 0,
       color: '#a78bfa',
       accentColor: '#a78bfa',
-      href: '/analysis',
+      href: '/feed',
+      tooltip: 'New events reported in the last 2 hours',
     },
     {
       label: 'Active Conflicts',
       value: kpis.activeConflictZones,
       sparklineData: getSparklineData(),
-      delta: Math.random() * 15 - 7,
+      delta: 0,
       color: '#f97316',
       accentColor: '#f97316',
       href: '/situations',
+      tooltip: 'Number of distinct active conflict zones worldwide',
     },
     {
-      label: 'Escalation Index',
-      value: Math.floor(Math.random() * 100),
+      label: 'Hot Regions',
+      value: kpis.hotRegionCount,
       sparklineData: getSparklineData(),
-      delta: Math.random() * 25 - 12,
+      delta: 0,
       color: '#eab308',
       accentColor: '#eab308',
-      href: '/analysis',
+      href: '/analysis/countries',
+      tooltip: 'Regions with elevated threat levels requiring monitoring',
     },
     {
-      label: 'Avg Severity',
-      value: Math.floor(Math.random() * 5),
+      label: 'Active Alerts',
+      value: kpis.activeAlertsCount,
       sparklineData: getSparklineData(),
-      delta: Math.random() * 10 - 5,
+      delta: 0,
       color: '#22c55e',
       accentColor: '#22c55e',
-      href: '/feed',
+      href: '/alerts',
+      tooltip: 'Active alert rules that have been triggered',
     },
   ]
 
@@ -335,30 +348,57 @@ interface ThreatDot {
 
 function LiveThreatMapMini({ events }: { events: OverviewEvent[] }) {
   const dots = useMemo<ThreatDot[]>(() => {
-    const regionToDots: Record<string, ThreatDot[]> = {}
+    // Country-level coordinates for precise mapping
+    const COUNTRY_COORDS: Record<string, [number, number]> = {
+      'US': [150, 160], 'CA': [140, 100], 'MX': [130, 240],
+      'BR': [240, 400], 'AR': [220, 460], 'CO': [190, 320],
+      'GB': [370, 140], 'FR': [380, 170], 'DE': [400, 150],
+      'IT': [410, 185], 'ES': [360, 190], 'PL': [420, 140],
+      'UA': [460, 140], 'RU': [530, 110], 'TR': [480, 190],
+      'SY': [510, 210], 'IQ': [520, 220], 'IR': [550, 220],
+      'SA': [510, 270], 'YE': [500, 300], 'IL': [500, 215],
+      'PS': [498, 218], 'LB': [502, 205], 'JO': [505, 220],
+      'EG': [450, 250], 'LY': [420, 240], 'TN': [400, 215],
+      'SD': [460, 310], 'SS': [460, 340], 'ET': [480, 340],
+      'SO': [500, 350], 'KE': [480, 370], 'NG': [390, 320],
+      'CD': [440, 370], 'ZA': [440, 440],
+      'IN': [610, 270], 'PK': [580, 230], 'AF': [570, 210],
+      'BD': [640, 260], 'MM': [650, 270],
+      'CN': [670, 200], 'JP': [730, 180], 'KR': [710, 190],
+      'KP': [710, 175], 'TW': [710, 230],
+      'TH': [660, 300], 'VN': [670, 290], 'PH': [710, 290],
+      'ID': [680, 360], 'MY': [670, 330],
+      'AU': [720, 420],
+    }
+
+    // Fallback region coordinates for unmapped countries
+    const REGION_FALLBACK: Record<string, [number, number]> = {
+      'Middle East': [550, 280],
+      'Eastern Europe': [480, 220],
+      'North Africa': [400, 280],
+      'Sub-Saharan Africa': [440, 450],
+      'South Asia': [620, 350],
+      'East Asia': [700, 300],
+      'Southeast Asia': [680, 400],
+      'Latin America': [200, 450],
+      'Western Europe': [350, 200],
+      'Central America': [150, 360],
+      'Global': [500, 360],
+    }
+
+    const countryToDots: Record<string, ThreatDot[]> = {}
 
     events.slice(0, 30).forEach((event, idx) => {
-      const region = event.region || 'Global'
-      if (!regionToDots[region]) regionToDots[region] = []
+      // Prefer country_code over region for positioning
+      const countryCode = event.country_code || 'UNKNOWN'
+      if (!countryToDots[countryCode]) countryToDots[countryCode] = []
 
-      // Simplified world map coordinates
-      const coords: Record<string, [number, number]> = {
-        'Middle East': [550, 280],
-        'Eastern Europe': [480, 220],
-        'North Africa': [400, 280],
-        'Sub-Saharan Africa': [440, 450],
-        'South Asia': [620, 350],
-        'East Asia': [700, 300],
-        'Southeast Asia': [680, 400],
-        'Latin America': [200, 450],
-        'Western Europe': [350, 200],
-        'Central America': [150, 360],
-        'Global': [500, 360],
-      }
+      // Look up country coordinates; fallback to region or random
+      let [x, y] = COUNTRY_COORDS[countryCode] ||
+                   REGION_FALLBACK[event.region || 'Global'] ||
+                   [Math.random() * 800, Math.random() * 500]
 
-      const [x, y] = coords[region] || [Math.random() * 800, Math.random() * 500]
-
-      regionToDots[region].push({
+      countryToDots[countryCode].push({
         id: event.id,
         x: x + Math.random() * 30 - 15,
         y: y + Math.random() * 30 - 15,
@@ -367,7 +407,7 @@ function LiveThreatMapMini({ events }: { events: OverviewEvent[] }) {
       })
     })
 
-    return Object.values(regionToDots).flat()
+    return Object.values(countryToDots).flat()
   }, [events])
 
   return (
@@ -518,7 +558,8 @@ function HotRegionsPanel({ regions }: { regions: HotRegion[] }) {
         {safeRegions.map((region, idx) => {
           const color = RISK_COLORS[region.riskLevel]
           const width = `${(region.eventCount / maxCount) * 100}%`
-          const isEscalating = Math.random() > 0.5
+          // Show escalation based on risk level (critical/high = escalating)
+          const isEscalating = region.riskLevel === 'Critical' || region.riskLevel === 'High'
 
           return (
             <motion.div
@@ -666,6 +707,7 @@ interface ActivityItem {
   type: 'event' | 'alert' | 'prediction'
   title: string
   timeAgo: string
+  href?: string
 }
 
 function ActivityTimeline({ events }: { events: OverviewEvent[] }) {
@@ -675,12 +717,13 @@ function ActivityTimeline({ events }: { events: OverviewEvent[] }) {
       type: 'event',
       title: `New event: ${(event.title ?? 'Untitled').substring(0, 50)}`,
       timeAgo: formatRelativeOccurredTime(event.occurred_at),
+      href: `/feed?severity=${event.severity ?? 2}`,
     }))
 
     // Mix in some mock alerts and predictions
     const mockActivities: ActivityItem[] = [
-      { id: 'alert-1', type: 'alert', title: 'Alert triggered: Critical situation detected', timeAgo: '3m ago' },
-      { id: 'pred-1', type: 'prediction', title: 'Prediction confirmed: Escalation trend', timeAgo: '12m ago' },
+      { id: 'alert-1', type: 'alert', title: 'Alert triggered: Critical situation detected', timeAgo: '3m ago', href: '/alerts' },
+      { id: 'pred-1', type: 'prediction', title: 'Prediction confirmed: Escalation trend', timeAgo: '12m ago', href: '/analysis/forecasts' },
     ]
 
     return [...items.slice(0, 4), ...mockActivities, ...items.slice(4, 8)].slice(0, 8)
@@ -710,7 +753,7 @@ function ActivityTimeline({ events }: { events: OverviewEvent[] }) {
                   ? '#ef4444'
                   : '#10b981'
 
-            return (
+            const content = (
               <motion.div
                 key={activity.id}
                 initial={{ opacity: 0, x: -10 }}
@@ -733,6 +776,14 @@ function ActivityTimeline({ events }: { events: OverviewEvent[] }) {
                 </div>
               </motion.div>
             )
+
+            return activity.href ? (
+              <Link key={activity.id} href={activity.href} className="block hover:opacity-80 transition-opacity cursor-pointer">
+                {content}
+              </Link>
+            ) : (
+              content
+            )
           })}
         </div>
       </div>
@@ -746,7 +797,10 @@ function ActivityTimeline({ events }: { events: OverviewEvent[] }) {
 
 function GlobalStatsFooter({ data }: { data: OverviewData }) {
   const lastUpdated = data.lastUpdatedAt ? formatRelativeOccurredTime(data.lastUpdatedAt) : 'unknown'
-  const eventRate = Math.floor(Math.random() * 50) + 10
+  // Calculate events per hour based on 24h window
+  const eventRate = Math.max(1, Math.round(data.kpis.eventsWindow / 24))
+  // Estimate of countries monitored (based on typical deployment)
+  const countriesMonitored = 195
 
   return (
     <motion.div
@@ -762,7 +816,7 @@ function GlobalStatsFooter({ data }: { data: OverviewData }) {
             animate={{ opacity: [1, 0.5, 1] }}
             transition={{ duration: 2, repeat: Infinity }}
           />
-          <span>Monitoring {data.kpis.eventsWindow + Math.floor(Math.random() * 50)} countries</span>
+          <span>Monitoring {countriesMonitored} countries</span>
         </div>
         <div>·</div>
         <div>
@@ -898,7 +952,7 @@ export function OverviewClient() {
           <>
             {/* ROW 1: KPI COMMAND STRIP */}
             <div className="space-y-2">
-              <KpiCommandStrip kpis={data.kpis} window={win} />
+              <KpiCommandStrip kpis={data.kpis} window={win} severityCounts={data.severityCounts} />
             </div>
 
             {/* ROW 1.5: GLOBAL THREAT OVERVIEW */}

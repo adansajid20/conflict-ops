@@ -121,16 +121,21 @@ export async function GET(req: NextRequest): Promise<NextResponse<GlobalSummaryR
       .map(([country_code, event_count]) => ({ country_code, event_count }))
 
     // Calculate trending regions (increased activity)
-    const trendingRegions: TrendingRegion[] = Array.from(countryEventMap.entries())
+    const allRegions: TrendingRegion[] = Array.from(countryEventMap.entries())
       .map(([country_code, event_count]) => ({
         country_code,
         event_count,
         previous_count: countryPreviousMap.get(country_code) || 0,
         trend: event_count - (countryPreviousMap.get(country_code) || 0),
       }))
-      .filter((r) => r.trend > 0)
       .sort((a, b) => b.trend - a.trend)
-      .slice(0, 5)
+
+    // If no historical data, show top countries by current activity instead
+    // (indicates emerging/new activity rather than trend increase)
+    const hasHistoricalData = Array.from(countryPreviousMap.values()).some((count) => count > 0)
+    const trendingRegions: TrendingRegion[] = hasHistoricalData
+      ? allRegions.filter((r) => r.trend > 0).slice(0, 5)
+      : allRegions.slice(0, 5)
 
     // Calculate global threat level (0-100 scale)
     // Uses logarithmic scaling so the score is meaningful across wide event ranges.

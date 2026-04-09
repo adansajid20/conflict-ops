@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { RefreshCw, TrendingUp, AlertCircle } from 'lucide-react'
 import { getCountryName, getCountryFlag } from '@/lib/countries'
@@ -42,7 +43,8 @@ function ThreatGauge({ value }: { value: number }) {
   const circumference = 2 * Math.PI * 45
 
   return (
-    <div className="relative w-32 h-32">
+    <Link href="/methodology" title="View threat methodology">
+      <div className="relative w-32 h-32 cursor-pointer hover:opacity-80 transition-opacity">
       <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
         {/* Background circle */}
         <circle
@@ -87,7 +89,8 @@ function ThreatGauge({ value }: { value: number }) {
           <div className="text-[10px] font-semibold text-white/60 uppercase">Threat</div>
         </motion.div>
       </div>
-    </div>
+      </div>
+    </Link>
   )
 }
 
@@ -102,27 +105,37 @@ function SeverityCard({
   color: string
   icon: string
 }) {
+  const severityMap: Record<string, string> = {
+    Critical: 'critical',
+    High: 'high',
+    Medium: 'medium',
+    Low: 'low',
+  }
+  const severityParam = severityMap[label] || label.toLowerCase()
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={SPRING_CONFIG}
-      className="bg-white/5 border border-white/10 backdrop-blur-xl rounded-lg p-4 hover:bg-white/[0.07] transition-all"
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-xl">{icon}</span>
-        <span className="text-xs font-semibold text-white/60 uppercase">{label}</span>
-      </div>
-      <div className="flex items-end gap-2">
-        <div className="text-2xl font-bold tabular-nums" style={{ color }}>
-          {value}
+    <Link href={`/feed?severity=${severityParam}`}>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={SPRING_CONFIG}
+        className="bg-white/5 border border-white/10 backdrop-blur-xl rounded-lg p-4 hover:bg-white/[0.07] transition-all cursor-pointer"
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xl">{icon}</span>
+          <span className="text-xs font-semibold text-white/60 uppercase">{label}</span>
         </div>
-        <div
-          className="w-1 h-6 rounded-full"
-          style={{ backgroundColor: color, opacity: 0.6 }}
-        />
-      </div>
-    </motion.div>
+        <div className="flex items-end gap-2">
+          <div className="text-2xl font-bold tabular-nums" style={{ color }}>
+            {value}
+          </div>
+          <div
+            className="w-1 h-6 rounded-full"
+            style={{ backgroundColor: color, opacity: 0.6 }}
+          />
+        </div>
+      </motion.div>
+    </Link>
   )
 }
 
@@ -139,23 +152,25 @@ function CountryRow({
   const name = getCountryName(countryCode)
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ ...SPRING_CONFIG, delay: index * 0.05 }}
-      className="flex items-center justify-between py-2.5 px-3 rounded hover:bg-white/5 transition-colors"
-    >
-      <div className="flex items-center gap-2 min-w-0 flex-1">
-        <span className="text-lg">{flag}</span>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold truncate">{name}</div>
-          <div className="text-xs text-white/40">{eventCount} events</div>
+    <Link href={`/analysis/countries/${countryCode.toLowerCase()}`}>
+      <motion.div
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ ...SPRING_CONFIG, delay: index * 0.05 }}
+        className="flex items-center justify-between py-2.5 px-3 rounded hover:bg-white/5 transition-colors cursor-pointer"
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className="text-lg">{flag}</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold truncate">{name}</div>
+            <div className="text-xs text-white/40">{eventCount} events</div>
+          </div>
         </div>
-      </div>
-      <div className="ml-auto pl-2">
-        <div className="text-sm font-bold tabular-nums text-cyan-400">{eventCount}</div>
-      </div>
-    </motion.div>
+        <div className="ml-auto pl-2">
+          <div className="text-sm font-bold tabular-nums text-cyan-400">{eventCount}</div>
+        </div>
+      </motion.div>
+    </Link>
   )
 }
 
@@ -174,28 +189,30 @@ function TrendingRow({
   const trendIcon = trend > 0 ? '📈' : '📉'
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ ...SPRING_CONFIG, delay: index * 0.05 }}
-      className="flex items-center justify-between py-2.5 px-3 rounded hover:bg-white/5 transition-colors"
-    >
-      <div className="flex items-center gap-2 min-w-0 flex-1">
-        <span className="text-lg">{flag}</span>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold truncate">{name}</div>
-          <div className="text-xs text-white/40">
-            {Math.abs(trend)} more event{Math.abs(trend) === 1 ? '' : 's'}
+    <Link href={`/analysis/countries/${countryCode.toLowerCase()}`}>
+      <motion.div
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ ...SPRING_CONFIG, delay: index * 0.05 }}
+        className="flex items-center justify-between py-2.5 px-3 rounded hover:bg-white/5 transition-colors cursor-pointer"
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className="text-lg">{flag}</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold truncate">{name}</div>
+            <div className="text-xs text-white/40">
+              {Math.abs(trend)} more event{Math.abs(trend) === 1 ? '' : 's'}
+            </div>
           </div>
         </div>
-      </div>
-      <div className="ml-auto pl-2 flex items-center gap-1.5">
-        <span className="text-lg">{trendIcon}</span>
-        <div className="text-sm font-bold tabular-nums" style={{ color: trendColor }}>
-          {trend > 0 ? '+' : ''}{trend}
+        <div className="ml-auto pl-2 flex items-center gap-1.5">
+          <span className="text-lg">{trendIcon}</span>
+          <div className="text-sm font-bold tabular-nums" style={{ color: trendColor }}>
+            {trend > 0 ? '+' : ''}{trend}
+          </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+    </Link>
   )
 }
 
