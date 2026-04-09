@@ -2,9 +2,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
-
-const CRON_SECRET = process.env.INTERNAL_SECRET ?? ''
 
 // Group events by title similarity — finds same story across multiple outlets
 function slugify(title: string): string {
@@ -18,8 +17,7 @@ function slugify(title: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  const token = req.nextUrl.searchParams.get('token')
-  if (token !== CRON_SECRET) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
   const since6h = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()

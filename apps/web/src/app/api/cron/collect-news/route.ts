@@ -2,15 +2,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
-
-function authOk(req: NextRequest) {
-  const token = new URL(req.url).searchParams.get('token')
-  if (token && token === process.env.INTERNAL_SECRET) return true
-  const auth = req.headers.get('authorization')
-  if (auth && process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true
-  return false
-}
 
 const CONFLICT_KEYWORDS = ['airstrike','missile','bombing','attack','military','troops','conflict','war','ceasefire','sanctions','coup','explosion','insurgent','rebel','militia','drone strike','nuclear','refugee','humanitarian crisis','territorial dispute','naval blockade','cyber attack','assassination','ethnic cleansing','arms deal','mercenary','Wagner','NATO','UN Security Council','martial law','border clash','ceasefire violation','peace talks','embargo','proxy war']
 
@@ -29,7 +22,7 @@ function toSnake(region: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   let collected = 0
 

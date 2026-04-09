@@ -274,7 +274,7 @@ export async function generateActorProfiles(
 
     // Calculate threat level
     let threatLevel: 'low' | 'medium' | 'high' | 'critical' = 'low'
-    const threatScore = recent7d * 0.4 + avgSeverity * 0.3 + (activityTrend === 'increasing' ? 2 : 0) + total * 0.1
+    const threatScore = Math.min(10, recent7d * 0.4 + avgSeverity * 0.3 + (activityTrend === 'increasing' ? 2 : 0) + total * 0.1)
     if (threatScore >= 8) threatLevel = 'critical'
     else if (threatScore >= 5) threatLevel = 'high'
     else if (threatScore >= 2) threatLevel = 'medium'

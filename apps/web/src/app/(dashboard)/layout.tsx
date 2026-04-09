@@ -11,9 +11,11 @@ import {
   Bell,
   Bot,
   Brain,
+  Briefcase,
   ChevronLeft,
   Coins,
   Clock,
+  Crosshair,
   FileText,
   Flag,
   FlaskConical,
@@ -24,6 +26,7 @@ import {
   LineChart,
   Lock,
   MapPin,
+  Navigation,
   Palette,
   Plane,
   Radar,
@@ -73,14 +76,18 @@ const ANALYSIS_NAV: NavItem[] = [
   { href: '/analysis/forecasts', label: 'Predictive Forecasts', icon: LineChart },
   { href: '/analysis/actors', label: 'Actors', icon: Users },
   { href: '/analysis/reports', label: 'Reports', icon: FileText },
+  { href: '/reports', label: 'Intel Reports', icon: FileText },
   { href: '/analysis/countries', label: 'Countries', icon: Flag },
   { href: '/analysis/market', label: 'Market', icon: BarChart3 },
+  { href: '/markets', label: 'Markets Overview', icon: Coins },
 ]
 
 const INTELLIGENCE_PREMIUM_NAV: NavItem[] = [
   { href: '/situation-room', label: 'Situation Room', icon: Radio },
+  { href: '/situations', label: 'Situations', icon: Crosshair },
   { href: '/humanitarian', label: 'Humanitarian Tracker', icon: Heart },
   { href: '/anomalies', label: 'Anomalies', icon: AlertTriangle },
+  { href: '/missions', label: 'Missions', icon: Briefcase },
 ]
 
 const TOOLS_NAV: NavItem[] = [
@@ -96,6 +103,7 @@ const TOOLS_NAV: NavItem[] = [
   { href: '/custom', label: 'Custom', icon: Palette },
   { href: '/analyst', label: 'Analyst', icon: Bot },
   { href: '/tools/tracking', label: 'Tracking', icon: Radar },
+  { href: '/tracking', label: 'Live Tracking', icon: Navigation },
 ]
 
 const ADMIN_NAV: NavItem[] = [

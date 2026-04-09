@@ -1,25 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { ingestRSSLive } from '@/lib/ingest/rss-live'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
 export const dynamic = 'force-dynamic'
 
-function isAuthorized(request: Request): boolean {
-  const url = new URL(request.url)
-  const token = url.searchParams.get('token')
-  const internalSecret = process.env.INTERNAL_SECRET
-  const cronSecret = process.env.CRON_SECRET
-  const authorization = request.headers.get('authorization')
-
-  if (token && internalSecret && token === internalSecret) return true
-  if (authorization && cronSecret && authorization === `Bearer ${cronSecret}`) return true
-
-  return false
-}
-
-export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
+export async function GET(request: NextRequest) {
+  if (!cronAuthOk(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

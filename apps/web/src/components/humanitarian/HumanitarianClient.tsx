@@ -375,8 +375,9 @@ export function HumanitarianClient() {
         setLoading(true)
         const res = await fetch('/api/v1/humanitarian/overview', { cache: 'no-store' })
         if (!res.ok) throw new Error(`API error: ${res.statusText}`)
-        const json = (await res.json()) as HumanitarianOverviewResponse
-        setData(json)
+        const json = await res.json()
+        const data = (json.data || json) as HumanitarianOverviewResponse
+        setData(data)
         setError(null)
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to fetch data'

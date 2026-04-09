@@ -35,7 +35,6 @@ interface NewsAPIResponse {
 export async function ingestNewsAPI(): Promise<{ stored: number; skipped: number; errors: number; disabled?: boolean }> {
   const apiKey = process.env['NEWS_API_KEY']
   if (!apiKey) {
-    console.log('[NewsAPI] Skipping: NEWS_API_KEY not set. Get free key at https://newsapi.org/register')
     return { stored: 0, skipped: 0, errors: 0, disabled: true }
   }
 

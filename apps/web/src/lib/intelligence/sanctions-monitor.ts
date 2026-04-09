@@ -61,8 +61,8 @@ export async function detectActiveSanctionedEntities(): Promise<SanctionedEntity
 
     // Filter events where this entity appears (in title, description, or entities JSONB)
     const relevantEvents = matchingEvents.filter(evt => {
-      const title = (evt as Record<string, unknown>).title as string | undefined ?? ''
-      const description = (evt as Record<string, unknown>).description as string | undefined ?? ''
+      const title = ((evt as Record<string, unknown>).title as string | undefined) ?? ''
+      const description = ((evt as Record<string, unknown>).description as string | undefined) ?? ''
       const entitiesJson = evt.entities as Record<string, unknown> | null | undefined
       const entityList = (entitiesJson?.entities ?? []) as string[]
 

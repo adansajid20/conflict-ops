@@ -248,8 +248,6 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Log what ACLED returns so we can debug access issues
-    console.log(`[ACLED] Response keys: ${Object.keys(data).join(', ')}, data count: ${data.data?.length ?? 'undefined'}, status: ${data.status ?? 'none'}`)
 
     if (data.error || data.message) {
       console.error(`[ACLED] API error: ${data.message ?? JSON.stringify(data)}`)

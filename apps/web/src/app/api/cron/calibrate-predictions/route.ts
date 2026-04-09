@@ -2,6 +2,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import {
   calculateAccuracyMetrics,
   calculateAdjustmentFactors,
@@ -9,12 +10,8 @@ import {
   storePredictionCalibration,
 } from '@/lib/intelligence/prediction-feedback'
 
-function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
-}
-
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
     const [metrics, factors, scores] = await Promise.all([

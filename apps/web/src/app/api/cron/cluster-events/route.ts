@@ -2,11 +2,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
-
-function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
-}
 
 function getWorstSeverity(sevs: (number | null)[]): string {
   const nums = sevs.filter((s): s is number => s != null)
@@ -32,7 +29,7 @@ function calcTrajectory(evts: Array<{ severity: number | null; occurred_at: stri
 }
 
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
   const h48 = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()

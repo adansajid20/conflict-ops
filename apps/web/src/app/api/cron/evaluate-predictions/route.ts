@@ -2,14 +2,11 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
-function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
-}
-
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
 
   const { data: predictions } = await supabase.from('predictions').select('*').is('outcome', null).order('created_at', { ascending: true }).limit(50)

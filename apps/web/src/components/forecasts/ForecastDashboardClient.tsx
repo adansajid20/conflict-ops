@@ -877,7 +877,8 @@ export function ForecastDashboardClient() {
     }
 
     fetchData()
-  }, [horizon, selectedCountry])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [horizon])
 
   const selectedForecast = useMemo(
     () => forecasts.find(f => f.country_code === selectedCountry),

@@ -305,7 +305,7 @@ export async function generateToneShiftSignal(
     (shiftConfidence * 0.6 + languageConfidence * 0.4) / 2
   )
 
-  const changePercentage = (rhetoric.sentiment_shift / Math.abs(rhetoric.baseline_sentiment || 1)) * 100
+  const changePercentage = (rhetoric.sentiment_shift / Math.max(Math.abs(rhetoric.baseline_sentiment), 0.01)) * 100
 
   const description = `
 Rhetoric shift detected in ${rhetoric.country_code}: sentiment declined from ${rhetoric.baseline_sentiment.toFixed(2)} to ${rhetoric.recent_sentiment.toFixed(2)}

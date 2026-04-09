@@ -53,9 +53,11 @@ export function CommandPalette() {
 
   useEffect(() => {
     if (!open) return
+    let isMounted = true
     void fetch('/api/v1/events?limit=6', { cache: 'no-store' })
       .then((res) => res.json())
       .then((json: { data?: Array<{ id: string; title: string; source?: string; region?: string }> }) => {
+        if (!isMounted) return
         const items = (json.data ?? []).map((event) => ({
           id: `event-${event.id}`,
           label: event.title,
@@ -66,7 +68,8 @@ export function CommandPalette() {
         }))
         setRecentEvents(items)
       })
-      .catch(() => setRecentEvents([]))
+      .catch(() => { if (isMounted) setRecentEvents([]) })
+    return () => { isMounted = false }
   }, [open])
 
   const actionItems: PaletteItem[] = [

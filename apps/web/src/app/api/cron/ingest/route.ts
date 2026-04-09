@@ -1,6 +1,9 @@
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+import { NextRequest } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
+
 /**
  * GET /api/cron/ingest?token=<INTERNAL_SECRET>
  * Public cron trigger — for use with cron-job.org (free tier, GET only, no custom headers)
@@ -8,18 +11,8 @@ export const dynamic = 'force-dynamic'
  */
 export const maxDuration = 60
 
-export async function GET(req: Request) {
-  const url = new URL(req.url)
-  const token = url.searchParams.get('token') ?? ''
-  const validSecret = process.env['INTERNAL_SECRET'] ?? ''
-  const authHeader = req.headers.get('authorization') ?? ''
-  const cronSecret = process.env['CRON_SECRET'] ?? ''
-
-  const isAuthorized =
-    (token && validSecret && token === validSecret) ||
-    (authHeader && cronSecret && authHeader === `Bearer ${cronSecret}`)
-
-  if (!isAuthorized) {
+export async function GET(req: NextRequest) {
+  if (!cronAuthOk(req)) {
     return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 

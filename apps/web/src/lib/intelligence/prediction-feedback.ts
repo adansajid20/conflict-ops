@@ -247,7 +247,7 @@ export async function calculateBrierScores(): Promise<CalibrationMetrics> {
   for (const typeName of Object.keys(byTypeObj)) {
     const { brier_sum, confirmed, total } = byTypeObj[typeName]!
     by_type[typeName] = {
-      brier_score: brier_sum / total,
+      brier_score: total > 0 ? brier_sum / total : 0,
       accuracy: total > 0 ? confirmed / total : 0,
       sample_count: total,
     }
@@ -287,7 +287,7 @@ export async function calculateBrierScores(): Promise<CalibrationMetrics> {
   for (const regionName of Object.keys(byRegionObj)) {
     const { brier_sum, confirmed, total } = byRegionObj[regionName]!
     by_region[regionName] = {
-      brier_score: brier_sum / total,
+      brier_score: total > 0 ? brier_sum / total : 0,
       accuracy: total > 0 ? confirmed / total : 0,
       sample_count: total,
     }

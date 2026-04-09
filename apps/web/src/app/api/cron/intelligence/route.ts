@@ -2,17 +2,14 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { enhanceVesselIntelligence } from '@/lib/ingest/tracking/ais-enhanced'
 import { runSanctionsMonitoring } from '@/lib/intelligence/sanctions-monitor'
 import { collectEconomicSignals } from '@/lib/ingest/economic-signals'
 import { calculateAllCompositeScores } from '@/lib/intelligence/signal-aggregator'
 
-function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
-}
-
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const startTime = Date.now()
 

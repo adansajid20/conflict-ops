@@ -224,6 +224,7 @@ export function IntelDrawer({ item, items = [], onClose, onNavigate }: IntelDraw
         setRelated((j.data ?? []).filter(e => e.id !== item.id).slice(0, 3))
       )
       .catch(() => setRelated([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item?.id])
 
   if (!item) return null

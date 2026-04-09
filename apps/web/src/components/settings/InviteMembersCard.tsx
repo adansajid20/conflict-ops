@@ -18,14 +18,15 @@ export function InviteMembersCard({ isAdmin }: { isAdmin: boolean }) {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<InviteRecord[]>([])
 
-  const loadInvites = async () => {
-    if (!isAdmin) return
-    const res = await fetch('/api/v1/enterprise/invite', { cache: 'no-store' })
-    const json = await res.json() as { data?: InviteRecord[] }
-    setPending(json.data ?? [])
-  }
-
-  useEffect(() => { void loadInvites() }, [isAdmin])
+  useEffect(() => {
+    const loadInvites = async () => {
+      if (!isAdmin) return
+      const res = await fetch('/api/v1/enterprise/invite', { cache: 'no-store' })
+      const json = await res.json() as { data?: InviteRecord[] }
+      setPending(json.data ?? [])
+    }
+    void loadInvites()
+  }, [isAdmin])
 
   const submit = async () => {
     setLoading(true)
@@ -43,7 +44,9 @@ export function InviteMembersCard({ isAdmin }: { isAdmin: boolean }) {
         setEmail('')
         setRole('analyst')
         setOpen(false)
-        void loadInvites()
+        const res2 = await fetch('/api/v1/enterprise/invite', { cache: 'no-store' })
+        const json2 = await res2.json() as { data?: InviteRecord[] }
+        setPending(json2.data ?? [])
       }
     } catch {
       setError('Network error')

@@ -2,11 +2,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
-
-function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
-}
 
 const INTERACTION_WEIGHTS: Record<string, number> = {
   alert_create: 5, report_generate: 4, pin_to_board: 3, share: 3,
@@ -14,7 +11,7 @@ const INTERACTION_WEIGHTS: Record<string, number> = {
 }
 
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   const h7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 

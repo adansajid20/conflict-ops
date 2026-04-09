@@ -82,7 +82,7 @@ export async function GET(req: Request): Promise<NextResponse> {
     const eventCap = limits.dataRetentionDays === -1 ? -1 : limits.dataRetentionDays * 100
     if (orgData?.overage_policy === 'cap' && eventCap !== -1) {
       const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString()
-      const { count } = await supabase.from('events').select('id', { count: 'exact', head: true }).gte('ingested_at', monthStart)
+      const { count } = await supabase.from('events').select('id', { count: 'exact', head: true }).gte('occurred_at', monthStart)
       if ((count ?? 0) >= eventCap) {
         return NextResponse.json({ success: false, error: 'Event limit reached. Upgrade or change overage policy.' }, { status: 429 })
       }

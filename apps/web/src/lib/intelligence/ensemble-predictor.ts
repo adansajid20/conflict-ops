@@ -93,7 +93,8 @@ async function statisticalModel(
   }
 
   const n = counts.length
-  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+  const denominator = n * sumX2 - sumX * sumX
+  const slope = denominator !== 0 ? (n * sumXY - sumX * sumY) / denominator : 0
   const intercept = (sumY - slope * sumX) / n
 
   // Trend direction from slope

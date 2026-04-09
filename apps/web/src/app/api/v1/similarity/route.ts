@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   if (mode === 'events') {
     const { data, error } = await supabase.rpc('match_events', {
-      query_embedding: JSON.stringify(embedding),
+      query_embedding: embedding,
       match_threshold: threshold,
       match_count: limit,
     })
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ events: data ?? [], patterns: [] })
   } else {
     const { data, error } = await supabase.rpc('match_patterns', {
-      query_embedding: JSON.stringify(embedding),
+      query_embedding: embedding,
       match_threshold: threshold,
       match_count: limit,
     })

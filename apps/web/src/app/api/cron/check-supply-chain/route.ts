@@ -2,11 +2,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
-
-function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
-}
 
 async function callHaiku(prompt: string): Promise<string> {
   const key = process.env.ANTHROPIC_API_KEY
@@ -29,7 +26,7 @@ async function callHaiku(prompt: string): Promise<string> {
 }
 
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   const h15m = new Date(Date.now() - 15 * 60 * 1000).toISOString()
   const h24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()

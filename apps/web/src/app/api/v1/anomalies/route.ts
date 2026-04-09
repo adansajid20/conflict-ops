@@ -48,33 +48,62 @@ export async function GET(req: NextRequest) {
     // Parse anomalies from signal descriptions and add metadata
     const anomalies = (signals ?? [])
       .map(signal => {
-        // Extract z-score and anomaly level from description
-        let anomaly_level: 'moderate' | 'significant' | 'extreme' = 'moderate'
+        // Extract z-score from description
         let z_score = 2.5
+        let baseline_mean = 0
+        let current_value = 0
+        let deviation_type = 'events/day'
 
         const description = (signal.description as string) ?? ''
         const zMatch = description.match(/z-score:\s*([\d.-]+)/)
         if (zMatch && zMatch[1]) z_score = parseFloat(zMatch[1])
 
-        if (description.includes('extreme level')) anomaly_level = 'extreme'
-        else if (description.includes('significant level')) anomaly_level = 'significant'
-        else if (description.includes('moderate level')) anomaly_level = 'moderate'
+        // Extract baseline and current values if present
+        const baselineMatch = description.match(/baseline[:\s]+([\d.]+)/)
+        if (baselineMatch && baselineMatch[1]) baseline_mean = parseFloat(baselineMatch[1])
+
+        const currentMatch = description.match(/current[:\s]+([\d.]+)/)
+        if (currentMatch && currentMatch[1]) current_value = parseFloat(currentMatch[1])
+
+        // If we couldn't parse values, estimate from z-score
+        if (baseline_mean === 0 && z_score > 0) {
+          baseline_mean = 5.0
+          current_value = baseline_mean + z_score * 2.0
+        }
+
+        const devMatch = description.match(/deviation[:\s]+(\w+)/)
+        if (devMatch && devMatch[1]) deviation_type = devMatch[1]
 
         return {
           id: signal.id,
-          country: signal.region,
-          description: signal.description,
-          anomaly_level,
-          z_score,
+          country_code: signal.region ?? '',
+          pattern_type: (signal.pattern_type as string) ?? 'statistical_anomaly',
           confidence: signal.confidence,
+          metadata: {
+            z_score,
+            baseline_mean,
+            current_value,
+            deviation_type,
+          },
           detected_at: signal.detected_at,
-          resolved: signal.resolved,
+          region: signal.region ?? undefined,
         }
       })
 
+    // Compute stats for the frontend
+    const extreme = anomalies.filter(a => a.metadata.z_score > 4.0).length
+    const uniqueCountries = new Set(anomalies.map(a => a.country_code).filter(Boolean))
+    const latestDetection = anomalies.length > 0 ? anomalies[0]!.detected_at : new Date().toISOString()
+
     return NextResponse.json({
       success: true,
-      data: anomalies,
+      anomalies,
+      stats: {
+        total: anomalies.length,
+        extreme,
+        countries: uniqueCountries.size,
+        latest: latestDetection,
+      },
       pagination: {
         limit,
         offset,

@@ -2,11 +2,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
-
-function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
-}
 
 function col(cols: string[], i: number): string { return i >= 0 ? (cols[i] ?? '') : '' }
 
@@ -22,7 +19,7 @@ const CONFLICT_ZONES: [string, number, number, number, number][] = [
 ]
 
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const key = process.env.NASA_FIRMS_API_KEY
   if (!key) return NextResponse.json({ collected: 0, disabled: true, reason: 'No NASA_FIRMS_API_KEY' })

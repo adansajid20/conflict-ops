@@ -33,6 +33,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: enrichedProfile,
+      timestamp: new Date().toISOString(),
     })
   } catch (error) {
     console.error('[actor-profile] Error:', error)

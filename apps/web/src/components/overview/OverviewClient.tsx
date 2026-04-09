@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useSpring, useTransform, useMotionValue } from
 import { Clock, Map, RefreshCw, Activity, TrendingUp, AlertCircle, CheckCircle2, Zap } from 'lucide-react'
 import { safeRelativeTime } from '@/lib/utils/time'
 import { EventDetailPanel } from './EventDetailPanel'
+import { GlobalThreatOverview } from '@/components/dashboard/GlobalThreatOverview'
 import { getBestDescription, getLocationDisplay, getSignificanceTier, getRegionDisplay, getOutletDisplay } from '@/lib/event-presentation'
 import type { OverviewData, OverviewEvent, HotRegion } from './types'
 
@@ -828,6 +829,11 @@ export function OverviewClient() {
             {/* ROW 1: KPI COMMAND STRIP */}
             <div className="space-y-2">
               <KpiCommandStrip kpis={data.kpis} window={win} />
+            </div>
+
+            {/* ROW 1.5: GLOBAL THREAT OVERVIEW */}
+            <div className="space-y-2">
+              <GlobalThreatOverview />
             </div>
 
             {/* ROW 2: LIVE MAP + HOT REGIONS */}

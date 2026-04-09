@@ -170,8 +170,8 @@ export function ActorNetworkGraphClient() {
   useEffect(() => {
     Promise.all([fetch('/api/v1/actors/network').then(r => r.json())])
       .then(([networkData]) => {
-        if (networkData.success && networkData.data) {
-          const data = networkData.data
+        if (networkData.success) {
+          const data = networkData.data || networkData
           setActors(data.actors || [])
           setRelationships(data.relationships || [])
         }

@@ -2,18 +2,10 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { evaluateAllRules } from '@/lib/alerts/advanced-engine'
 import { computeEscalationLevel, ESCALATION_LABELS } from '@/lib/alerts/escalation'
 import { createServiceClient } from '@/lib/supabase/server'
-
-function authOk(req: NextRequest) {
-  const token = new URL(req.url).searchParams.get('token')
-  if (token && token === process.env.INTERNAL_SECRET) return true
-  const auth = req.headers.get('authorization')
-  if (auth && process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true
-  if (auth && process.env.INTERNAL_SECRET && auth === `Bearer ${process.env.INTERNAL_SECRET}`) return true
-  return false
-}
 
 /**
  * Advanced Alert Evaluation Cron
@@ -32,7 +24,7 @@ function authOk(req: NextRequest) {
  * 3. Multi-channel delivery (in_app, email, webhook)
  */
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
     // ── Phase 1: Rule evaluation ──

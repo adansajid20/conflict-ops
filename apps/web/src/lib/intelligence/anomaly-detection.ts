@@ -70,7 +70,7 @@ export async function calculateCountryBaseline(country: string): Promise<Baselin
   const counts = Object.keys(dailyCountsObj).map(date => dailyCountsObj[date]!.count)
   const mean = counts.length > 0 ? counts.reduce((a, b) => a + b, 0) / counts.length : 0
   const variance = counts.length > 1 ? counts.reduce((acc, c) => acc + Math.pow(c - mean, 2), 0) / (counts.length - 1) : 0
-  const std_dev = Math.sqrt(variance)
+  const std_dev = Math.sqrt(Math.max(0, variance))
 
   // Calculate mean severity
   const severities = Object.keys(dailyCountsObj).map(

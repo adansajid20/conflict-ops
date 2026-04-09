@@ -2,9 +2,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
-
-const CRON_SECRET = process.env.INTERNAL_SECRET ?? ''
 
 // Conflict zone bounding boxes [minLon, minLat, maxLon, maxLat]
 const CONFLICT_ZONES: Record<string, [number, number, number, number]> = {
@@ -35,8 +34,7 @@ function classifyAircraftType(callsign: string | null, icao: string | null): str
 }
 
 export async function GET(req: NextRequest) {
-  const token = req.nextUrl.searchParams.get('token')
-  if (token !== CRON_SECRET) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
   let stored = 0, errors = 0

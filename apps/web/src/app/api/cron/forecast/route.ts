@@ -1,17 +1,15 @@
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+import { NextRequest } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { getCachedSnapshot, setCachedSnapshot } from '@/lib/cache/redis'
 import { detectTrends, updateCountryRiskScores } from '@/lib/intelligence/forecasting'
 
 export const maxDuration = 60
 
-export async function GET(req: Request) {
-  const url = new URL(req.url)
-  const token = url.searchParams.get('token') ?? ''
-  const validSecret = process.env['INTERNAL_SECRET'] ?? ''
-
-  if (!token || token !== validSecret) {
+export async function GET(req: NextRequest) {
+  if (!cronAuthOk(req)) {
     return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 

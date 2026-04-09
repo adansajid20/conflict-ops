@@ -2,11 +2,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
-
-function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
-}
 
 // Map region slug → ISO country codes + display names
 const COUNTRY_MAP: Array<{ code: string; name: string; region: string }> = [
@@ -68,7 +65,7 @@ function conflictIntensity(events: number, maxSev: number): string {
 }
 
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   const now = new Date()
   const d7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()

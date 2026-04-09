@@ -326,7 +326,11 @@ export async function GET(req: NextRequest) {
       supply_chain_resilience_score: resilienceScore,
     }
 
-    return NextResponse.json(response)
+    return NextResponse.json({
+      success: true,
+      data: response,
+      timestamp: new Date().toISOString(),
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })

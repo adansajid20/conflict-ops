@@ -1,6 +1,8 @@
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+import { NextRequest } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { extractEntitiesBatch } from '@/lib/intelligence/entity-extraction'
 
@@ -18,12 +20,8 @@ type AnalyzeEventRow = {
   provenance_raw: Record<string, unknown> | null
 }
 
-export async function GET(req: Request) {
-  const url = new URL(req.url)
-  const token = url.searchParams.get('token') ?? ''
-  const validSecret = process.env['INTERNAL_SECRET'] ?? ''
-
-  if (!token || token !== validSecret) {
+export async function GET(req: NextRequest) {
+  if (!cronAuthOk(req)) {
     return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 

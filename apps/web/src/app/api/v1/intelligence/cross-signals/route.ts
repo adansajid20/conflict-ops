@@ -285,26 +285,30 @@ export async function GET(request: NextRequest) {
     const mediumRiskHotspots = hotspots.filter(h => h.convergence_score >= 30 && h.convergence_score < 50).length
 
     return NextResponse.json({
-      metadata: {
-        generated_at: now.toISOString(),
-        analysis_period_days: 14,
-        events_analyzed: events.length,
-        countries_analyzed: countryEventsMap.size,
-        countries_with_convergence: hotspots.length,
+      success: true,
+      data: {
+        metadata: {
+          generated_at: now.toISOString(),
+          analysis_period_days: 14,
+          events_analyzed: events.length,
+          countries_analyzed: countryEventsMap.size,
+          countries_with_convergence: hotspots.length,
+        },
+        convergence_summary: {
+          critical_hotspots: criticalHotspots,
+          high_risk_hotspots: highRiskHotspots,
+          medium_risk_hotspots: mediumRiskHotspots,
+          total_convergence_countries: hotspots.length,
+        },
+        convergence_hotspots: hotspots.slice(0, 50), // Top 50
+        signal_definitions: Object.fromEntries(
+          Object.entries(SIGNAL_DOMAINS).map(([key, domain]) => [
+            key,
+            { name: domain.name },
+          ])
+        ),
       },
-      convergence_summary: {
-        critical_hotspots: criticalHotspots,
-        high_risk_hotspots: highRiskHotspots,
-        medium_risk_hotspots: mediumRiskHotspots,
-        total_convergence_countries: hotspots.length,
-      },
-      convergence_hotspots: hotspots.slice(0, 50), // Top 50
-      signal_definitions: Object.fromEntries(
-        Object.entries(SIGNAL_DOMAINS).map(([key, domain]) => [
-          key,
-          { name: domain.name },
-        ])
-      ),
+      timestamp: now.toISOString(),
     }, {
       headers: { 'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600' },
     })

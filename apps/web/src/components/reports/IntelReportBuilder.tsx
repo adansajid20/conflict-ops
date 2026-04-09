@@ -20,21 +20,23 @@ export function IntelReportBuilder() {
   const [events, setEvents] = useState<EventRecord[]>([])
   const [query, setQuery] = useState('')
 
-  const loadReports = async () => {
-    const res = await fetch('/api/v1/reports', { cache: 'no-store' })
-    const json = await res.json() as { data?: IntelReport[] }
-    const list = json.data ?? []
-    setReports(list)
-    if (!current && list[0]) setCurrent(list[0])
-  }
+  useEffect(() => {
+    const loadReports = async () => {
+      const res = await fetch('/api/v1/reports', { cache: 'no-store' })
+      const json = await res.json() as { data?: IntelReport[] }
+      const list = json.data ?? []
+      setReports(list)
+      if (list[0]) setCurrent(list[0])
+    }
 
-  const loadEvents = async () => {
-    const res = await fetch('/api/v1/events?limit=25', { cache: 'no-store' })
-    const json = await res.json() as { data?: EventRecord[] }
-    setEvents(json.data ?? [])
-  }
+    const loadEvents = async () => {
+      const res = await fetch('/api/v1/events?limit=25', { cache: 'no-store' })
+      const json = await res.json() as { data?: EventRecord[] }
+      setEvents(json.data ?? [])
+    }
 
-  useEffect(() => { void loadReports(); void loadEvents() }, [])
+    void loadReports(); void loadEvents()
+  }, [])
 
   const createReport = async () => {
     const res = await fetch('/api/v1/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'New Intel Report', classification_banner: 'UNCLASSIFIED' }) })

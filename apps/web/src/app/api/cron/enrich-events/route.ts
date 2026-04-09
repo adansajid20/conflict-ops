@@ -2,11 +2,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
-
-function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
-}
 
 function sevToInt(s: string): number {
   switch (s) { case 'critical': return 4; case 'high': return 3; case 'medium': return 2; default: return 1 }
@@ -27,7 +24,7 @@ function calcEscalationScore(analysis: Record<string, unknown>): number {
 }
 
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const key = process.env.ANTHROPIC_API_KEY
   if (!key) return NextResponse.json({ enriched: 0, disabled: true, reason: 'No ANTHROPIC_API_KEY' })

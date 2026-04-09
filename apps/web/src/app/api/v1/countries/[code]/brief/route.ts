@@ -277,36 +277,40 @@ export async function GET(
     const travelAdvisory = calculateTravelAdvisory(maxSeverity, events24h.length, severityDist.critical)
 
     return NextResponse.json({
-      metadata: {
-        generated_at: now.toISOString(),
-        country_code: countryCode,
-        api_version: 'v1',
+      success: true,
+      data: {
+        metadata: {
+          generated_at: now.toISOString(),
+          country_code: countryCode,
+          api_version: 'v1',
+        },
+        country_profile: {
+          name: profile.name,
+          region: profile.region,
+          population_estimate: profile.population,
+          current_risk_level: travelAdvisory,
+        },
+        risk_breakdown: riskBreakdown,
+        active_threats: activeThreats,
+        event_statistics: {
+          events_7d: events7d.length,
+          events_30d: events30d.length,
+          events_90d: events90d.length,
+          severity_distribution: severityDist,
+          top_event_types: topEventTypes,
+          total_casualties_30d: totalCasualties,
+        },
+        trend_analysis: {
+          direction: trend,
+          events_30d: events30d.length,
+          events_30d_prior: events30dPrior.length,
+          change_percent: events30dPrior.length > 0 ? Math.round(((events30d.length - events30dPrior.length) / events30dPrior.length) * 100) : 0,
+        },
+        key_actors: topActors,
+        neighboring_risk: neighboringRisks,
+        travel_advisory_level: travelAdvisory,
       },
-      country_profile: {
-        name: profile.name,
-        region: profile.region,
-        population_estimate: profile.population,
-        current_risk_level: travelAdvisory,
-      },
-      risk_breakdown: riskBreakdown,
-      active_threats: activeThreats,
-      event_statistics: {
-        events_7d: events7d.length,
-        events_30d: events30d.length,
-        events_90d: events90d.length,
-        severity_distribution: severityDist,
-        top_event_types: topEventTypes,
-        total_casualties_30d: totalCasualties,
-      },
-      trend_analysis: {
-        direction: trend,
-        events_30d: events30d.length,
-        events_30d_prior: events30dPrior.length,
-        change_percent: events30dPrior.length > 0 ? Math.round(((events30d.length - events30dPrior.length) / events30dPrior.length) * 100) : 0,
-      },
-      key_actors: topActors,
-      neighboring_risk: neighboringRisks,
-      travel_advisory_level: travelAdvisory,
+      timestamp: now.toISOString(),
     }, {
       headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200' },
     })

@@ -2,11 +2,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
-
-function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
-}
 
 // Region → commodity correlations
 const REGION_COMMODITY_MAP: Record<string, string[]> = {
@@ -45,7 +42,7 @@ async function callHaiku(prompt: string): Promise<string> {
 }
 
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   const h6 = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
   let detected = 0
@@ -74,6 +71,7 @@ export async function GET(req: NextRequest) {
       if (!before?.price || !after?.price) continue
       const priceBefore = before.price as number
       const priceAfter = after.price as number
+      if (priceBefore === 0) continue
       const changePct = ((priceAfter - priceBefore) / priceBefore) * 100
 
       // Only flag if price moved >1.5%

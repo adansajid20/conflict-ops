@@ -105,7 +105,6 @@ export async function ingestACLED(): Promise<{ stored: number; skipped: number; 
 
   if (!email || !apiKey) {
     // Not configured — skip silently (don't treat as error)
-    console.log('[ACLED] Skipping: ACLED_EMAIL and ACLED_API_KEY not set. Register free at https://developer.acleddata.com/')
     return { stored: 0, skipped: 0, errors: 0, disabled: true }
   }
 

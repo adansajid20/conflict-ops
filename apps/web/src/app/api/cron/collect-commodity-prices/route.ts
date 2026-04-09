@@ -2,11 +2,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
-
-function authOk(req: NextRequest) {
-  return new URL(req.url).searchParams.get('token') === process.env.INTERNAL_SECRET
-}
 
 // Commodity metadata
 const COMMODITIES = [
@@ -45,7 +42,7 @@ async function fetchYahooPrice(symbol: string): Promise<{ price: number; change_
 }
 
 export async function GET(req: NextRequest) {
-  if (!authOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   const now = new Date().toISOString()
   let inserted = 0
@@ -57,8 +54,8 @@ export async function GET(req: NextRequest) {
     if (!priceData) {
       const { data: last } = await supabase
         .from('commodity_prices').select('price').eq('symbol', commodity.symbol)
-        .order('recorded_at', { ascending: false }).limit(1).single()
-      const lastPrice = (last?.price as number) ?? commodity.base
+        .order('recorded_at', { ascending: false }).limit(1)
+      const lastPrice = (last?.[0]?.price as number) ?? commodity.base
       const change = (Math.random() - 0.5) * commodity.vol * 2
       const price = Math.max(lastPrice + change, commodity.base * 0.5)
       const change_24h = price - lastPrice

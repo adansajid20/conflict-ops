@@ -488,7 +488,8 @@ export function SituationRoomClient() {
 
       if (hotspotRes.ok) {
         const hotspotData = await hotspotRes.json()
-        setHotspots(hotspotData.data?.hotspots || hotspotData.data || [])
+        const hotspotContent = hotspotData.data || hotspotData
+        setHotspots(hotspotContent.convergence_hotspots || hotspotContent.hotspots || hotspotContent.data || [])
       }
 
       if (humanRes.ok) {
@@ -500,9 +501,10 @@ export function SituationRoomClient() {
       let compositeScoreMap = new Map<string, number>()
       if (compositeRes.ok) {
         const compositeData = await compositeRes.json()
-        const scores = Array.isArray(compositeData.composite_scores)
-          ? compositeData.composite_scores
-          : compositeData.data || []
+        const compositeContent = compositeData.data || compositeData
+        const scores = Array.isArray(compositeContent.composite_scores)
+          ? compositeContent.composite_scores
+          : compositeContent.data || []
         scores.forEach((item: CompositeScoreData) => {
           compositeScoreMap.set(item.country_code, item.composite_score)
         })

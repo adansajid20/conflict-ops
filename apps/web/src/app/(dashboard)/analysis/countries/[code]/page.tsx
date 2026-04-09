@@ -83,7 +83,8 @@ async function getCountryData(code: string): Promise<CountryBrief | null> {
       next: { revalidate: 3600 },
     })
     if (!res.ok) return null
-    return res.json()
+    const json = await res.json()
+    return json.data || json
   } catch {
     return null
   }

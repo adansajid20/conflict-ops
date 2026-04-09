@@ -201,8 +201,9 @@ export function AnomalyFeedClient() {
       const res = await fetch('/api/v1/anomalies', { cache: 'no-store' })
       if (!res.ok) throw new Error(`API error: ${res.status}`)
 
-      const data = await res.json() as { anomalies?: Anomaly[]; stats?: Stats }
-      setAnomalies(data.anomalies ?? [])
+      const data = await res.json() as { anomalies?: Anomaly[]; stats?: Stats; data?: Anomaly[] }
+      // Support both response shapes for backward compatibility
+      setAnomalies(data.anomalies ?? data.data ?? [])
       setStats(data.stats ?? null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch anomalies')

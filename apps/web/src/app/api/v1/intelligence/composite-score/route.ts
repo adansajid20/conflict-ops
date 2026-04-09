@@ -11,19 +11,23 @@ export async function GET(req: NextRequest) {
   const allCountries = url.searchParams.get('all') === 'true'
 
   try {
+    const timestamp = new Date().toISOString()
     if (allCountries) {
       // Calculate composite scores for all major conflict zones
       const scores = await calculateAllCompositeScores()
       return NextResponse.json({
-        composite_scores: scores,
-        count: scores.length,
-        timestamp: new Date().toISOString(),
+        success: true,
+        data: {
+          composite_scores: scores,
+          count: scores.length,
+        },
+        timestamp,
       })
     }
 
     if (!countryCode || !countryName) {
       return NextResponse.json(
-        { error: 'Missing required parameters: country_code and country_name (or use ?all=true)' },
+        { success: false, error: 'Missing required parameters: country_code and country_name (or use ?all=true)' },
         { status: 400 }
       )
     }
@@ -32,13 +36,16 @@ export async function GET(req: NextRequest) {
     const score = await calculateCompositeScore(countryCode, countryName)
 
     return NextResponse.json({
-      composite_score: score,
-      timestamp: new Date().toISOString(),
+      success: true,
+      data: {
+        composite_score: score,
+      },
+      timestamp,
     })
   } catch (error) {
     console.error('[composite-score] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to calculate composite score', details: String(error) },
+      { success: false, error: 'Failed to calculate composite score', details: String(error) },
       { status: 500 }
     )
   }

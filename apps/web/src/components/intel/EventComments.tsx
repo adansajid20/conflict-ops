@@ -21,6 +21,8 @@ export function EventComments({ eventId }: { eventId: string }) {
   const [comments, setComments] = useState<CommentRecord[]>([])
   const [members, setMembers] = useState<MemberRecord[]>([])
   const [body, setBody] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const suggestions = useMemo(() => {
     const match = body.match(/@([a-zA-Z0-9._-]*)$/)
@@ -33,28 +35,50 @@ export function EventComments({ eventId }: { eventId: string }) {
     }).slice(0, 5)
   }, [body, members])
 
-  const load = async () => {
-    const [commentsRes, orgRes] = await Promise.all([
-      fetch(`/api/v1/events/comments?event_id=${encodeURIComponent(eventId)}`, { cache: 'no-store' }),
-      fetch('/api/v1/enterprise/org', { cache: 'no-store' }),
-    ])
-    const commentsJson = await commentsRes.json() as { data?: CommentRecord[] }
-    const orgJson = await orgRes.json() as { data?: { members?: MemberRecord[] } }
-    setComments(commentsJson.data ?? [])
-    setMembers(orgJson.data?.members ?? [])
-  }
-
-  useEffect(() => { void load() }, [eventId])
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setError(null)
+        const [commentsRes, orgRes] = await Promise.all([
+          fetch(`/api/v1/events/comments?event_id=${encodeURIComponent(eventId)}`, { cache: 'no-store' }),
+          fetch('/api/v1/enterprise/org', { cache: 'no-store' }),
+        ])
+        if (!commentsRes.ok) throw new Error(`Failed to load comments: ${commentsRes.statusText}`)
+        if (!orgRes.ok) throw new Error(`Failed to load members: ${orgRes.statusText}`)
+        const commentsJson = await commentsRes.json() as { data?: CommentRecord[] }
+        const orgJson = await orgRes.json() as { data?: { members?: MemberRecord[] } }
+        setComments(commentsJson.data ?? [])
+        setMembers(orgJson.data?.members ?? [])
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load comments and members')
+      }
+    }
+    void load()
+  }, [eventId])
 
   const submit = async () => {
     if (!body.trim()) return
-    await fetch('/api/v1/events/comments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event_id: eventId, body: body.trim() }),
-    })
-    setBody('')
-    void load()
+    try {
+      setSubmitError(null)
+      const res = await fetch('/api/v1/events/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_id: eventId, body: body.trim() }),
+      })
+      if (!res.ok) throw new Error(`Failed to post comment: ${res.statusText}`)
+      setBody('')
+      // Reload comments after posting
+      const [commentsRes, orgRes] = await Promise.all([
+        fetch(`/api/v1/events/comments?event_id=${encodeURIComponent(eventId)}`, { cache: 'no-store' }),
+        fetch('/api/v1/enterprise/org', { cache: 'no-store' }),
+      ])
+      const commentsJson = await commentsRes.json() as { data?: CommentRecord[] }
+      const orgJson = await orgRes.json() as { data?: { members?: MemberRecord[] } }
+      setComments(commentsJson.data ?? [])
+      setMembers(orgJson.data?.members ?? [])
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to post comment')
+    }
   }
 
   const applyMention = (value: string) => {
@@ -63,6 +87,11 @@ export function EventComments({ eventId }: { eventId: string }) {
 
   return (
     <div className="space-y-3">
+      {error && (
+        <div className="rounded border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+          <strong>Error:</strong> {error}
+        </div>
+      )}
       <div className="relative">
         <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={3} placeholder="Add comment… Use @username to mention teammates."
           className="w-full rounded border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-sm text-white" style={{ resize: 'vertical' }} />
@@ -82,6 +111,11 @@ export function EventComments({ eventId }: { eventId: string }) {
       <div className="flex justify-end">
         <button onClick={() => void submit()} className="rounded bg-blue-500 px-4 py-2 text-xs mono font-bold text-white">POST COMMENT</button>
       </div>
+      {submitError && (
+        <div className="rounded border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+          <strong>Error:</strong> {submitError}
+        </div>
+      )}
       <div className="space-y-2">
         {comments.map((comment) => (
           <div key={comment.id} className="rounded border border-white/[0.05] bg-white/[0.03] p-3">

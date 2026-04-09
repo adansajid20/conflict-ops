@@ -63,7 +63,7 @@ async function getEventSignals(region: string): Promise<number> {
   const frequencyScore = events24h.length
 
   // Normalize: 10 events at severity 3 = ~15 points
-  return Math.min(25, Math.round((frequencyScore * 0.75) + (severityScore * 0.5)))
+  return Math.max(0, Math.min(25, Math.round((frequencyScore * 0.75) + (severityScore * 0.5))))
 }
 
 /**
@@ -320,14 +320,14 @@ export async function calculateCompositeScore(countryCode: string, countryName: 
 
   // Calculate weighted composite (0-100)
   const compositeScore = Math.round(
-    (normalizedScores.events / 25) * weights.events * 100 +
-    (normalizedScores.correlations / 20) * weights.correlations * 100 +
-    (normalizedScores.anomalies / 20) * weights.anomalies * 100 +
-    (normalizedScores.sentiment / 15) * weights.sentiment * 100 +
-    (normalizedScores.economic / 18) * weights.economic * 100 +
-    (normalizedScores.vessels / 15) * weights.vessels * 100 +
-    (normalizedScores.predictions / 12) * weights.predictions * 100 +
-    (normalizedScores.strategic / 20) * weights.strategic * 100
+    ((normalizedScores.events ?? 0) / 25) * weights.events * 100 +
+    ((normalizedScores.correlations ?? 0) / 20) * weights.correlations * 100 +
+    ((normalizedScores.anomalies ?? 0) / 20) * weights.anomalies * 100 +
+    ((normalizedScores.sentiment ?? 0) / 15) * weights.sentiment * 100 +
+    ((normalizedScores.economic ?? 0) / 18) * weights.economic * 100 +
+    ((normalizedScores.vessels ?? 0) / 15) * weights.vessels * 100 +
+    ((normalizedScores.predictions ?? 0) / 12) * weights.predictions * 100 +
+    ((normalizedScores.strategic ?? 0) / 20) * weights.strategic * 100
   )
 
   // Determine severity

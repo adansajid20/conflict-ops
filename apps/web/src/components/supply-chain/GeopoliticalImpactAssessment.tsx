@@ -112,8 +112,9 @@ export function GeopoliticalImpactAssessment() {
       const res = await fetch('/api/v1/supply-chain/impact', { cache: 'no-store' })
       if (!res.ok) throw new Error(`API error: ${res.status}`)
 
-      const json = await res.json() as ImpactData
-      setData(json)
+      const json = await res.json()
+      const data = (json.data || json) as ImpactData
+      setData(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch impact assessment')
       console.error('Impact assessment fetch error:', err)

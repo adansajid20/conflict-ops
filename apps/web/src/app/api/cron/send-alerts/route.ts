@@ -2,6 +2,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAuthOk } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendAlertEmail } from '@/lib/email/alerts'
 
@@ -28,16 +29,13 @@ type EventRow = {
   event_type?: string | null
 }
 
-const CRON_SECRET = process.env.INTERNAL_SECRET ?? ''
-
 function isMissingAlertsTable(error: { message?: string; code?: string } | null | undefined) {
   const message = `${error?.message ?? ''}`.toLowerCase()
   return error?.code === '42P01' || message.includes('relation') && message.includes('alerts') && message.includes('does not exist')
 }
 
 export async function GET(req: NextRequest) {
-  const token = req.nextUrl.searchParams.get('token')
-  if (token !== CRON_SECRET) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!cronAuthOk(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
   const since = new Date(Date.now() - 5 * 60 * 1000).toISOString()
@@ -58,7 +56,7 @@ export async function GET(req: NextRequest) {
   const { data: newEvents, error: eventsError } = await supabase
     .from('events')
     .select('id,title,severity,region,source,source_id,occurred_at,event_type')
-    .gte('ingested_at', since)
+    .gte('occurred_at', since)
     .order('occurred_at', { ascending: false })
     .limit(100)
 
