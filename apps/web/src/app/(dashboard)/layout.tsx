@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
 import {
   AlertCircle,
+  AlertTriangle,
   BarChart3,
   Bell,
   Bot,
@@ -79,6 +80,7 @@ const ANALYSIS_NAV: NavItem[] = [
 const INTELLIGENCE_PREMIUM_NAV: NavItem[] = [
   { href: '/situation-room', label: 'Situation Room', icon: Radio },
   { href: '/humanitarian', label: 'Humanitarian Tracker', icon: Heart },
+  { href: '/anomalies', label: 'Anomalies', icon: AlertTriangle },
 ]
 
 const TOOLS_NAV: NavItem[] = [

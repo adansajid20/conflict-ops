@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Shield, TrendingUp, MapPin } from 'lucide-react'
+import { Search, Shield, TrendingUp, MapPin, Network } from 'lucide-react'
 
 interface Actor {
   id: string; name: string; actor_type: string | null; country: string | null
@@ -79,6 +79,16 @@ export function ActorsClient() {
               {actors.length} tracked entities across all regions
             </p>
           </div>
+          <Link href="/analysis/actors/network">
+            <motion.button
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-cyan-400/40 bg-cyan-400/5 text-cyan-400 font-semibold text-sm hover:border-cyan-400/60 transition-colors"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Network className="w-4 h-4" />
+              View Network Graph
+            </motion.button>
+          </Link>
         </div>
 
         {/* Search bar */}

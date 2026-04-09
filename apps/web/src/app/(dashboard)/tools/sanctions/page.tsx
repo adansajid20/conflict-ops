@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { Search, AlertTriangle, CheckCircle, Clock, Shield } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ActiveSanctionsIntelligence } from '@/components/sanctions/ActiveSanctionsIntelligence'
 
 type Entity = { id: string; entity_name: string; entity_type: string; list_source: string; country: string; program: string }
 type Match = { id: string; sanctions_entity_id: string; matched_entity_type: string; matched_entity_id: string; match_confidence: number; match_reason: string; detected_at: string; reviewed: boolean; is_confirmed: boolean; sanctions_entity?: { entity_name: string; entity_type: string; list_source: string; program: string; country: string } }
@@ -245,6 +246,21 @@ export default function SanctionsPage() {
           <p className="text-xs mt-4 text-white/30">Data updated daily from OFAC SDN, EU Consolidated List, UN Security Council, and UK OFSI</p>
         </motion.div>
       )}
+
+      {/* Active Sanctions Intelligence Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, ...SPRING_SMOOTH }}
+        className="pt-6 border-t border-white/[0.06]"
+      >
+        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-orange-400" />
+          Active Sanctions Intelligence
+        </h2>
+        <p className="text-white/60 text-sm mb-5">Recently active sanctioned entities detected in ConflictRadar event stream</p>
+        <ActiveSanctionsIntelligence />
+      </motion.div>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Package, Plus, AlertTriangle, Trash2, MapPin } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUser } from '@clerk/nextjs'
+import { GeopoliticalImpactAssessment } from '@/components/supply-chain/GeopoliticalImpactAssessment'
 
 type Node = { id: string; node_name: string; node_type: string; country?: string; region?: string; criticality: string; notes?: string; risk_score?: number; travel_advisory?: string }
 type Alert = { id: string; node_id: string; title: string; impact_assessment: string; severity: string; created_at: string }
@@ -246,6 +247,21 @@ export default function SupplyChainPage() {
             </motion.div>
           ))}
         </div>
+      </motion.div>
+
+      {/* Geopolitical Impact Assessment Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, ...SPRING_SMOOTH }}
+        className="pt-6 border-t border-white/[0.06]"
+      >
+        <h2 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-red-400" />
+          Geopolitical Impact Assessment
+        </h2>
+        <p className="text-white/60 text-sm mb-5">Real-time supply chain resilience analysis and risk assessment</p>
+        <GeopoliticalImpactAssessment />
       </motion.div>
     </div>
   )

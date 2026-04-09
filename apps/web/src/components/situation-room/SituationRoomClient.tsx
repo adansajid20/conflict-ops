@@ -36,6 +36,15 @@ interface ThreatMatrixCountry {
   country_code: string
   country_name: string
   risk_level: 'critical' | 'high' | 'medium' | 'low'
+  composite_score?: number
+}
+
+interface CompositeScoreData {
+  country_code: string
+  country_name: string
+  composite_score: number
+  signal_components?: Record<string, number>
+  timestamp?: string
 }
 
 // Icon type casting
@@ -79,6 +88,13 @@ function getRiskColor(level: string): string {
   if (level === 'high') return '#f97316'
   if (level === 'medium') return '#eab308'
   return '#22c55e'
+}
+
+function getColorFromScore(score: number): string {
+  if (score >= 80) return '#ef4444' // red - critical
+  if (score >= 60) return '#f97316' // orange - high
+  if (score >= 30) return '#eab308' // yellow - medium
+  return '#22c55e' // green - low
 }
 
 // Status Bar Component
@@ -358,25 +374,26 @@ function ThreatMatrix({ countries }: { countries: ThreatMatrixCountry[] }) {
 
       {/* Grid */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-2 mb-4">
           <AnimatePresence>
             {countries.slice(0, 16).map((country, idx) => {
-              const color = getRiskColor(country.risk_level)
-              const isPulsing = country.risk_level === 'critical'
+              const score = country.composite_score ?? 0
+              const color = getColorFromScore(score)
+              const isPulsing = score >= 80
               return (
                 <motion.div
                   key={country.country_code}
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ ...SPRING_SNAPPY, delay: 0.4 + idx * 0.03 }}
-                  className={`aspect-square rounded-lg border flex items-center justify-center cursor-pointer relative overflow-hidden group transition-all ${
+                  className={`aspect-square rounded-lg border flex flex-col items-center justify-center cursor-pointer relative overflow-hidden group transition-all ${
                     isPulsing ? 'animate-pulse' : ''
                   }`}
                   style={{
                     backgroundColor: `${color}15`,
                     borderColor: `${color}40`,
                   }}
-                  title={country.country_name}
+                  title={`${country.country_name}: ${score.toFixed(0)}`}
                 >
                   {isPulsing && (
                     <div
@@ -390,12 +407,43 @@ function ThreatMatrix({ countries }: { countries: ThreatMatrixCountry[] }) {
                     <div className="text-lg font-bold" style={{ color }}>
                       {country.country_code}
                     </div>
+                    <div className="text-xs font-mono mt-1" style={{ color }}>
+                      {score.toFixed(0)}
+                    </div>
                   </div>
                 </motion.div>
               )
             })}
           </AnimatePresence>
         </div>
+
+        {/* Legend */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.55 }}
+          className="rounded-lg bg-white/[0.03] border border-white/10 p-3 text-[10px]"
+        >
+          <div className="font-semibold text-white/70 mb-2">Score Legend</div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#ef4444' }} />
+              <span className="text-white/50">80-100: Critical</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#f97316' }} />
+              <span className="text-white/50">60-80: High</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#eab308' }} />
+              <span className="text-white/50">30-60: Medium</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#22c55e' }} />
+              <span className="text-white/50">0-30: Low</span>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </motion.div>
   )
@@ -425,11 +473,12 @@ export function SituationRoomClient() {
   // Fetch all data
   const fetchData = useCallback(async () => {
     try {
-      const [eventsRes, hotspotRes, humanRes, threatRes] = await Promise.all([
+      const [eventsRes, hotspotRes, humanRes, threatRes, compositeRes] = await Promise.all([
         fetch('/api/v1/events?severity=critical,high&limit=20'),
         fetch('/api/v1/intelligence/cross-signals'),
         fetch('/api/v1/humanitarian/overview?days=7'),
         fetch('/api/v1/countries?limit=20&sort=risk'),
+        fetch('/api/v1/intelligence/composite-score?all=true'),
       ])
 
       if (eventsRes.ok) {
@@ -447,9 +496,27 @@ export function SituationRoomClient() {
         setHumanitarian(humanData.data || null)
       }
 
+      // Get composite scores and merge with threat matrix
+      let compositeScoreMap = new Map<string, number>()
+      if (compositeRes.ok) {
+        const compositeData = await compositeRes.json()
+        const scores = Array.isArray(compositeData.composite_scores)
+          ? compositeData.composite_scores
+          : compositeData.data || []
+        scores.forEach((item: CompositeScoreData) => {
+          compositeScoreMap.set(item.country_code, item.composite_score)
+        })
+      }
+
       if (threatRes.ok) {
         const threatData = await threatRes.json()
-        setThreatMatrix(threatData.data || [])
+        const countries = (threatData.data || []) as ThreatMatrixCountry[]
+        // Merge composite scores into threat matrix countries
+        const enrichedCountries = countries.map(country => ({
+          ...country,
+          composite_score: compositeScoreMap.get(country.country_code) ?? 0,
+        }))
+        setThreatMatrix(enrichedCountries)
       }
 
       setLoading(false)

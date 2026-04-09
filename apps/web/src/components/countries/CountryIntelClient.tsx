@@ -79,6 +79,38 @@ interface RiskScoreExplainer {
   }[]
 }
 
+interface StrategicContext {
+  country_code: string
+  phase: 'escalation' | 'peak' | 'de-escalation' | 'dormant'
+  long_term_trend: {
+    slope: number
+    direction: 'escalating' | 'stable' | 'de-escalating'
+    confidence: number
+    event_count_90d: number
+    severity_trend_90d: number
+    casualty_trend_90d: number
+  }
+  cyclical_context: {
+    is_seasonal: boolean
+    deviation_from_cycle: number
+    historical_pattern: string
+    quarter_comparison: {
+      current_30d: number
+      prior_year_same_period: number
+      difference_pct: number
+    }
+  }
+  active_precursors: {
+    type: string
+    detected_at: string
+    expected_follow_on: string
+    timeline_days: number
+    confidence: number
+  }[]
+  strategic_risk_level: number
+  forecast_note: string
+}
+
 interface ClientProps {
   countryData: CountryBrief
   riskScores: RiskScoreExplainer | null
@@ -393,6 +425,376 @@ function RiskIndicatorCards({ indicators }: { indicators: any[] }) {
           </motion.div>
         )
       })}
+    </motion.div>
+  )
+}
+
+/* ============================================================================ */
+/*  Strategic Assessment Section                                               */
+/* ============================================================================ */
+function StrategicAssessmentSection({ context }: { context: StrategicContext }) {
+  const ref = useRef(null)
+  const isInView = useInView(ref, { once: true })
+
+  // Phase configuration
+  const phaseConfig = {
+    escalation: { color: '#ef4444', icon: TrendingUp, label: 'Escalation', bgColor: 'rgba(239, 68, 68, 0.1)' },
+    peak: { color: '#f97316', icon: AlertTriangle, label: 'Peak Activity', bgColor: 'rgba(249, 115, 22, 0.1)' },
+    'de-escalation': { color: '#eab308', icon: TrendingDown, label: 'De-escalation', bgColor: 'rgba(234, 179, 8, 0.1)' },
+    dormant: { color: '#22c55e', icon: Activity, label: 'Dormant', bgColor: 'rgba(34, 197, 94, 0.1)' },
+  }
+
+  const phase = phaseConfig[context.phase as keyof typeof phaseConfig] || phaseConfig.dormant
+  const PhaseIcon = phase.icon
+
+  // Determine precursor urgency colors
+  const getPrecursorColor = (timelineDays: number, confidence: number) => {
+    if (timelineDays <= 7 && confidence > 0.7) return { bg: 'rgba(239, 68, 68, 0.1)', border: '#ef4444', label: 'Imminent' }
+    if (timelineDays <= 21 && confidence > 0.6) return { bg: 'rgba(249, 115, 22, 0.1)', border: '#f97316', label: 'Near-term' }
+    return { bg: 'rgba(234, 179, 8, 0.1)', border: '#eab308', label: 'Watch' }
+  }
+
+  return (
+    <motion.div
+      ref={ref}
+      className="space-y-6"
+      initial={{ opacity: 0 }}
+      animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+      transition={{ staggerChildren: 0.1 }}
+    >
+      <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+        <Shield className="w-6 h-6 text-purple-400" />
+        Strategic Assessment
+      </h2>
+
+      {/* Conflict Phase Badge */}
+      <motion.div
+        className="rounded-2xl border overflow-hidden p-8"
+        style={GLASS_STYLE}
+        initial={{ opacity: 0, y: 20 }}
+        animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+        transition={{ duration: 0.6, ...SPRING_CONFIG }}
+      >
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-purple-400/30 to-transparent" />
+
+        <h3 className="text-lg font-bold text-white mb-6">Current Phase</h3>
+
+        <motion.div
+          className="flex items-center gap-6 p-6 rounded-xl"
+          style={{ backgroundColor: phase.bgColor, borderLeft: `4px solid ${phase.color}` }}
+          initial={{ scale: 0.95 }}
+          animate={isInView ? { scale: 1 } : { scale: 0.95 }}
+          transition={{ ...SPRING_CONFIG }}
+        >
+          <motion.div
+            animate={{ scale: [1, 1.15, 1] }}
+            transition={{ repeat: Infinity, duration: 2 }}
+            style={{ color: phase.color }}
+          >
+            <PhaseIcon className="w-10 h-10" />
+          </motion.div>
+          <div>
+            <motion.p className="text-3xl font-bold" style={{ color: phase.color }}>
+              {phase.label}
+            </motion.p>
+            <p className="text-sm text-white/60 mt-1">Conflict trajectory analysis</p>
+          </div>
+        </motion.div>
+      </motion.div>
+
+      {/* Long-Term Trend */}
+      <motion.div
+        className="rounded-2xl border overflow-hidden p-8"
+        style={GLASS_STYLE}
+        initial={{ opacity: 0, y: 20 }}
+        animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+        transition={{ duration: 0.6, delay: 0.1, ...SPRING_CONFIG }}
+      >
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-400/30 to-transparent" />
+
+        <h3 className="text-lg font-bold text-white mb-6">90-Day Trend Analysis</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Trend Direction */}
+          <motion.div
+            className="p-5 rounded-lg border"
+            style={{ borderColor: phase.color + '40' }}
+            initial={{ opacity: 0, x: -10 }}
+            animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: -10 }}
+            transition={{ delay: 0.1 }}
+          >
+            <p className="text-xs text-white/60 mb-3 font-semibold">Direction</p>
+            <div className="flex items-center gap-3 mb-2">
+              <motion.div
+                animate={{ y: context.long_term_trend.slope > 0 ? -3 : 3 }}
+                transition={{ repeat: Infinity, duration: 1.5, type: 'spring' as const }}
+                style={{ color: phase.color }}
+              >
+                {context.long_term_trend.direction === 'escalating' ? (
+                  <TrendingUp className="w-6 h-6" />
+                ) : context.long_term_trend.direction === 'de-escalating' ? (
+                  <TrendingDown className="w-6 h-6" />
+                ) : (
+                  <Activity className="w-6 h-6" />
+                )}
+              </motion.div>
+              <motion.p
+                className="text-2xl font-bold capitalize"
+                style={{ color: phase.color }}
+              >
+                {context.long_term_trend.direction}
+              </motion.p>
+            </div>
+            <p className="text-xs text-white/50">Slope: {context.long_term_trend.slope.toFixed(3)}</p>
+          </motion.div>
+
+          {/* Confidence & Events */}
+          <motion.div
+            className="space-y-3"
+            initial={{ opacity: 0, x: 10 }}
+            animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: 10 }}
+            transition={{ delay: 0.1 }}
+          >
+            <div className="p-5 rounded-lg border border-cyan-400/40">
+              <p className="text-xs text-white/60 mb-3 font-semibold">Confidence (R²)</p>
+              <div className="flex items-end gap-3">
+                <motion.p className="text-3xl font-bold text-cyan-400">
+                  {(context.long_term_trend.confidence * 100).toFixed(0)}%
+                </motion.p>
+                <motion.div
+                  className="flex-1 h-8 bg-white/5 rounded-lg overflow-hidden"
+                  initial={{ width: 0 }}
+                  animate={isInView ? { width: '100%' } : { width: 0 }}
+                >
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-cyan-400 to-blue-500"
+                    initial={{ width: 0 }}
+                    animate={isInView ? { width: `${context.long_term_trend.confidence * 100}%` } : { width: 0 }}
+                    transition={{ duration: 1.5, delay: 0.2 }}
+                  />
+                </motion.div>
+              </div>
+              <p className="text-xs text-white/50 mt-2">Trend fit quality</p>
+            </div>
+
+            <div className="p-5 rounded-lg border border-yellow-400/40">
+              <p className="text-xs text-white/60 mb-2 font-semibold">90-Day Event Count</p>
+              <motion.p className="text-2xl font-bold text-yellow-400 font-mono">
+                <AnimatedCounter value={context.long_term_trend.event_count_90d} />
+              </motion.p>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Simple line visualization */}
+        <motion.div
+          className="mt-6 p-4 bg-white/5 rounded-lg overflow-hidden"
+          initial={{ opacity: 0 }}
+          animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <svg width="100%" height="80" viewBox="0 0 300 60">
+            <line x1="0" y1="55" x2="300" y2="55" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+            <polyline
+              points="0,50 10,48 20,45 30,40 40,35 50,28 60,20 70,15 80,12 90,10 100,15 110,20 120,28 130,35 140,42 150,48 160,50 170,48 180,45 190,40 200,35 210,30 220,28 230,25 240,20 250,18 260,15 270,12 280,10 290,8 300,5"
+              fill="none"
+              stroke={phase.color}
+              strokeWidth="2"
+            />
+          </svg>
+        </motion.div>
+      </motion.div>
+
+      {/* Cyclical Context */}
+      {context.cyclical_context.is_seasonal && (
+        <motion.div
+          className="rounded-2xl border overflow-hidden p-8"
+          style={GLASS_STYLE}
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.6, delay: 0.2, ...SPRING_CONFIG }}
+        >
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-400/30 to-transparent" />
+
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-3">
+            <Globe className="w-5 h-5 text-amber-400" />
+            Seasonal Context
+          </h3>
+
+          <motion.div
+            className="p-4 rounded-lg border border-amber-400/40 bg-amber-400/5"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.95 }}
+            transition={{ ...SPRING_CONFIG }}
+          >
+            <p className="text-sm text-white font-semibold mb-2">
+              Activity is <span style={{ color: context.cyclical_context.deviation_from_cycle > 0 ? '#f97316' : '#22c55e' }} className="font-bold">
+                {Math.abs(context.cyclical_context.deviation_from_cycle).toFixed(0)}%
+              </span> {context.cyclical_context.deviation_from_cycle > 0 ? 'above' : 'below'} historical seasonal average
+            </p>
+            <p className="text-xs text-white/60">
+              Pattern: {context.cyclical_context.historical_pattern.replace(/_/g, ' ')}
+            </p>
+            <div className="mt-3 pt-3 border-t border-white/10">
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <p className="text-white/50">Current (30d)</p>
+                  <p className="font-bold text-white">{context.cyclical_context.quarter_comparison.current_30d}</p>
+                </div>
+                <div>
+                  <p className="text-white/50">Prior Year (30d)</p>
+                  <p className="font-bold text-white">{context.cyclical_context.quarter_comparison.prior_year_same_period}</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Active Precursors */}
+      {context.active_precursors.length > 0 && (
+        <motion.div
+          className="rounded-2xl border overflow-hidden p-8"
+          style={GLASS_STYLE}
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.6, delay: 0.3, ...SPRING_CONFIG }}
+        >
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-400/30 to-transparent" />
+
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-400" />
+            Active Precursors (Most Critical)
+          </h3>
+
+          <div className="space-y-3">
+            {context.active_precursors.map((precursor, i) => {
+              const urgency = getPrecursorColor(precursor.timeline_days, precursor.confidence)
+
+              return (
+                <motion.div
+                  key={`${precursor.type}-${i}`}
+                  className="p-5 rounded-lg border"
+                  style={{ backgroundColor: urgency.bg, borderColor: urgency.border + '60' }}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: -10 }}
+                  transition={{ delay: 0.3 + i * 0.08, ...SPRING_CONFIG }}
+                  whileHover={{ scale: 1.01, x: 2 }}
+                >
+                  <div className="flex items-start gap-4">
+                    <motion.div
+                      className="w-2 h-2 rounded-full flex-shrink-0 mt-2"
+                      style={{ backgroundColor: urgency.border }}
+                      animate={{ scale: [1, 1.3, 1] }}
+                      transition={{ repeat: Infinity, duration: 1.5 }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <p className="font-semibold text-white capitalize text-sm">
+                          {precursor.type.replace(/_/g, ' ')}
+                        </p>
+                        <motion.span
+                          className="text-xs font-bold px-2 py-1 rounded whitespace-nowrap"
+                          style={{ backgroundColor: urgency.border + '20', color: urgency.border }}
+                        >
+                          {urgency.label}
+                        </motion.span>
+                      </div>
+
+                      <p className="text-xs text-white/70 mb-2">
+                        Expected follow-on: <span className="font-semibold">{precursor.expected_follow_on}</span>
+                      </p>
+
+                      <div className="flex items-center justify-between text-[10px] text-white/60 gap-2">
+                        <div>Confidence: <span className="font-bold text-white">{(precursor.confidence * 100).toFixed(0)}%</span></div>
+                        <div>Timeline: <span className="font-bold text-white">{precursor.timeline_days} days</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Strategic Risk Score */}
+      <motion.div
+        className="rounded-2xl border overflow-hidden p-8"
+        style={GLASS_STYLE}
+        initial={{ opacity: 0, y: 20 }}
+        animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+        transition={{ duration: 0.6, delay: context.active_precursors.length > 0 ? 0.4 : 0.3, ...SPRING_CONFIG }}
+      >
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-pink-400/30 to-transparent" />
+
+        <h3 className="text-lg font-bold text-white mb-6">Strategic Risk Score</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Circular gauge */}
+          <motion.div
+            className="flex items-center justify-center"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.8 }}
+            transition={{ delay: 0.2, ...SPRING_CONFIG }}
+          >
+            <svg width="180" height="180" className="transform -rotate-90">
+              <circle cx="90" cy="90" r="80" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
+              <motion.circle
+                cx="90"
+                cy="90"
+                r="80"
+                fill="none"
+                stroke={context.strategic_risk_level > 75 ? '#ef4444' : context.strategic_risk_level > 50 ? '#f97316' : '#eab308'}
+                strokeWidth="8"
+                strokeDasharray={`${2 * Math.PI * 80}`}
+                strokeDashoffset={`${2 * Math.PI * 80 * (1 - context.strategic_risk_level / 100)}`}
+                initial={{ strokeDashoffset: 2 * Math.PI * 80 }}
+                animate={isInView ? { strokeDashoffset: 2 * Math.PI * 80 * (1 - context.strategic_risk_level / 100) } : {}}
+                transition={{ duration: 1.5, delay: 0.3 }}
+                strokeLinecap="round"
+                filter="drop-shadow(0 0 8px currentColor)"
+              />
+              <text
+                x="90"
+                y="95"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="text-2xl font-bold fill-white"
+              >
+                <tspan x="90" dy="0">
+                  <motion.tspan
+                    initial={{ opacity: 0 }}
+                    animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <AnimatedCounter value={context.strategic_risk_level} />
+                  </motion.tspan>
+                </tspan>
+                <tspan x="90" dy="16" className="text-xs fill-white/60">
+                  / 100
+                </tspan>
+              </text>
+            </svg>
+          </motion.div>
+
+          {/* Forecast Note */}
+          <motion.div
+            className="flex flex-col justify-center"
+            initial={{ opacity: 0, x: 10 }}
+            animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: 10 }}
+            transition={{ delay: 0.2 }}
+          >
+            <p className="text-xs text-white/60 mb-3 font-semibold">Forecast Assessment</p>
+            <motion.p className="text-sm leading-relaxed text-white/80 p-4 rounded-lg border border-white/10">
+              {context.forecast_note}
+            </motion.p>
+            <p className="text-xs text-white/40 mt-4">
+              Assessment generated from 90-day trend analysis, cyclical patterns, and precursor detection
+            </p>
+          </motion.div>
+        </div>
+      </motion.div>
     </motion.div>
   )
 }
@@ -854,6 +1256,22 @@ function TravelAdvisoryBanner({ advisory }: { advisory: any }) {
 /*  Main Client Component                                                      */
 /* ============================================================================ */
 export function CountryIntelClient({ countryData, riskScores }: ClientProps) {
+  const [strategicContext, setStrategicContext] = useState<StrategicContext | null>(null)
+  const [contextLoading, setContextLoading] = useState(true)
+
+  useEffect(() => {
+    // Fetch strategic context
+    fetch(`/api/v1/intelligence/strategic-context?country_code=${countryData.country_code}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.data) {
+          setStrategicContext(d.data)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setContextLoading(false))
+  }, [countryData.country_code])
+
   const getRiskColorForScore = (score: number) => {
     if (score >= 8) return RISK_COLORS.critical
     if (score >= 6) return RISK_COLORS.high
@@ -942,6 +1360,18 @@ export function CountryIntelClient({ countryData, riskScores }: ClientProps) {
       {/* Risk Radar Chart - Hero Visual */}
       {countryData.risk_breakdown.length > 0 && (
         <RiskRadarChart data={countryData.risk_breakdown} />
+      )}
+
+      {/* Strategic Assessment Section */}
+      {!contextLoading && strategicContext && (
+        <motion.div
+          className="space-y-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <StrategicAssessmentSection context={strategicContext} />
+        </motion.div>
       )}
 
       {/* 6-Indicator Risk Cards */}

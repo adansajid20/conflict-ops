@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, Info } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Info, TrendingUpIcon, Network, Activity, Clock } from 'lucide-react'
 
 /* ================================================================ */
 /*  Types                                                            */
@@ -44,6 +44,22 @@ type CrossSignal = {
   escalation_probability: number
 }
 
+type IndividualModel = {
+  model_name: string
+  probability: number
+  direction: 'escalate' | 'stable' | 'de-escalate'
+  weight: number
+}
+
+type EnsemblePrediction = {
+  ensemble_probability: number
+  ensemble_direction: 'escalate' | 'stable' | 'de-escalate'
+  confidence: number
+  model_agreement: number
+  individual_models: IndividualModel[]
+  reasoning: string
+}
+
 /* ================================================================ */
 /*  Constants                                                        */
 /* ================================================================ */
@@ -64,6 +80,225 @@ const DOMAIN_COLORS: Record<string, string> = {
 
 const SPRING_SNAPPY = { type: 'spring' as const, stiffness: 400, damping: 30 }
 const SPRING_SMOOTH = { type: 'spring' as const, stiffness: 120, damping: 20, mass: 0.8 }
+
+/* ================================================================ */
+/*  Model Icons Helper                                              */
+/* ================================================================ */
+function getModelIcon(modelName: string) {
+  if (modelName.toLowerCase().includes('statistical')) {
+    return <TrendingUpIcon className="w-5 h-5" />
+  }
+  if (modelName.toLowerCase().includes('pattern')) {
+    return <Network className="w-5 h-5" />
+  }
+  if (modelName.toLowerCase().includes('momentum')) {
+    return <Activity className="w-5 h-5" />
+  }
+  if (modelName.toLowerCase().includes('analogue') || modelName.toLowerCase().includes('historical')) {
+    return <Clock className="w-5 h-5" />
+  }
+  return <TrendingUpIcon className="w-5 h-5" />
+}
+
+function getAgreementColor(agreement: number) {
+  if (agreement >= 0.75) return '#22c55e' // green - strong agreement
+  if (agreement >= 0.5) return '#eab308' // yellow - mixed
+  return '#ef4444' // red - disagree
+}
+
+/* ================================================================ */
+/*  Ensemble Model Card                                             */
+/* ================================================================ */
+function EnsembleModelCard({ model, index }: { model: IndividualModel; index: number }) {
+  const directionIcon =
+    model.direction === 'escalate' ? '↑' :
+    model.direction === 'de-escalate' ? '↓' : '→'
+
+  const directionColor =
+    model.direction === 'escalate' ? '#ef4444' :
+    model.direction === 'de-escalate' ? '#22c55e' : '#eab308'
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...SPRING_SMOOTH, delay: 0.4 + index * 0.08 }}
+      className="rounded-xl overflow-hidden border p-4"
+      style={{
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%)',
+        borderColor: 'rgba(255,255,255,0.06)',
+      }}
+    >
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <div className="text-white/40">{getModelIcon(model.model_name)}</div>
+          <div>
+            <h4 className="text-sm font-semibold text-white">{model.model_name}</h4>
+            <p className="text-[11px] text-white/40">Weight: {(model.weight * 100).toFixed(0)}%</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-white/50">Probability</span>
+          <span className="text-sm font-bold tabular-nums" style={{ color: directionColor }}>
+            {(model.probability * 100).toFixed(0)}%
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between pt-2 border-t border-white/[0.05]">
+          <span className="text-xs text-white/50">Direction</span>
+          <span className="text-lg" style={{ color: directionColor }}>
+            {directionIcon}
+          </span>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+/* ================================================================ */
+/*  Ensemble Model Consensus Panel                                  */
+/* ================================================================ */
+function EnsembleModelConsensus({ ensemble, countryCode }: { ensemble: EnsemblePrediction | null; countryCode: string }) {
+  if (!ensemble) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ ...SPRING_SMOOTH, delay: 0.3 }}
+        className="rounded-2xl overflow-hidden border p-6 text-center text-white/50"
+        style={{
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%)',
+          borderColor: 'rgba(255,255,255,0.06)',
+        }}
+      >
+        <p>Loading ensemble consensus…</p>
+      </motion.div>
+    )
+  }
+
+  const agreementColor = getAgreementColor(ensemble.model_agreement)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...SPRING_SMOOTH, delay: 0.3 }}
+      className="rounded-2xl overflow-hidden border p-6 space-y-5"
+      style={{
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%)',
+        borderColor: 'rgba(255,255,255,0.06)',
+      }}
+    >
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+
+      <div className="flex items-center gap-2 mb-1">
+        <h3 className="text-sm font-semibold text-white">Ensemble Model Consensus</h3>
+        <Info className="w-4 h-4 text-white/30" />
+      </div>
+      <p className="text-xs text-white/40">Multi-model consensus prediction</p>
+
+      {/* Ensemble Probability - Large Number */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ ...SPRING_SNAPPY, delay: 0.35 }}
+        className="rounded-xl p-4 text-center"
+        style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.08)',
+        }}
+      >
+        <p className="text-xs text-white/50 mb-2">Ensemble Probability</p>
+        <motion.div
+          className="text-5xl font-bold font-mono mb-2"
+          style={{ color: '#06b6d4' }}
+        >
+          {(ensemble.ensemble_probability * 100).toFixed(0)}%
+        </motion.div>
+        <p className="text-sm text-white/60">
+          {ensemble.ensemble_direction === 'escalate' ? '📈 Escalation' :
+           ensemble.ensemble_direction === 'de-escalate' ? '📉 De-escalation' :
+           '➡️ Status Quo'}
+        </p>
+      </motion.div>
+
+      {/* Model Agreement */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ ...SPRING_SMOOTH, delay: 0.4 }}
+        className="rounded-xl p-4"
+        style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.08)',
+        }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-semibold text-white">Model Agreement</span>
+          <span className="text-sm font-bold" style={{ color: agreementColor }}>
+            {(ensemble.model_agreement * 100).toFixed(0)}%
+          </span>
+        </div>
+        <motion.div
+          className="relative h-2.5 rounded-full overflow-hidden"
+          style={{ background: 'rgba(255,255,255,0.05)' }}
+        >
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: agreementColor }}
+            initial={{ width: 0 }}
+            animate={{ width: `${ensemble.model_agreement * 100}%` }}
+            transition={{ duration: 1.2, delay: 0.45 }}
+          />
+        </motion.div>
+        <p className="text-[10px] text-white/40 mt-2">
+          {ensemble.model_agreement >= 0.75 ? '✓ Strong agreement between models' :
+           ensemble.model_agreement >= 0.5 ? '⚠ Mixed predictions' :
+           '⚠ Models strongly disagree'}
+        </p>
+      </motion.div>
+
+      {/* Individual Models Grid */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.35 }}
+      >
+        <h4 className="text-xs font-semibold text-white mb-3 flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-cyan-400/50" />
+          Individual Model Predictions
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {ensemble.individual_models.map((model, idx) => (
+            <EnsembleModelCard key={model.model_name} model={model} index={idx} />
+          ))}
+        </div>
+      </motion.div>
+
+      {/* Reasoning */}
+      {ensemble.reasoning && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...SPRING_SMOOTH, delay: 0.5 }}
+          className="rounded-xl p-4 border"
+          style={{
+            background: 'rgba(255,255,255,0.02)',
+            borderColor: 'rgba(255,255,255,0.05)',
+          }}
+        >
+          <p className="text-xs font-semibold text-white/60 mb-2">Ensemble Reasoning</p>
+          <p className="text-xs text-white/50 leading-relaxed">{ensemble.reasoning}</p>
+        </motion.div>
+      )}
+    </motion.div>
+  )
+}
 
 /* ================================================================ */
 /*  Animated Counter                                                */
@@ -568,9 +803,38 @@ function HistoricalContextPanel({ forecast }: { forecast: Forecast }) {
 export function ForecastDashboardClient() {
   const [forecasts, setForecasts] = useState<Forecast[]>([])
   const [crossSignals, setCrossSignals] = useState<CrossSignal[]>([])
+  const [ensemble, setEnsemble] = useState<EnsemblePrediction | null>(null)
+  const [ensembleLoading, setEnsembleLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null)
   const [horizon, setHorizon] = useState(14)
+
+  // Fetch ensemble prediction when country changes
+  useEffect(() => {
+    if (!selectedCountry) return
+
+    const fetchEnsemble = async () => {
+      setEnsembleLoading(true)
+      try {
+        const response = await fetch(
+          `/api/v1/intelligence/ensemble-forecast?country_code=${selectedCountry}&horizon=${horizon}`
+        )
+        if (response.ok) {
+          const data = await response.json()
+          setEnsemble(data.data?.prediction || null)
+        } else {
+          setEnsemble(null)
+        }
+      } catch (error) {
+        console.error('Failed to fetch ensemble data:', error)
+        setEnsemble(null)
+      } finally {
+        setEnsembleLoading(false)
+      }
+    }
+
+    fetchEnsemble()
+  }, [selectedCountry, horizon])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -713,6 +977,28 @@ export function ForecastDashboardClient() {
             <span className="text-lg">{COUNTRY_FLAGS[selectedForecast.country_code]}</span>
             {selectedForecast.country_name} - Detailed Analysis
           </h3>
+
+          {/* Ensemble Model Consensus */}
+          <div className="mb-6">
+            {ensembleLoading ? (
+              <motion.div
+                className="rounded-2xl border p-6 text-center text-white/50"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%)',
+                  borderColor: 'rgba(255,255,255,0.06)',
+                }}
+              >
+                <motion.div
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  Loading ensemble consensus…
+                </motion.div>
+              </motion.div>
+            ) : (
+              <EnsembleModelConsensus ensemble={ensemble} countryCode={selectedForecast.country_code} />
+            )}
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <ScenarioProbabilityPanel forecast={selectedForecast} />
