@@ -344,6 +344,7 @@ interface ThreatDot {
   y: number
   severity: number
   title: string
+  countryCode?: string
 }
 
 function LiveThreatMapMini({ events }: { events: OverviewEvent[] }) {
@@ -386,29 +387,65 @@ function LiveThreatMapMini({ events }: { events: OverviewEvent[] }) {
       'Global': [500, 360],
     }
 
-    const countryToDots: Record<string, ThreatDot[]> = {}
+    const allDots: ThreatDot[] = []
 
-    events.slice(0, 30).forEach((event, idx) => {
-      // Prefer country_code over region for positioning
+    events.slice(0, 30).forEach((event) => {
       const countryCode = event.country_code || 'UNKNOWN'
-      if (!countryToDots[countryCode]) countryToDots[countryCode] = []
 
-      // Look up country coordinates; fallback to region or random
-      let [x, y] = COUNTRY_COORDS[countryCode] ||
+      const [baseX, baseY] = COUNTRY_COORDS[countryCode] ||
                    REGION_FALLBACK[event.region || 'Global'] ||
-                   [Math.random() * 800, Math.random() * 500]
+                   [400, 250]
 
-      countryToDots[countryCode].push({
+      allDots.push({
         id: event.id,
-        x: x + Math.random() * 30 - 15,
-        y: y + Math.random() * 30 - 15,
+        x: baseX + Math.random() * 20 - 10,
+        y: baseY + Math.random() * 20 - 10,
         severity: event.severity ?? 2,
         title: event.title ?? 'Event',
+        countryCode: countryCode,
       })
     })
 
-    return Object.values(countryToDots).flat()
+    return allDots
   }, [events])
+
+  // Compute country labels from dots — show name near cluster center
+  const countryLabels = useMemo(() => {
+    const COUNTRY_NAMES: Record<string, string> = {
+      'US': 'United States', 'CA': 'Canada', 'MX': 'Mexico', 'BR': 'Brazil', 'AR': 'Argentina',
+      'CO': 'Colombia', 'GB': 'UK', 'FR': 'France', 'DE': 'Germany', 'IT': 'Italy', 'ES': 'Spain',
+      'PL': 'Poland', 'UA': 'Ukraine', 'RU': 'Russia', 'TR': 'Turkey', 'SY': 'Syria', 'IQ': 'Iraq',
+      'IR': 'Iran', 'SA': 'Saudi Arabia', 'YE': 'Yemen', 'IL': 'Israel', 'PS': 'Palestine',
+      'LB': 'Lebanon', 'JO': 'Jordan', 'EG': 'Egypt', 'LY': 'Libya', 'TN': 'Tunisia',
+      'SD': 'Sudan', 'SS': 'South Sudan', 'ET': 'Ethiopia', 'SO': 'Somalia', 'KE': 'Kenya',
+      'NG': 'Nigeria', 'CD': 'DR Congo', 'ZA': 'South Africa', 'IN': 'India', 'PK': 'Pakistan',
+      'AF': 'Afghanistan', 'BD': 'Bangladesh', 'MM': 'Myanmar', 'CN': 'China', 'JP': 'Japan',
+      'KR': 'South Korea', 'KP': 'North Korea', 'TW': 'Taiwan', 'TH': 'Thailand', 'VN': 'Vietnam',
+      'PH': 'Philippines', 'ID': 'Indonesia', 'MY': 'Malaysia', 'AU': 'Australia',
+    }
+
+    const grouped: Record<string, { x: number; y: number; count: number }> = {}
+    for (const dot of dots) {
+      const code = dot.countryCode || ''
+      if (!code || code === 'UNKNOWN') continue
+      const existing = grouped[code]
+      if (existing) {
+        existing.x += dot.x
+        existing.y += dot.y
+        existing.count++
+      } else {
+        grouped[code] = { x: dot.x, y: dot.y, count: 1 }
+      }
+    }
+
+    return Object.entries(grouped).map(([code, val]) => ({
+      code,
+      name: COUNTRY_NAMES[code] || code,
+      x: val.x / val.count,
+      y: val.y / val.count - 12,
+      count: val.count,
+    }))
+  }, [dots])
 
   return (
     <motion.section
@@ -449,32 +486,26 @@ function LiveThreatMapMini({ events }: { events: OverviewEvent[] }) {
           <path d="M680,380 L750,370 L770,420 L740,450 L690,440 Z" stroke="white" strokeWidth="0.6" fill="white" fillOpacity="0.03" />
         </svg>
 
-        {/* Region labels */}
-        <svg viewBox="0 0 800 500" className="absolute inset-0 w-full h-full">
-          {Object.entries({
-            'Middle East': [520, 190],
-            'Eastern Europe': [450, 110],
-            'Sub-Saharan Africa': [420, 360],
-            'South Asia': [610, 260],
-            'East Asia': [680, 140],
-            'Southeast Asia': [690, 300],
-            'Latin America': [200, 380],
-          } as Record<string, [number, number]>).map(([region, [x, y]]) => {
-            const regionDots = dots.filter(d => {
-              const coords: Record<string, [number, number]> = {
-                'Middle East': [550, 280], 'Eastern Europe': [480, 220], 'Sub-Saharan Africa': [440, 450],
-                'South Asia': [620, 350], 'East Asia': [700, 300], 'Southeast Asia': [680, 400], 'Latin America': [200, 450],
-              }
-              const [rx, ry] = coords[region] || [0, 0]
-              return Math.abs(d.x - rx) < 40 && Math.abs(d.y - ry) < 40
-            })
-            if (regionDots.length === 0) return null
-            return (
-              <text key={region} x={x} y={y} fill="white" opacity="0.25" fontSize="9" fontWeight="500" textAnchor="middle">
-                {region}
+        {/* Country name labels near dot clusters */}
+        <svg viewBox="0 0 800 500" className="absolute inset-0 w-full h-full pointer-events-none">
+          {countryLabels.map((label) => (
+            <g key={label.code}>
+              <text
+                x={label.x} y={label.y}
+                fill="white" opacity="0.5" fontSize="8" fontWeight="600"
+                textAnchor="middle"
+              >
+                {label.name}
               </text>
-            )
-          })}
+              <text
+                x={label.x} y={label.y + 9}
+                fill="white" opacity="0.25" fontSize="7"
+                textAnchor="middle"
+              >
+                {label.count} event{label.count !== 1 ? 's' : ''}
+              </text>
+            </g>
+          ))}
         </svg>
 
         {/* Threat dots */}

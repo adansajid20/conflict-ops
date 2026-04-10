@@ -1,7 +1,7 @@
-export const revalidate = 3600 // Cache for 1 hour
-export const dynamic = 'force-dynamic'
-
 import { MethodologyClient } from '@/components/methodology/MethodologyClient'
+import { headers } from 'next/headers'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Risk Scoring Methodology | ConflictRadar',
@@ -9,15 +9,17 @@ export const metadata = {
 }
 
 export default async function MethodologyPage() {
-  // Fetch methodology from the API
   let methodologyData = null
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+    // Build absolute URL from request headers (works on Vercel and locally)
+    const headersList = headers()
+    const host = headersList.get('host') || 'localhost:3000'
+    const protocol = headersList.get('x-forwarded-proto') || 'http'
+    const baseUrl = `${protocol}://${host}`
+
     const res = await fetch(`${baseUrl}/api/v1/risk-scores/methodology`, {
-      cache: 'force-cache',
-      headers: {
-        'Accept': 'application/json',
-      },
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' },
     })
     if (res.ok) {
       const json = await res.json()

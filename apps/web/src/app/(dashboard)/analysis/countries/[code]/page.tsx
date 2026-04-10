@@ -1,5 +1,8 @@
 import { CountryIntelClient } from '@/components/countries/CountryIntelClient'
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
+
+export const dynamic = 'force-dynamic'
 
 interface PageProps {
   params: {
@@ -75,12 +78,18 @@ interface RiskScoreExplainer {
   }[]
 }
 
+function getBaseUrl(): string {
+  const headersList = headers()
+  const host = headersList.get('host') || 'localhost:3000'
+  const protocol = headersList.get('x-forwarded-proto') || 'http'
+  return `${protocol}://${host}`
+}
+
 async function getCountryData(code: string): Promise<CountryBrief | null> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+    const baseUrl = getBaseUrl()
     const res = await fetch(`${baseUrl}/api/v1/countries/${code}/brief`, {
       cache: 'no-store',
-      next: { revalidate: 3600 },
     })
     if (!res.ok) return null
     const json = await res.json()
@@ -92,10 +101,9 @@ async function getCountryData(code: string): Promise<CountryBrief | null> {
 
 async function getRiskScores(code: string): Promise<RiskScoreExplainer | null> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+    const baseUrl = getBaseUrl()
     const res = await fetch(`${baseUrl}/api/v1/risk-scores/explain?country_code=${code}`, {
       cache: 'no-store',
-      next: { revalidate: 3600 },
     })
     if (!res.ok) return null
     return res.json()
