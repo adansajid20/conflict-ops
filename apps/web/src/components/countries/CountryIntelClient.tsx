@@ -112,8 +112,9 @@ interface StrategicContext {
 }
 
 interface ClientProps {
-  countryData: CountryBrief
-  riskScores: RiskScoreExplainer | null
+  countryCode: string
+  countryData?: CountryBrief
+  riskScores?: RiskScoreExplainer | null
 }
 
 /* ============================================================================ */
@@ -1255,11 +1256,160 @@ function TravelAdvisoryBanner({ advisory }: { advisory: any }) {
 /* ============================================================================ */
 /*  Main Client Component                                                      */
 /* ============================================================================ */
-export function CountryIntelClient({ countryData, riskScores }: ClientProps) {
+/* ============================================================================ */
+/*  FLAG emoji lookup                                                        */
+/* ============================================================================ */
+function countryCodeToFlag(code: string): string {
+  const codePoints = code
+    .toUpperCase()
+    .split('')
+    .map(c => 0x1F1E6 + c.charCodeAt(0) - 65)
+  return String.fromCodePoint(...codePoints)
+}
+
+/* ============================================================================ */
+/*  Transform API responses into component types                             */
+/* ============================================================================ */
+function transformBriefResponse(raw: Record<string, unknown>, code: string): CountryBrief {
+  const d = (raw as { data?: Record<string, unknown> }).data ?? raw
+  const profile = (d as Record<string, unknown>).country_profile as Record<string, unknown> | undefined
+  const stats = (d as Record<string, unknown>).event_statistics as Record<string, unknown> | undefined
+  const trend = (d as Record<string, unknown>).trend_analysis as Record<string, unknown> | undefined
+  const rb = (d as Record<string, unknown>).risk_breakdown as Record<string, number> | undefined
+  const advisoryLevel = ((d as Record<string, unknown>).travel_advisory_level ?? 1) as number
+  const advisoryLabels: Record<number, { label: string; description: string }> = {
+    1: { label: 'Exercise Normal Precautions', description: 'Standard safety measures recommended.' },
+    2: { label: 'Exercise Increased Caution', description: 'Be aware of heightened risks.' },
+    3: { label: 'Reconsider Travel', description: 'Serious risks present. Reconsider travel plans.' },
+    4: { label: 'Do Not Travel', description: 'Very high risk. Avoid all travel.' },
+  }
+  const advisory = advisoryLabels[advisoryLevel] ?? advisoryLabels[1]!
+
+  const riskBreakdown = rb
+    ? Object.entries(rb).map(([category, score]) => ({ category, score }))
+    : []
+
+  const sevDist = (stats?.severity_distribution ?? { critical: 0, high: 0, medium: 0, low: 0 }) as {
+    critical: number; high: number; medium: number; low: number
+  }
+
+  const riskLevel = advisoryLevel * 2.5 // map 1-4 to ~2.5-10 scale
+
+  const riskLabels: Record<number, string> = { 1: 'Low', 2: 'Moderate', 3: 'High', 4: 'Critical' }
+
+  return {
+    country_code: code,
+    country_name: (profile?.name ?? code) as string,
+    flag_emoji: countryCodeToFlag(code),
+    region: (profile?.region ?? 'Unknown') as string,
+    risk_level: riskLevel,
+    risk_label: riskLabels[advisoryLevel] ?? 'Unknown',
+    travel_advisory: {
+      level: advisoryLevel,
+      label: advisory.label,
+      description: advisory.description,
+    },
+    risk_breakdown: riskBreakdown,
+    active_threats: (((d as Record<string, unknown>).active_threats ?? []) as Record<string, unknown>[]).map(t => ({
+      id: (t.id ?? '') as string,
+      title: (t.title ?? 'Unknown Event') as string,
+      severity: String(t.severity ?? 'unknown'),
+      date: (t.occurred_at ?? '') as string,
+      event_type: (t.event_type ?? '') as string,
+    })),
+    event_stats: {
+      days_7: (stats?.events_7d ?? 0) as number,
+      days_30: (stats?.events_30d ?? 0) as number,
+      days_90: (stats?.events_90d ?? 0) as number,
+      severity_distribution: sevDist,
+      top_event_types: ((stats?.top_event_types ?? []) as { type: string; count: number }[]),
+      casualty_total: (stats?.total_casualties_30d ?? 0) as number,
+    },
+    trend_analysis: {
+      direction: (trend?.direction ?? 'stable') as string,
+      percentage_change: (trend?.change_percent ?? 0) as number,
+      interpretation: (trend?.direction === 'escalating' ? 'Situation is worsening compared to prior period' : trend?.direction === 'de_escalating' ? 'Situation is improving' : 'Situation remains stable') as string,
+    },
+    key_actors: (((d as Record<string, unknown>).key_actors ?? []) as Record<string, unknown>[]).map(a => ({
+      id: (a.actorId ?? '') as string,
+      name: (a.actorId ?? 'Unknown') as string,
+      event_count: (a.count ?? 0) as number,
+      threat_level: 'high',
+    })),
+    neighboring_countries: (((d as Record<string, unknown>).neighboring_risk ?? []) as Record<string, unknown>[]).map(n => ({
+      code: (n.country_code ?? '') as string,
+      name: (n.country_name ?? '') as string,
+      risk_level: (n.risk_level ?? 0) as number,
+    })),
+  }
+}
+
+function transformRiskScores(raw: Record<string, unknown>): RiskScoreExplainer {
+  const d = (raw as { data?: Record<string, unknown> }).data ?? raw
+  const indicatorKeys = [
+    { key: 'conflict_intensity', icon: '⚔️' },
+    { key: 'civilian_impact', icon: '👥' },
+    { key: 'geographic_spread', icon: '🌍' },
+    { key: 'escalation_trajectory', icon: '📈' },
+    { key: 'actor_fragmentation', icon: '🔀' },
+    { key: 'international_attention', icon: '📡' },
+  ]
+
+  const indicators = indicatorKeys
+    .map(({ key, icon }) => {
+      const ind = (d as Record<string, unknown>)[key] as Record<string, unknown> | undefined
+      if (!ind) return null
+      return {
+        id: key,
+        name: (ind.name ?? key) as string,
+        icon,
+        score: (ind.score ?? 0) as number,
+        reasoning: (ind.reasoning ?? '') as string,
+        trend: (ind.trend ?? 'stable') as string,
+      }
+    })
+    .filter(Boolean) as RiskScoreExplainer['indicators']
+
+  return { indicators }
+}
+
+export function CountryIntelClient({ countryCode, countryData: initialCountryData, riskScores: initialRiskScores }: ClientProps) {
+  const [countryData, setCountryData] = useState<CountryBrief | null>(initialCountryData ?? null)
+  const [riskScores, setRiskScores] = useState<RiskScoreExplainer | null>(initialRiskScores ?? null)
+  const [loading, setLoading] = useState(!initialCountryData)
+  const [error, setError] = useState<string | null>(null)
   const [strategicContext, setStrategicContext] = useState<StrategicContext | null>(null)
   const [contextLoading, setContextLoading] = useState(true)
 
+  // Client-side data fetching when no server data is provided
   useEffect(() => {
+    if (initialCountryData) return // Already have data from server
+    const code = countryCode.toUpperCase()
+    setLoading(true)
+    setError(null)
+
+    Promise.all([
+      fetch(`/api/v1/countries/${code}/brief`).then(r => {
+        if (!r.ok) throw new Error(`Country not found (${r.status})`)
+        return r.json()
+      }),
+      fetch(`/api/v1/risk-scores/explain?country_code=${code}`).then(r => r.ok ? r.json() : null),
+    ])
+      .then(([briefRaw, riskRaw]) => {
+        const brief = transformBriefResponse(briefRaw, code)
+        setCountryData(brief)
+        if (riskRaw?.success) {
+          setRiskScores(transformRiskScores(riskRaw))
+        }
+      })
+      .catch(err => {
+        setError(err.message || 'Failed to load country data')
+      })
+      .finally(() => setLoading(false))
+  }, [countryCode, initialCountryData])
+
+  useEffect(() => {
+    if (!countryData) return
     // Fetch strategic context
     fetch(`/api/v1/intelligence/strategic-context?country_code=${countryData.country_code}`)
       .then(r => r.json())
@@ -1270,13 +1420,47 @@ export function CountryIntelClient({ countryData, riskScores }: ClientProps) {
       })
       .catch(() => {})
       .finally(() => setContextLoading(false))
-  }, [countryData.country_code])
+  }, [countryData])
 
   const getRiskColorForScore = (score: number) => {
     if (score >= 8) return RISK_COLORS.critical
     if (score >= 6) return RISK_COLORS.high
     if (score >= 4) return RISK_COLORS.medium
     return RISK_COLORS.low
+  }
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-2 border-white/20 border-t-cyan-400 rounded-full animate-spin mx-auto" />
+          <p className="text-white/60 text-lg">Loading intelligence briefing...</p>
+          <p className="text-white/30 text-sm font-mono">{countryCode}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error || !countryData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4 max-w-md">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto">
+            <AlertTriangle className="w-8 h-8 text-red-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-white">Intelligence Unavailable</h2>
+          <p className="text-white/60">{error || `No intelligence data available for ${countryCode}.`}</p>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 text-white/80 hover:bg-white/20 transition-colors text-sm"
+          >
+            ← Back to Overview
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   const riskColor = getRiskColorForScore(countryData.risk_level)

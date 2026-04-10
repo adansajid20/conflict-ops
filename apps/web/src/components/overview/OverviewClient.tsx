@@ -348,104 +348,143 @@ interface ThreatDot {
 }
 
 function LiveThreatMapMini({ events }: { events: OverviewEvent[] }) {
-  const dots = useMemo<ThreatDot[]>(() => {
-    // Country-level coordinates for precise mapping
+  // Aggregate events by country for the map — show one dot per country, sized by count
+  const countryAggregates = useMemo(() => {
+    // Well-spaced country coordinates on a Mercator-like 800×500 projection
     const COUNTRY_COORDS: Record<string, [number, number]> = {
-      'US': [150, 160], 'CA': [140, 100], 'MX': [130, 240],
-      'BR': [240, 400], 'AR': [220, 460], 'CO': [190, 320],
-      'GB': [370, 140], 'FR': [380, 170], 'DE': [400, 150],
-      'IT': [410, 185], 'ES': [360, 190], 'PL': [420, 140],
-      'UA': [460, 140], 'RU': [530, 110], 'TR': [480, 190],
-      'SY': [510, 210], 'IQ': [520, 220], 'IR': [550, 220],
-      'SA': [510, 270], 'YE': [500, 300], 'IL': [500, 215],
-      'PS': [498, 218], 'LB': [502, 205], 'JO': [505, 220],
-      'EG': [450, 250], 'LY': [420, 240], 'TN': [400, 215],
-      'SD': [460, 310], 'SS': [460, 340], 'ET': [480, 340],
-      'SO': [500, 350], 'KE': [480, 370], 'NG': [390, 320],
-      'CD': [440, 370], 'ZA': [440, 440],
-      'IN': [610, 270], 'PK': [580, 230], 'AF': [570, 210],
-      'BD': [640, 260], 'MM': [650, 270],
-      'CN': [670, 200], 'JP': [730, 180], 'KR': [710, 190],
-      'KP': [710, 175], 'TW': [710, 230],
-      'TH': [660, 300], 'VN': [670, 290], 'PH': [710, 290],
-      'ID': [680, 360], 'MY': [670, 330],
-      'AU': [720, 420],
+      'US': [150, 170], 'CA': [145, 105], 'MX': [125, 245],
+      'BR': [245, 390], 'AR': [225, 455], 'CO': [195, 315],
+      'VE': [215, 295], 'PE': [190, 360], 'CL': [210, 435],
+      'GB': [368, 122], 'FR': [382, 158], 'DE': [402, 135],
+      'IT': [412, 172], 'ES': [358, 178], 'PL': [425, 128],
+      'UA': [462, 138], 'RU': [530, 100], 'TR': [478, 178],
+      // Middle East — spread these out more so they don't cluster
+      'SY': [490, 195], 'IQ': [510, 208], 'IR': [548, 198],
+      'SA': [505, 262], 'YE': [492, 298], 'IL': [476, 210],
+      'PS': [474, 218], 'LB': [478, 198], 'JO': [484, 222],
+      'AE': [530, 252], 'KW': [518, 232], 'OM': [540, 270],
+      // North Africa
+      'EG': [448, 238], 'LY': [415, 228], 'TN': [398, 206],
+      'DZ': [378, 218], 'MA': [358, 218],
+      // Sub-Saharan Africa — well-spaced
+      'SD': [458, 298], 'SS': [452, 328], 'ET': [478, 328],
+      'SO': [500, 340], 'KE': [476, 365], 'NG': [388, 312],
+      'CD': [438, 365], 'ZA': [438, 438], 'ML': [370, 288],
+      'BF': [372, 298], 'CM': [408, 335], 'MZ': [458, 410],
+      'CF': [425, 340],
+      // South Asia
+      'IN': [600, 262], 'PK': [572, 222], 'AF': [562, 202],
+      'BD': [618, 248], 'NP': [598, 235], 'LK': [608, 300],
+      // East Asia
+      'CN': [660, 192], 'JP': [728, 172], 'KR': [708, 185],
+      'KP': [700, 168], 'TW': [705, 228], 'MN': [642, 142],
+      // Southeast Asia
+      'MM': [638, 260], 'TH': [650, 288], 'VN': [662, 278],
+      'PH': [705, 278], 'ID': [675, 355], 'MY': [665, 322],
+      'KH': [658, 298], 'LA': [652, 268],
+      // Oceania
+      'AU': [718, 415],
     }
 
-    // Fallback region coordinates for unmapped countries
-    const REGION_FALLBACK: Record<string, [number, number]> = {
-      'Middle East': [550, 280],
-      'Eastern Europe': [480, 220],
-      'North Africa': [400, 280],
-      'Sub-Saharan Africa': [440, 450],
-      'South Asia': [620, 350],
-      'East Asia': [700, 300],
-      'Southeast Asia': [680, 400],
-      'Latin America': [200, 450],
-      'Western Europe': [350, 200],
-      'Central America': [150, 360],
-      'Global': [500, 360],
-    }
-
-    const allDots: ThreatDot[] = []
-
-    events.slice(0, 30).forEach((event) => {
-      const countryCode = event.country_code || 'UNKNOWN'
-
-      const [baseX, baseY] = COUNTRY_COORDS[countryCode] ||
-                   REGION_FALLBACK[event.region || 'Global'] ||
-                   [400, 250]
-
-      allDots.push({
-        id: event.id,
-        x: baseX + Math.random() * 20 - 10,
-        y: baseY + Math.random() * 20 - 10,
-        severity: event.severity ?? 2,
-        title: event.title ?? 'Event',
-        countryCode: countryCode,
-      })
-    })
-
-    return allDots
-  }, [events])
-
-  // Compute country labels from dots — show name near cluster center
-  const countryLabels = useMemo(() => {
     const COUNTRY_NAMES: Record<string, string> = {
       'US': 'United States', 'CA': 'Canada', 'MX': 'Mexico', 'BR': 'Brazil', 'AR': 'Argentina',
-      'CO': 'Colombia', 'GB': 'UK', 'FR': 'France', 'DE': 'Germany', 'IT': 'Italy', 'ES': 'Spain',
-      'PL': 'Poland', 'UA': 'Ukraine', 'RU': 'Russia', 'TR': 'Turkey', 'SY': 'Syria', 'IQ': 'Iraq',
-      'IR': 'Iran', 'SA': 'Saudi Arabia', 'YE': 'Yemen', 'IL': 'Israel', 'PS': 'Palestine',
-      'LB': 'Lebanon', 'JO': 'Jordan', 'EG': 'Egypt', 'LY': 'Libya', 'TN': 'Tunisia',
-      'SD': 'Sudan', 'SS': 'South Sudan', 'ET': 'Ethiopia', 'SO': 'Somalia', 'KE': 'Kenya',
-      'NG': 'Nigeria', 'CD': 'DR Congo', 'ZA': 'South Africa', 'IN': 'India', 'PK': 'Pakistan',
-      'AF': 'Afghanistan', 'BD': 'Bangladesh', 'MM': 'Myanmar', 'CN': 'China', 'JP': 'Japan',
-      'KR': 'South Korea', 'KP': 'North Korea', 'TW': 'Taiwan', 'TH': 'Thailand', 'VN': 'Vietnam',
-      'PH': 'Philippines', 'ID': 'Indonesia', 'MY': 'Malaysia', 'AU': 'Australia',
+      'CO': 'Colombia', 'VE': 'Venezuela', 'PE': 'Peru', 'CL': 'Chile',
+      'GB': 'UK', 'FR': 'France', 'DE': 'Germany', 'IT': 'Italy', 'ES': 'Spain',
+      'PL': 'Poland', 'UA': 'Ukraine', 'RU': 'Russia', 'TR': 'Turkey',
+      'SY': 'Syria', 'IQ': 'Iraq', 'IR': 'Iran', 'SA': 'Saudi Arabia', 'YE': 'Yemen',
+      'IL': 'Israel', 'PS': 'Palestine', 'LB': 'Lebanon', 'JO': 'Jordan',
+      'AE': 'UAE', 'KW': 'Kuwait', 'OM': 'Oman',
+      'EG': 'Egypt', 'LY': 'Libya', 'TN': 'Tunisia', 'DZ': 'Algeria', 'MA': 'Morocco',
+      'SD': 'Sudan', 'SS': 'S. Sudan', 'ET': 'Ethiopia', 'SO': 'Somalia', 'KE': 'Kenya',
+      'NG': 'Nigeria', 'CD': 'DR Congo', 'ZA': 'S. Africa', 'ML': 'Mali',
+      'BF': 'Burkina Faso', 'CM': 'Cameroon', 'MZ': 'Mozambique', 'CF': 'CAR',
+      'IN': 'India', 'PK': 'Pakistan', 'AF': 'Afghanistan', 'BD': 'Bangladesh',
+      'NP': 'Nepal', 'LK': 'Sri Lanka',
+      'CN': 'China', 'JP': 'Japan', 'KR': 'S. Korea', 'KP': 'N. Korea', 'TW': 'Taiwan',
+      'MN': 'Mongolia', 'MM': 'Myanmar', 'TH': 'Thailand', 'VN': 'Vietnam',
+      'PH': 'Philippines', 'ID': 'Indonesia', 'MY': 'Malaysia', 'KH': 'Cambodia',
+      'LA': 'Laos', 'AU': 'Australia',
     }
 
-    const grouped: Record<string, { x: number; y: number; count: number }> = {}
-    for (const dot of dots) {
-      const code = dot.countryCode || ''
-      if (!code || code === 'UNKNOWN') continue
-      const existing = grouped[code]
+    // Region fallback for unknown country codes
+    const REGION_FALLBACK: Record<string, [number, number]> = {
+      'Middle East': [510, 240], 'Western Asia': [510, 240],
+      'Eastern Europe': [460, 145], 'Central Europe': [410, 140],
+      'Western Europe': [375, 150], 'Southern Europe': [395, 175],
+      'North Africa': [400, 230], 'Northeast Africa': [460, 300],
+      'East Africa': [470, 355], 'West Africa': [380, 310],
+      'Central Africa': [430, 345], 'Southern Africa': [440, 420],
+      'Sub-Saharan Africa': [430, 380],
+      'South Asia': [595, 255], 'East Asia': [670, 180],
+      'Southeast Asia': [665, 310], 'Central Asia': [560, 165],
+      'South America': [220, 400], 'North America': [150, 150],
+      'Central America': [145, 265], 'Oceania': [720, 415],
+      'Global': [400, 280],
+    }
+
+    // Count events per country
+    const countryCounts: Record<string, { count: number; maxSeverity: number }> = {}
+    for (const event of events) {
+      const cc = event.country_code
+      if (!cc || cc === 'XX' || cc === 'UNKNOWN' || !/^[A-Z]{2}$/.test(cc)) continue
+      const existing = countryCounts[cc]
       if (existing) {
-        existing.x += dot.x
-        existing.y += dot.y
         existing.count++
+        existing.maxSeverity = Math.max(existing.maxSeverity, event.severity ?? 1)
       } else {
-        grouped[code] = { x: dot.x, y: dot.y, count: 1 }
+        countryCounts[cc] = { count: 1, maxSeverity: event.severity ?? 1 }
       }
     }
 
-    return Object.entries(grouped).map(([code, val]) => ({
-      code,
-      name: COUNTRY_NAMES[code] || code,
-      x: val.x / val.count,
-      y: val.y / val.count - 12,
-      count: val.count,
-    }))
-  }, [dots])
+    // Also count by region for events without valid country codes
+    const regionCounts: Record<string, { count: number; maxSeverity: number }> = {}
+    for (const event of events) {
+      const cc = event.country_code
+      if (cc && cc !== 'XX' && /^[A-Z]{2}$/.test(cc) && COUNTRY_COORDS[cc]) continue
+      const region = event.region || 'Global'
+      if (!REGION_FALLBACK[region]) continue
+      const existing = regionCounts[region]
+      if (existing) {
+        existing.count++
+        existing.maxSeverity = Math.max(existing.maxSeverity, event.severity ?? 1)
+      } else {
+        regionCounts[region] = { count: 1, maxSeverity: event.severity ?? 1 }
+      }
+    }
+
+    // Build final dot list — one per country
+    const result: { code: string; name: string; x: number; y: number; count: number; maxSeverity: number }[] = []
+
+    for (const [code, data] of Object.entries(countryCounts)) {
+      const coords = COUNTRY_COORDS[code]
+      if (!coords) continue
+      result.push({
+        code,
+        name: COUNTRY_NAMES[code] || code,
+        x: coords[0],
+        y: coords[1],
+        count: data.count,
+        maxSeverity: data.maxSeverity,
+      })
+    }
+
+    // Add region dots for unmapped events
+    for (const [region, data] of Object.entries(regionCounts)) {
+      const coords = REGION_FALLBACK[region]
+      if (!coords) continue
+      result.push({
+        code: region,
+        name: region,
+        x: coords[0],
+        y: coords[1],
+        count: data.count,
+        maxSeverity: data.maxSeverity,
+      })
+    }
+
+    // Sort by count descending so top countries render last (on top)
+    return result.sort((a, b) => a.count - b.count)
+  }, [events])
 
   return (
     <motion.section
@@ -464,67 +503,73 @@ function LiveThreatMapMini({ events }: { events: OverviewEvent[] }) {
       <div className="relative aspect-[16/9] bg-white/[0.01] overflow-hidden">
         {/* World map outline — simplified continents */}
         <svg viewBox="0 0 800 500" className="absolute inset-0 w-full h-full opacity-15">
-          {/* North America */}
           <path d="M60,80 L130,60 L180,70 L200,110 L190,150 L170,180 L140,200 L100,170 L70,130 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
-          {/* Central America */}
           <path d="M140,200 L170,210 L160,260 L140,280 L120,250 Z" stroke="white" strokeWidth="0.6" fill="white" fillOpacity="0.03" />
-          {/* South America */}
           <path d="M170,280 L220,260 L260,300 L270,380 L250,460 L200,470 L160,420 L150,340 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
-          {/* Europe */}
           <path d="M340,80 L400,60 L440,80 L460,120 L440,160 L400,170 L360,150 L340,120 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
-          {/* Africa */}
           <path d="M370,180 L430,170 L470,210 L480,300 L460,380 L420,420 L380,400 L360,320 L350,240 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
-          {/* Middle East */}
           <path d="M470,160 L540,150 L570,200 L550,250 L500,240 L470,210 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
-          {/* South Asia */}
           <path d="M570,200 L630,180 L660,240 L640,300 L590,290 L570,250 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
-          {/* East Asia */}
           <path d="M620,80 L700,60 L740,120 L730,200 L680,220 L640,180 L630,120 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
-          {/* Southeast Asia */}
           <path d="M650,260 L710,240 L740,300 L720,360 L680,350 L660,310 Z" stroke="white" strokeWidth="0.8" fill="white" fillOpacity="0.03" />
-          {/* Australia */}
           <path d="M680,380 L750,370 L770,420 L740,450 L690,440 Z" stroke="white" strokeWidth="0.6" fill="white" fillOpacity="0.03" />
         </svg>
 
-        {/* Country name labels near dot clusters */}
-        <svg viewBox="0 0 800 500" className="absolute inset-0 w-full h-full pointer-events-none">
-          {countryLabels.map((label) => (
-            <g key={label.code}>
-              <text
-                x={label.x} y={label.y}
-                fill="white" opacity="0.5" fontSize="8" fontWeight="600"
-                textAnchor="middle"
-              >
-                {label.name}
-              </text>
-              <text
-                x={label.x} y={label.y + 9}
-                fill="white" opacity="0.25" fontSize="7"
-                textAnchor="middle"
-              >
-                {label.count} event{label.count !== 1 ? 's' : ''}
-              </text>
-            </g>
-          ))}
-        </svg>
-
-        {/* Threat dots */}
+        {/* Country dots — one per country, sized by event count */}
         <svg viewBox="0 0 800 500" className="absolute inset-0 w-full h-full">
-          {dots.map((dot) => {
-            const pulseSpeed = dot.severity >= 4 ? 0.6 : dot.severity >= 3 ? 0.8 : 1.2
-            const dotSize = dot.severity >= 4 ? 5 : dot.severity >= 3 ? 3.5 : 2.5
-            const dotColor = dot.severity >= 4 ? '#ef4444' : dot.severity >= 3 ? '#f97316' : '#eab308'
+          {countryAggregates.map((item) => {
+            const dotColor = item.maxSeverity >= 4 ? '#ef4444' : item.maxSeverity >= 3 ? '#f97316' : item.maxSeverity >= 2 ? '#eab308' : '#22c55e'
+            // Size based on event count: min 3, max 12
+            const dotSize = Math.min(12, Math.max(3, 3 + Math.log2(item.count) * 2.5))
+            const pulseSpeed = item.maxSeverity >= 4 ? 0.8 : item.maxSeverity >= 3 ? 1.2 : 2
 
             return (
-              <g key={dot.id}>
+              <g key={item.code}>
+                {/* Pulse ring */}
                 <motion.circle
-                  cx={dot.x} cy={dot.y} r={dotSize}
-                  fill={dotColor} opacity="0.1"
-                  animate={{ r: dotSize * 2.5 }}
+                  cx={item.x} cy={item.y} r={dotSize}
+                  fill={dotColor} opacity="0.08"
+                  animate={{ r: [dotSize, dotSize * 3, dotSize] }}
                   transition={{ duration: pulseSpeed, repeat: Infinity, ease: 'easeOut' }}
                 />
-                <circle cx={dot.x} cy={dot.y} r={dotSize} fill={dotColor} opacity="0.8" />
-                <title>{dot.title} — Severity {dot.severity}</title>
+                {/* Glow */}
+                <circle cx={item.x} cy={item.y} r={dotSize * 1.5} fill={dotColor} opacity="0.06" />
+                {/* Main dot */}
+                <circle cx={item.x} cy={item.y} r={dotSize} fill={dotColor} opacity="0.85" />
+                {/* Inner bright core */}
+                <circle cx={item.x} cy={item.y} r={dotSize * 0.4} fill="white" opacity="0.3" />
+                <title>{item.name}: {item.count} events (Max Severity: {item.maxSeverity})</title>
+              </g>
+            )
+          })}
+        </svg>
+
+        {/* Country name labels — rendered on top */}
+        <svg viewBox="0 0 800 500" className="absolute inset-0 w-full h-full pointer-events-none">
+          {countryAggregates.map((item) => {
+            const labelY = item.y - Math.min(12, Math.max(3, 3 + Math.log2(item.count) * 2.5)) - 5
+            return (
+              <g key={`label-${item.code}`}>
+                {/* Dark background for readability */}
+                <rect
+                  x={item.x - 30} y={labelY - 8}
+                  width="60" height="18" rx="3"
+                  fill="#070B11" opacity="0.7"
+                />
+                <text
+                  x={item.x} y={labelY}
+                  fill="white" opacity="0.8" fontSize="8" fontWeight="700"
+                  textAnchor="middle" dominantBaseline="middle"
+                >
+                  {item.name}
+                </text>
+                <text
+                  x={item.x} y={labelY + 10}
+                  fill="white" opacity="0.35" fontSize="6.5"
+                  textAnchor="middle"
+                >
+                  {item.count} event{item.count !== 1 ? 's' : ''}
+                </text>
               </g>
             )
           })}
@@ -545,7 +590,7 @@ function LiveThreatMapMini({ events }: { events: OverviewEvent[] }) {
             <span className="text-[9px] text-white/40 font-medium">Medium</span>
           </div>
           <span className="text-[9px] text-white/20">•</span>
-          <span className="text-[9px] text-white/25">{dots.length} events plotted</span>
+          <span className="text-[9px] text-white/25">{countryAggregates.reduce((s, c) => s + c.count, 0)} events across {countryAggregates.length} locations</span>
         </div>
 
         {/* Gradient overlay bottom */}

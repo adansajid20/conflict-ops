@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronDown,
@@ -241,14 +241,51 @@ function IndicatorCard({ indicator, index }: { indicator: Indicator; index: numb
 
 export function MethodologyClient({ initialData }: Props) {
   const [activeTab, setActiveTab] = useState<'indicators' | 'sources' | 'limits' | 'faq'>('indicators')
-  const data = initialData
+  const [data, setData] = useState<MethodologyData | null>(initialData)
+  const [fetchError, setFetchError] = useState(false)
 
-  if (!data) {
+  // Client-side fetch when server-side data is unavailable
+  useEffect(() => {
+    if (initialData) return // Already have data from server
+    fetch('/api/v1/risk-scores/methodology')
+      .then(r => {
+        if (!r.ok) throw new Error('Failed')
+        return r.json()
+      })
+      .then(json => {
+        setData(json.data || json)
+      })
+      .catch(() => setFetchError(true))
+  }, [initialData])
+
+  if (!data && !fetchError) {
     return (
       <div className="w-full h-full flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-2 border-white/20 border-t-cyan-400 rounded-full animate-spin mx-auto mb-4" />
           <p className="text-white/50">Loading methodology...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <p className="text-white/60">Failed to load methodology data.</p>
+          <button
+            onClick={() => {
+              setFetchError(false)
+              fetch('/api/v1/risk-scores/methodology')
+                .then(r => r.json())
+                .then(json => setData(json.data || json))
+                .catch(() => setFetchError(true))
+            }}
+            className="px-4 py-2 rounded-lg bg-white/10 text-white/80 hover:bg-white/20 transition-colors text-sm"
+          >
+            Retry
+          </button>
         </div>
       </div>
     )
