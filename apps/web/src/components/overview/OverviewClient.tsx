@@ -868,6 +868,305 @@ function ActivityTimeline({ events }: { events: OverviewEvent[] }) {
 }
 
 // ============================================================================
+// GLOBAL VOLATILITY INDEX (CR-VIX)
+// ============================================================================
+
+interface VolatilityData {
+  global_index: number
+  average_7d: number
+  average_30d: number
+  trend: 'rising' | 'falling' | 'stable'
+  top_countries: Array<{
+    country: string
+    code: string
+    index: number
+    sparkline: number[]
+  }>
+}
+
+function GlobalVolatilityIndex() {
+  const [data, setData] = useState<VolatilityData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(false)
+    fetch('/api/v1/volatility-index?global=true')
+      .then(r => r.json())
+      .then((res: VolatilityData) => {
+        setData(res)
+        setLoading(false)
+      })
+      .catch(() => {
+        setError(true)
+        setLoading(false)
+      })
+  }, [])
+
+  const trendArrow = {
+    rising: '↑',
+    falling: '↓',
+    stable: '→',
+  }[data?.trend ?? 'stable']
+
+  const trendColor = {
+    rising: '#ef4444',
+    falling: '#22c55e',
+    stable: '#eab308',
+  }[data?.trend ?? 'stable']
+
+  const maxVIX = Math.max(...(data?.top_countries.map(c => c.index) ?? [100]), 100)
+
+  return (
+    <motion.section
+      className="overflow-hidden rounded-xl border border-white/[0.06] bg-gradient-to-br from-white/[0.03] to-white/[0.01]"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.3 }}
+    >
+      <div className="border-b border-white/[0.04] px-6 py-4">
+        <h2 className="text-sm font-semibold text-white/80">Global CR-VIX Index</h2>
+      </div>
+
+      <div className="px-6 py-6">
+        {loading ? (
+          <div className="text-center text-white/40">—</div>
+        ) : error || !data ? (
+          <div className="text-center text-white/40">Unable to load</div>
+        ) : (
+          <>
+            {/* Main VIX Display */}
+            <div className="mb-8">
+              <div className="flex items-baseline gap-4 mb-4">
+                <div className="text-5xl font-bold text-white tracking-tight">
+                  {Math.round(data.global_index)}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span style={{ color: trendColor }} className="text-2xl font-semibold">
+                    {trendArrow}
+                  </span>
+                  <span className="text-xs text-white/50 uppercase tracking-widest">
+                    {data.trend}
+                  </span>
+                </div>
+              </div>
+
+              {/* Moving Averages */}
+              <div className="flex gap-6 text-xs">
+                <div>
+                  <div className="text-white/40 mb-1">7d Avg</div>
+                  <div className="text-sm font-semibold text-white/70">
+                    {Math.round(data.average_7d)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-white/40 mb-1">30d Avg</div>
+                  <div className="text-sm font-semibold text-white/70">
+                    {Math.round(data.average_30d)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Top Volatile Countries */}
+            <div className="space-y-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-4">
+                Top Volatile Regions
+              </div>
+
+              {data.top_countries.map((country, idx) => {
+                const ratio = country.index / maxVIX
+                const countryColor = ratio > 0.66 ? '#ef4444' : ratio > 0.33 ? '#f97316' : '#eab308'
+
+                return (
+                  <motion.div
+                    key={country.code}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3, delay: idx * 0.05 }}
+                    className="flex items-center gap-3"
+                  >
+                    {/* Country flag emoji - would need mapping or fallback */}
+                    <span className="text-lg w-6">🌍</span>
+
+                    {/* Country name */}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-white/70">{country.country}</div>
+                      <div className="h-1 rounded-full overflow-hidden bg-white/[0.05] mt-1">
+                        <motion.div
+                          className="h-full rounded-full"
+                          style={{ background: countryColor }}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${ratio * 100}%` }}
+                          transition={{ duration: 0.8, delay: idx * 0.05 }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* VIX Score */}
+                    <div className="text-xs font-semibold text-white/60 w-8 text-right">
+                      {Math.round(country.index)}
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </motion.section>
+  )
+}
+
+// ============================================================================
+// EARLY WARNING SPOTLIGHT
+// ============================================================================
+
+interface EarlyWarning {
+  country_code: string
+  country_name: string
+  warning_level: 1 | 2 | 3 | 4 | 5
+  trajectory: 'escalating' | 'stable' | 'de_escalating'
+  updated_at: string
+}
+
+function EarlyWarningSpotlight() {
+  const [warnings, setWarnings] = useState<EarlyWarning[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(false)
+    fetch('/api/v1/early-warning')
+      .then(r => r.json())
+      .then((res: { data: EarlyWarning[] }) => {
+        setWarnings((res.data ?? []).sort((a, b) => b.warning_level - a.warning_level).slice(0, 5))
+        setLoading(false)
+      })
+      .catch(() => {
+        setError(true)
+        setLoading(false)
+      })
+  }, [])
+
+  const criticalLevel = warnings.some(w => w.warning_level >= 4)
+
+  const levelColor = (level: number) => {
+    switch (level) {
+      case 5:
+        return '#ef4444'
+      case 4:
+        return '#ef4444'
+      case 3:
+        return '#f97316'
+      case 2:
+        return '#eab308'
+      case 1:
+      default:
+        return '#22c55e'
+    }
+  }
+
+  const levelLabel = (level: number) => {
+    const labels = ['', 'Low', 'Medium', 'High', 'Critical', 'Extreme']
+    return labels[level] || 'Unknown'
+  }
+
+  const trajectoryArrow = (traj: string) => {
+    switch (traj) {
+      case 'escalating':
+        return '↑'
+      case 'de_escalating':
+        return '↓'
+      case 'stable':
+      default:
+        return '→'
+    }
+  }
+
+  return (
+    <motion.section
+      className={`overflow-hidden rounded-xl border transition-all duration-500 ${
+        criticalLevel
+          ? 'border-red-500/30 bg-gradient-to-br from-red-500/[0.08] to-red-500/[0.02] shadow-lg shadow-red-500/20'
+          : 'border-white/[0.06] bg-gradient-to-br from-white/[0.03] to-white/[0.01]'
+      }`}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.35 }}
+    >
+      {/* Pulsing glow border for critical alerts */}
+      {criticalLevel && (
+        <motion.div
+          className="absolute inset-0 rounded-xl border border-red-500/50 pointer-events-none"
+          animate={{ opacity: [0.3, 0.6, 0.3] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        />
+      )}
+
+      <div className="border-b border-white/[0.04] px-6 py-4 relative z-10">
+        <h2 className="text-sm font-semibold text-white/80">Early Warning Spotlight</h2>
+      </div>
+
+      <div className="px-6 py-6 relative z-10">
+        {loading ? (
+          <div className="text-center text-white/40">—</div>
+        ) : error ? (
+          <div className="text-center text-white/40">Unable to load</div>
+        ) : warnings.length === 0 ? (
+          <div className="text-center text-white/40">No warnings</div>
+        ) : (
+          <div className="space-y-3">
+            {warnings.map((warning, idx) => {
+              const color = levelColor(warning.warning_level)
+
+              return (
+                <motion.div
+                  key={warning.country_code}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: idx * 0.05 }}
+                >
+                  <Link
+                    href={`/analysis/countries/${warning.country_code.toLowerCase()}`}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors cursor-pointer group"
+                  >
+                    {/* Warning Level Badge */}
+                    <div
+                      className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs"
+                      style={{ background: `${color}20`, color }}
+                    >
+                      {warning.warning_level}
+                    </div>
+
+                    {/* Country Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-white/80 group-hover:text-white transition-colors">
+                        {warning.country_name}
+                      </div>
+                      <div className="text-[10px] text-white/40 mt-0.5">
+                        {levelLabel(warning.warning_level)} Level
+                      </div>
+                    </div>
+
+                    {/* Trajectory Arrow */}
+                    <div style={{ color }} className="text-lg font-semibold flex-shrink-0">
+                      {trajectoryArrow(warning.trajectory)}
+                    </div>
+                  </Link>
+                </motion.div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </motion.section>
+  )
+}
+
+// ============================================================================
 // GLOBAL STATS FOOTER
 // ============================================================================
 
@@ -1046,6 +1345,12 @@ export function OverviewClient() {
             <div className="grid gap-6 grid-cols-1 lg:grid-cols-[1fr_1fr]">
               <RecentCriticalEvents events={data.topStories} onSelect={setSelectedEvent} />
               <ActivityTimeline events={data.topStories} />
+            </div>
+
+            {/* ROW 4: VOLATILITY INDEX + EARLY WARNING */}
+            <div className="grid gap-6 grid-cols-1 lg:grid-cols-[1fr_1fr]">
+              <GlobalVolatilityIndex />
+              <EarlyWarningSpotlight />
             </div>
 
             {/* FOOTER: GLOBAL STATS */}

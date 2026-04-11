@@ -1380,6 +1380,9 @@ export function CountryIntelClient({ countryCode, countryData: initialCountryDat
   const [error, setError] = useState<string | null>(null)
   const [strategicContext, setStrategicContext] = useState<StrategicContext | null>(null)
   const [contextLoading, setContextLoading] = useState(true)
+  const [earlyWarning, setEarlyWarning] = useState<any | null>(null)
+  const [conflictPhase, setConflictPhase] = useState<any | null>(null)
+  const [actionBriefs, setActionBriefs] = useState<any | null>(null)
 
   // Client-side data fetching when no server data is provided
   useEffect(() => {
@@ -1394,12 +1397,24 @@ export function CountryIntelClient({ countryCode, countryData: initialCountryDat
         return r.json()
       }),
       fetch(`/api/v1/risk-scores/explain?country_code=${code}`).then(r => r.ok ? r.json() : null),
+      fetch(`/api/v1/early-warning?country_code=${code}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`/api/v1/conflict-phases?country_code=${code}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`/api/v1/action-briefs?country_code=${code}`).then(r => r.ok ? r.json() : null).catch(() => null),
     ])
-      .then(([briefRaw, riskRaw]) => {
+      .then(([briefRaw, riskRaw, warningRaw, phaseRaw, briefsRaw]) => {
         const brief = transformBriefResponse(briefRaw, code)
         setCountryData(brief)
         if (riskRaw?.success) {
           setRiskScores(transformRiskScores(riskRaw))
+        }
+        if (warningRaw?.success && warningRaw?.data) {
+          setEarlyWarning(warningRaw.data)
+        }
+        if (phaseRaw?.success && phaseRaw?.data) {
+          setConflictPhase(phaseRaw.data)
+        }
+        if (briefsRaw?.success && briefsRaw?.data) {
+          setActionBriefs(briefsRaw.data)
         }
       })
       .catch(err => {
@@ -1607,6 +1622,300 @@ export function CountryIntelClient({ countryCode, countryData: initialCountryDat
         <KeyActorsPanel actors={countryData.key_actors} />
         <NeighboringCountries neighbors={countryData.neighboring_countries} />
       </motion.div>
+
+      {/* Early Warning Assessment Section */}
+      {earlyWarning ? (
+        <motion.div
+          className="space-y-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8 }}
+        >
+          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+            <AlertTriangle className="w-6 h-6 text-orange-400" />
+            Early Warning Assessment
+          </h2>
+          <div className="space-y-6">
+            {/* Warning Level Badge */}
+            <div className="flex items-center justify-center gap-6">
+              <motion.div
+                className="relative w-32 h-32 rounded-full flex items-center justify-center font-bold text-5xl"
+                style={{
+                  backgroundColor:
+                    earlyWarning.warning_level >= 5
+                      ? '#ef4444'
+                      : earlyWarning.warning_level >= 4
+                        ? '#f97316'
+                        : earlyWarning.warning_level >= 3
+                          ? '#eab308'
+                          : '#22c55e',
+                  boxShadow: `0 0 20px ${
+                    earlyWarning.warning_level >= 5
+                      ? 'rgba(239, 68, 68, 0.5)'
+                      : earlyWarning.warning_level >= 4
+                        ? 'rgba(249, 115, 22, 0.5)'
+                        : earlyWarning.warning_level >= 3
+                          ? 'rgba(234, 179, 8, 0.5)'
+                          : 'rgba(34, 197, 94, 0.5)'
+                  }`,
+                }}
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+              >
+                {earlyWarning.warning_level}
+              </motion.div>
+              <div className="flex-1 space-y-2">
+                <p className="text-white/80 text-sm">Current Level</p>
+                <p className="text-white text-xl font-semibold">{earlyWarning.warning_label}</p>
+                <p className="text-white/60 text-sm">
+                  Trajectory: <span className="text-white font-semibold capitalize">
+                    {earlyWarning.trajectory?.direction || 'N/A'}
+                  </span>
+                </p>
+                {earlyWarning.time_to_crisis && (
+                  <p className="text-orange-400 text-sm">
+                    Est. {earlyWarning.time_to_crisis.estimated_hours}h to crisis
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Threat Scores Grid */}
+            {earlyWarning.threat_scores && Object.keys(earlyWarning.threat_scores).length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {Object.entries(earlyWarning.threat_scores).map(([threat, score]) => (
+                  <motion.div
+                    key={threat}
+                    className="p-3 rounded-lg border border-white/10 bg-white/[0.02]"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    <div className="text-xs font-semibold text-white/70 mb-2 capitalize">
+                      {threat.replace(/_/g, ' ')}
+                    </div>
+                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{
+                          backgroundColor: (score as number) >= 75 ? '#ef4444' : (score as number) >= 50 ? '#f97316' : '#22c55e',
+                        }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${score}%` }}
+                        transition={{ delay: 0.1, duration: 0.8 }}
+                      />
+                    </div>
+                    <div className="text-xs text-white/60 mt-1">{Math.round(score as number)}%</div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          className="p-6 rounded-xl bg-white/[0.02] border border-white/10 text-center text-white/50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8 }}
+        >
+          Early warning data unavailable
+        </motion.div>
+      )}
+
+      {/* Conflict Phase Section */}
+      {conflictPhase ? (
+        <motion.div
+          className="space-y-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.85 }}
+        >
+          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+            <Activity className="w-6 h-6 text-cyan-400" />
+            Conflict Phase Lifecycle
+          </h2>
+          <div className="space-y-6">
+            {/* Phase Timeline */}
+            <div className="p-6 bg-white/[0.02] border border-white/10 rounded-xl">
+              <div className="flex items-center justify-between gap-2 mb-8">
+                {['DORMANT', 'EMERGING', 'ESCALATION', 'CRISIS', 'DE-ESCALATION'].map((phase, idx) => {
+                  const isActive = conflictPhase.currentPhase === phase
+                  return (
+                    <motion.div
+                      key={phase}
+                      className="flex flex-col items-center flex-1"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.05 * idx }}
+                    >
+                      <motion.div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs mb-2 border-2 ${
+                          isActive
+                            ? 'border-cyan-400 bg-cyan-400/20 text-cyan-300'
+                            : 'border-white/20 bg-white/5 text-white/50'
+                        }`}
+                        animate={isActive ? { scale: [1, 1.2, 1] } : {}}
+                        transition={{ repeat: isActive ? Infinity : 0, duration: 2 }}
+                      >
+                        {idx + 1}
+                      </motion.div>
+                      <p className="text-xs font-semibold text-center text-white/70">{phase}</p>
+                    </motion.div>
+                  )
+                })}
+              </div>
+
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between text-white/60">
+                  <span>Phase Duration:</span>
+                  <span className="text-white">
+                    {conflictPhase.phaseDuration?.days || 'N/A'} days
+                    {conflictPhase.phaseDuration?.since && ` (since ${conflictPhase.phaseDuration.since})`}
+                  </span>
+                </div>
+                <div className="flex justify-between text-white/60">
+                  <span>Velocity:</span>
+                  <span className="text-white font-semibold capitalize">
+                    {conflictPhase.velocity?.classification || 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-white/60">
+                  <span>Confidence:</span>
+                  <span className="text-white">{Math.round((conflictPhase.confidence || 0) * 100)}%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Transition Probabilities */}
+            {conflictPhase.transitionProbabilities && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[
+                  { label: 'Next 7d', value: conflictPhase.transitionProbabilities.next7d },
+                  { label: 'Next 14d', value: conflictPhase.transitionProbabilities.next14d },
+                  { label: 'Next 30d', value: conflictPhase.transitionProbabilities.next30d },
+                ].map(({ label, value }) => (
+                  <motion.div
+                    key={label}
+                    className="p-4 bg-white/[0.02] border border-white/10 rounded-lg"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    <div className="text-xs text-white/50 mb-2">{label}</div>
+                    <div className="text-lg font-bold text-cyan-400">{Math.round((value || 0) * 100)}%</div>
+                    <div className="text-xs text-white/40">of phase change</div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          className="p-6 rounded-xl bg-white/[0.02] border border-white/10 text-center text-white/50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.85 }}
+        >
+          Conflict phase data unavailable
+        </motion.div>
+      )}
+
+      {/* Action Briefs Section */}
+      {actionBriefs && actionBriefs.actions && actionBriefs.actions.length > 0 ? (
+        <motion.div
+          className="space-y-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.9 }}
+        >
+          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+            <Target className="w-6 h-6 text-green-400" />
+            Prescriptive Action Recommendations
+          </h2>
+          <div className="space-y-4">
+            {/* Organize actions by timeframe */}
+            {['Immediate', 'Short-term', 'Medium-term'].map(timeframe => {
+              const timeframeActions = actionBriefs.actions.filter(
+                (a: any) => a.timeframe?.toLowerCase() === timeframe.toLowerCase()
+              )
+              return timeframeActions.length > 0 ? (
+                <motion.div
+                  key={timeframe}
+                  className="space-y-3"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <h3 className="text-sm font-semibold text-white/80 uppercase tracking-wide px-1">
+                    {timeframe}
+                  </h3>
+                  {timeframeActions.map((action: any) => (
+                    <motion.div
+                      key={action.id}
+                      className="p-4 bg-white/[0.02] border border-white/10 rounded-lg hover:border-white/20 transition-colors"
+                      whileHover={{ x: 4 }}
+                    >
+                      <div className="flex gap-3 mb-2">
+                        <motion.span
+                          className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide ${
+                            action.priority === 'critical'
+                              ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                              : action.priority === 'high'
+                                ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
+                                : action.priority === 'medium'
+                                  ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                                  : 'bg-green-500/20 text-green-300 border border-green-500/30'
+                          }`}
+                        >
+                          {action.priority}
+                        </motion.span>
+                      </div>
+                      <p className="text-white/80 text-sm mb-2">{action.description}</p>
+                      {action.personas && action.personas.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {action.personas.map((persona: string) => (
+                            <span
+                              key={persona}
+                              className="text-xs px-2 py-1 rounded bg-white/5 text-white/60 border border-white/10"
+                            >
+                              {persona}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </motion.div>
+              ) : null
+            })}
+
+            {/* Monitoring Priorities */}
+            {actionBriefs.monitoringPriorities && actionBriefs.monitoringPriorities.length > 0 && (
+              <motion.div
+                className="mt-6 p-4 bg-white/[0.02] border border-white/10 rounded-lg"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <h3 className="text-sm font-semibold text-white/80 uppercase tracking-wide mb-3">Monitor</h3>
+                <ul className="space-y-2">
+                  {actionBriefs.monitoringPriorities.map((item: any, idx: number) => (
+                    <li key={idx} className="text-sm text-white/60 flex gap-2">
+                      <span className="text-cyan-400">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            )}
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          className="p-6 rounded-xl bg-white/[0.02] border border-white/10 text-center text-white/50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.9 }}
+        >
+          Action briefs data unavailable
+        </motion.div>
+      )}
 
       {/* Footer */}
       <motion.div

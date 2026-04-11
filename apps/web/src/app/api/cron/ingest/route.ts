@@ -103,6 +103,18 @@ export async function GET(req: NextRequest) {
     console.error('[ingest] correlation/risk step failed:', e)
   }
 
+  // Prediction market signal integration (non-fatal)
+  try {
+    const { fetchPredictionMarketsWithSignals } = await import('@/lib/ingest/prediction-markets')
+    const { createServiceClient: _sc2 } = await import('@/lib/supabase/server')
+    const pmResult = await fetchPredictionMarketsWithSignals(_sc2())
+    if (pmResult.stored > 0) {
+      correlationResult.signals_created += pmResult.stored
+    }
+  } catch (e) {
+    console.error('[ingest] prediction markets step failed:', e)
+  }
+
   // Narrative cluster detection
   try {
     const { detectCorrelationSignals: _unused } = await import('@/lib/pipeline/correlate') // keep import warm
