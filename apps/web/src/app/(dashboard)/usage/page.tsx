@@ -1,5 +1,5 @@
 export const dynamic = 'force-dynamic'
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import UsageClient from './UsageClient'
@@ -26,7 +26,7 @@ async function getUsage(orgId: string) {
 }
 
 export default async function UsagePage() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) redirect('/sign-in')
   const supabase = createServiceClient()
   const { data: user } = await supabase.from('users').select('org_id').eq('clerk_user_id', userId).single()

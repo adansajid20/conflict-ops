@@ -1,5 +1,5 @@
 export const dynamic = 'force-dynamic'
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
@@ -7,7 +7,7 @@ import { InviteMembersCard } from '@/components/settings/InviteMembersCard'
 import { Users, ShieldCheck, Lock } from 'lucide-react'
 
 export default async function TeamPage() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) redirect('/sign-in')
 
   const supabase = createServiceClient()
