@@ -63,16 +63,26 @@ const isPublicRoute = createRouteMatcher([
   '/map(.*)',
 ])
 
-export default clerkMiddleware((auth, req) => {
+const clerkMw = clerkMiddleware((auth, req) => {
   if (!isPublicRoute(req)) {
-    const { userId } = auth()
-    if (!userId) {
+    const authObj = auth()
+    if (!authObj?.userId) {
       const signInUrl = new URL('/sign-in', req.url)
       signInUrl.searchParams.set('redirect_url', req.nextUrl.pathname)
       return NextResponse.redirect(signInUrl)
     }
   }
 })
+
+// Wrap the entire middleware so Clerk internal errors never crash the site
+export default function middleware(req: Parameters<typeof clerkMw>[0], evt: Parameters<typeof clerkMw>[1]) {
+  try {
+    return clerkMw(req, evt)
+  } catch {
+    // If Clerk crashes (missing keys, internal error), let the request through
+    return NextResponse.next()
+  }
+}
 
 export const config = {
   matcher: [
