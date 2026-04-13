@@ -889,9 +889,10 @@ function GlobalVolatilityIndex() {
     setLoading(true)
     setError(false)
     fetch('/api/v1/volatility-index?global=true')
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error('fetch failed'); return r.json() })
       .then((res: VolatilityData) => {
-        setData(res)
+        if (!res || typeof res.global_index !== 'number') throw new Error('invalid shape')
+        setData({ ...res, top_countries: res.top_countries ?? [] })
         setLoading(false)
       })
       .catch(() => {
@@ -912,7 +913,7 @@ function GlobalVolatilityIndex() {
     stable: '#eab308',
   }[data?.trend ?? 'stable']
 
-  const maxVIX = Math.max(...(data?.top_countries.map(c => c.index) ?? [100]), 100)
+  const maxVIX = Math.max(...(data?.top_countries ?? []).map(c => c.index), 100)
 
   return (
     <motion.section
@@ -982,7 +983,7 @@ function GlobalVolatilityIndex() {
                 Top Volatile Regions
               </div>
 
-              {data.top_countries.map((country, idx) => {
+              {(data.top_countries ?? []).map((country, idx) => {
                 const ratio = country.index / maxVIX
                 const countryColor = ratio > 0.66 ? '#ef4444' : ratio > 0.33 ? '#f97316' : '#eab308'
 
