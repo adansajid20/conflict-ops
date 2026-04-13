@@ -103,7 +103,7 @@ export default function APISettingsPage() {
                 </pre>
 
                 <p className="mt-4 text-xs text-white/50">
-                  Rate limit: 1,000 req/hr on Business plan · View full <a href="/docs/api" className="text-blue-400 hover:text-blue-300 transition-colors">API documentation</a>
+                  Rate limit: 1,000 req/hr on Business plan · View full <a href="/api/public/v1" className="text-blue-400 hover:text-blue-300 transition-colors">API documentation</a>
                 </p>
               </div>
             </div>

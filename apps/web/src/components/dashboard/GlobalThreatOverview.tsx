@@ -229,8 +229,14 @@ export function GlobalThreatOverview({ refreshInterval = 60000 }: GlobalThreatOv
       if (!response.ok) throw new Error('Failed to fetch global summary')
 
       const json = await response.json()
-      if (json.success) {
-        setData(json.data)
+      if (json.success && json.data) {
+        // Ensure arrays exist to prevent .map() crashes
+        setData({
+          ...json.data,
+          top_countries: json.data.top_countries ?? [],
+          trending_regions: json.data.trending_regions ?? [],
+          severity_breakdown: json.data.severity_breakdown ?? { critical: 0, high: 0, medium: 0, low: 0 },
+        })
       } else {
         throw new Error(json.error || 'Unknown error')
       }

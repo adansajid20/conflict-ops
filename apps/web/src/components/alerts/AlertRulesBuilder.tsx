@@ -23,15 +23,20 @@ export function AlertRulesBuilder() {
   const [message, setMessage] = useState('')
 
   async function load() {
-    const [rulesResponse, orgResponse] = await Promise.all([
-      fetch('/api/v1/alert-rules', { cache: 'no-store' }),
-      fetch('/api/v1/enterprise/org', { cache: 'no-store' }),
-    ])
-    const rulesJson = await rulesResponse.json() as { data?: Rule[]; error?: string }
-    const orgJson = await orgResponse.json() as OrgResponse
-    setRules(rulesJson.data ?? [])
-    setPlanId(orgJson.data?.org?.plan_id ?? 'individual')
-    if (rulesJson.error) setMessage(rulesJson.error)
+    try {
+      const [rulesResponse, orgResponse] = await Promise.all([
+        fetch('/api/v1/alert-rules', { cache: 'no-store' }),
+        fetch('/api/v1/enterprise/org', { cache: 'no-store' }),
+      ])
+      if (!rulesResponse.ok) throw new Error(`Alert rules: HTTP ${rulesResponse.status}`)
+      const rulesJson = await rulesResponse.json() as { data?: Rule[]; error?: string }
+      const orgJson = orgResponse.ok ? await orgResponse.json() as OrgResponse : { data: undefined }
+      setRules(rulesJson.data ?? [])
+      setPlanId(orgJson.data?.org?.plan_id ?? 'individual')
+      if (rulesJson.error) setMessage(rulesJson.error)
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Failed to load alert rules')
+    }
   }
 
   useEffect(() => { void load() }, [])

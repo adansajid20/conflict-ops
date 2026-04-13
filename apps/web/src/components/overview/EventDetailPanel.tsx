@@ -196,7 +196,7 @@ export function EventDetailPanel({ event, onClose, onSelect, hasOrg }: EventDeta
   const eventTypeLabel = EVENT_TYPE_LABELS[event.event_type ?? ''] ?? event.event_type ?? 'General'
 
   function handleCopyLink() {
-    copyToClipboard(`https://conflictradar.co/feed?event=${eventId}`)
+    copyToClipboard(`${window.location.origin}/feed?event=${eventId}`)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1500)
   }

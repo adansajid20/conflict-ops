@@ -1427,13 +1427,13 @@ export function CountryIntelClient({ countryCode, countryData: initialCountryDat
     if (!countryData) return
     // Fetch strategic context
     fetch(`/api/v1/intelligence/strategic-context?country_code=${countryData.country_code}`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then(d => {
         if (d.success && d.data) {
           setStrategicContext(d.data)
         }
       })
-      .catch(() => {})
+      .catch(() => { /* strategic context is optional — gracefully degrade */ })
       .finally(() => setContextLoading(false))
   }, [countryData])
 

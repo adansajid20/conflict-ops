@@ -34,11 +34,12 @@ export function ReportsClient() {
   const [genRegion, setGenRegion] = useState('')
   const [selectedType, setSelectedType] = useState<string>('region_deep_dive')
 
+  const [fetchError, setFetchError] = useState(false)
   useEffect(() => {
     fetch('/api/v1/reports?limit=30')
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then(d => { setReports((d as { reports: Report[] }).reports ?? []); setLoading(false) })
-      .catch(() => setLoading(false))
+      .catch(() => { setFetchError(true); setLoading(false) })
   }, [])
 
   const generateReport = async () => {

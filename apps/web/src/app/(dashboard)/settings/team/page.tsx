@@ -159,7 +159,7 @@ export default async function TeamPage() {
                   <h3 className="text-xl font-semibold text-white mb-2">SSO / SAML Configuration</h3>
                   <p className="text-white/60">Set up enterprise single sign-on for your organization</p>
                 </div>
-                <a href="/settings/sso" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2 text-sm font-semibold text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-200">
+                <a href="/settings/integrations" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2 text-sm font-semibold text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-200">
                   Configure SSO
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

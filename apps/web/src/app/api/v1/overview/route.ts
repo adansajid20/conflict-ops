@@ -201,6 +201,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
   const cached = await getCachedSnapshot<OverviewResponse>(cacheKey)
   if (cached) return NextResponse.json(cached)
 
+  try {
   const supabase = createServiceClient()
   const since = new Date(Date.now() - WINDOW_MS[win]!).toISOString()
   const since7d = new Date(Date.now() - WINDOW_MS['7d']!).toISOString()
@@ -234,7 +235,7 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
       .gte('severity', 3)
       .in('event_type', ['conflict', 'armed_conflict', 'airstrike', 'military', 'terrorism'])
       .not('region', 'is', null),
-    supabase.rpc('get_most_active_region', {}),
+    supabase.rpc('get_most_active_region', {}).then(r => r, () => ({ data: null, error: 'rpc not available' })),
     supabase
       .from('events')
       .select('id,source,source_id,event_type,title,description,summary_short,entities,region,country_code,severity,status,occurred_at,ingested_at,location,provenance_raw,raw,significance_score')
@@ -330,5 +331,9 @@ export async function GET(req: Request): Promise<NextResponse<OverviewResponse |
 
   await setCachedSnapshot(cacheKey, payload, 60)
   return NextResponse.json(payload)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: `Overview computation failed: ${message}` }, { status: 500 })
+  }
 }
 

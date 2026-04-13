@@ -197,7 +197,7 @@ function KpiCard({ label, value, sparklineData, delta, color, accentColor, href,
 
       <Link href={href} className="flex h-full flex-col justify-between">
         <div className="flex items-start justify-between">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">{label}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50">{label}</div>
           <div className="h-6 w-12">
             <Sparkline data={sparklineData} color={accentColor} />
           </div>
@@ -225,22 +225,25 @@ function KpiCard({ label, value, sparklineData, delta, color, accentColor, href,
 interface KpiCommandStripProps {
   kpis: OverviewData['kpis']
   window: Window
+  onWindowChange: (w: Window) => void
   severityCounts?: { critical: number; high: number; medium: number; low: number }
 }
 
-function KpiCommandStrip({ kpis, window, severityCounts }: KpiCommandStripProps) {
-  // Generate sparkline data from 7-day events (or fallback to zeros)
-  const getSparklineData = () => {
-    // Approximate distribution based on available data
+function KpiCommandStrip({ kpis, window, onWindowChange, severityCounts }: KpiCommandStripProps) {
+  // Generate deterministic sparkline data from 7-day events (no Math.random)
+  const getSparklineData = useMemo(() => {
     const dayCount = kpis.events7d / 7
-    return Array.from({ length: 7 }, () => Math.max(0, dayCount + (Math.random() * dayCount * 0.4 - dayCount * 0.2)))
-  }
+    if (dayCount <= 0) return [0, 0, 0, 0, 0, 0, 0]
+    // Deterministic variation pattern based on total count (simulates weekly rhythm)
+    const pattern = [0.85, 1.1, 1.15, 1.05, 0.95, 0.9, 0.8]
+    return pattern.map(p => Math.round(dayCount * p))
+  }, [kpis.events7d])
 
   const cards: KpiCardProps[] = [
     {
       label: 'Total Events',
       value: kpis.eventsWindow,
-      sparklineData: getSparklineData(),
+      sparklineData: getSparklineData,
       delta: 0,
       color: '#3b82f6',
       accentColor: '#3b82f6',
@@ -250,7 +253,7 @@ function KpiCommandStrip({ kpis, window, severityCounts }: KpiCommandStripProps)
     {
       label: 'Critical/High',
       value: kpis.criticalHighCount,
-      sparklineData: getSparklineData(),
+      sparklineData: getSparklineData,
       delta: 0,
       color: '#ef4444',
       accentColor: '#ef4444',
@@ -260,7 +263,7 @@ function KpiCommandStrip({ kpis, window, severityCounts }: KpiCommandStripProps)
     {
       label: 'Breaking (2h)',
       value: kpis.breaking2h,
-      sparklineData: getSparklineData(),
+      sparklineData: getSparklineData,
       delta: 0,
       color: '#a78bfa',
       accentColor: '#a78bfa',
@@ -270,7 +273,7 @@ function KpiCommandStrip({ kpis, window, severityCounts }: KpiCommandStripProps)
     {
       label: 'Active Conflicts',
       value: kpis.activeConflictZones,
-      sparklineData: getSparklineData(),
+      sparklineData: getSparklineData,
       delta: 0,
       color: '#f97316',
       accentColor: '#f97316',
@@ -280,7 +283,7 @@ function KpiCommandStrip({ kpis, window, severityCounts }: KpiCommandStripProps)
     {
       label: 'Hot Regions',
       value: kpis.hotRegionCount,
-      sparklineData: getSparklineData(),
+      sparklineData: getSparklineData,
       delta: 0,
       color: '#eab308',
       accentColor: '#eab308',
@@ -290,7 +293,7 @@ function KpiCommandStrip({ kpis, window, severityCounts }: KpiCommandStripProps)
     {
       label: 'Active Alerts',
       value: kpis.activeAlertsCount,
-      sparklineData: getSparklineData(),
+      sparklineData: getSparklineData,
       delta: 0,
       color: '#22c55e',
       accentColor: '#22c55e',
@@ -301,7 +304,7 @@ function KpiCommandStrip({ kpis, window, severityCounts }: KpiCommandStripProps)
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         {cards.map((card, i) => (
           <motion.div
             key={i}
@@ -322,12 +325,13 @@ function KpiCommandStrip({ kpis, window, severityCounts }: KpiCommandStripProps)
         className="inline-flex gap-1 rounded-full border border-white/[0.08] bg-white/[0.02] p-1"
       >
         {WINDOWS.map((w) => (
-          <span
+          <button
             key={w.key}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${window === w.key ? 'bg-white/[0.15] text-white' : 'text-white/40'}`}
+            onClick={() => onWindowChange(w.key)}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${window === w.key ? 'bg-white/[0.15] text-white' : 'text-white/40 hover:text-white/60'}`}
           >
             {w.label}
-          </span>
+          </button>
         ))}
       </motion.div>
     </div>
@@ -347,7 +351,7 @@ interface ThreatDot {
   countryCode?: string
 }
 
-function LiveThreatMapMini({ events }: { events: OverviewEvent[] }) {
+function LiveThreatMapMini({ events = [] }: { events: OverviewEvent[] }) {
   // Aggregate events by country for the map — show one dot per country, sized by count
   const countryAggregates = useMemo(() => {
     // Well-spaced country coordinates on a Mercator-like 800×500 projection
@@ -579,15 +583,15 @@ function LiveThreatMapMini({ events }: { events: OverviewEvent[] }) {
         <div className="absolute bottom-3 left-4 flex items-center gap-4 z-10">
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" />
-            <span className="text-[9px] text-white/40 font-medium">Critical</span>
+            <span className="text-[9px] text-white/50 font-medium">Critical</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full bg-[#f97316]" />
-            <span className="text-[9px] text-white/40 font-medium">High</span>
+            <span className="text-[9px] text-white/50 font-medium">High</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-[#eab308]" />
-            <span className="text-[9px] text-white/40 font-medium">Medium</span>
+            <span className="text-[9px] text-white/50 font-medium">Medium</span>
           </div>
           <span className="text-[9px] text-white/20">•</span>
           <span className="text-[9px] text-white/25">{countryAggregates.reduce((s, c) => s + c.count, 0)} events across {countryAggregates.length} locations</span>
@@ -613,7 +617,7 @@ const RISK_COLORS: Record<HotRegion['riskLevel'], string> = {
 }
 
 function HotRegionsPanel({ regions }: { regions: HotRegion[] }) {
-  const safeRegions = regions.filter((r) => r.slug !== 'global').slice(0, 8)
+  const safeRegions = (regions ?? []).filter((r) => r.slug !== 'global').slice(0, 8)
   const maxCount = Math.max(...safeRegions.map((r) => r.eventCount), 1)
 
   return (
@@ -675,7 +679,7 @@ function HotRegionsPanel({ regions }: { regions: HotRegion[] }) {
                 {/* Top drivers */}
                 <div className="mt-2 flex gap-1.5 flex-wrap">
                   {region.topDrivers.slice(0, 2).map((driver, dIdx) => (
-                    <span key={dIdx} className="text-[10px] text-white/40">
+                    <span key={dIdx} className="text-[10px] text-white/50">
                       {driver}
                       {dIdx < region.topDrivers.slice(0, 2).length - 1 && <span className="mx-1">·</span>}
                     </span>
@@ -694,7 +698,7 @@ function HotRegionsPanel({ regions }: { regions: HotRegion[] }) {
 // RECENT CRITICAL EVENTS
 // ============================================================================
 
-function RecentCriticalEvents({ events, onSelect }: { events: OverviewEvent[]; onSelect: (event: OverviewEvent) => void }) {
+function RecentCriticalEvents({ events = [], onSelect }: { events: OverviewEvent[]; onSelect: (event: OverviewEvent) => void }) {
   const [fetchedCritical, setFetchedCritical] = useState<OverviewEvent[]>([])
 
   useEffect(() => {
@@ -786,23 +790,15 @@ interface ActivityItem {
   href?: string
 }
 
-function ActivityTimeline({ events }: { events: OverviewEvent[] }) {
+function ActivityTimeline({ events = [] }: { events: OverviewEvent[] }) {
   const activities = useMemo<ActivityItem[]>(() => {
-    const items: ActivityItem[] = events.slice(0, 8).map((event, idx) => ({
+    return (events ?? []).slice(0, 10).map((event) => ({
       id: event.id,
-      type: 'event',
-      title: `New event: ${(event.title ?? 'Untitled').substring(0, 50)}`,
+      type: 'event' as const,
+      title: decodeHtmlEntities((event.title ?? 'Untitled').substring(0, 60)),
       timeAgo: formatRelativeOccurredTime(event.occurred_at),
       href: `/feed?severity=${event.severity ?? 2}`,
     }))
-
-    // Mix in some mock alerts and predictions
-    const mockActivities: ActivityItem[] = [
-      { id: 'alert-1', type: 'alert', title: 'Alert triggered: Critical situation detected', timeAgo: '3m ago', href: '/alerts' },
-      { id: 'pred-1', type: 'prediction', title: 'Prediction confirmed: Escalation trend', timeAgo: '12m ago', href: '/analysis/forecasts' },
-    ]
-
-    return [...items.slice(0, 4), ...mockActivities, ...items.slice(4, 8)].slice(0, 8)
   }, [events])
 
   return (
@@ -931,7 +927,18 @@ function GlobalVolatilityIndex() {
 
       <div className="px-6 py-6">
         {loading ? (
-          <div className="text-center text-white/40">—</div>
+          <div className="space-y-4">
+            <div className="h-12 w-24 rounded-lg bg-white/[0.04] animate-pulse" />
+            <div className="flex gap-6">
+              <div className="h-8 w-16 rounded bg-white/[0.04] animate-pulse" />
+              <div className="h-8 w-16 rounded bg-white/[0.04] animate-pulse" />
+            </div>
+            <div className="space-y-3 mt-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-6 rounded bg-white/[0.04] animate-pulse" />
+              ))}
+            </div>
+          </div>
         ) : error || !data ? (
           <div className="text-center text-white/40">Unable to load</div>
         ) : (
@@ -971,7 +978,7 @@ function GlobalVolatilityIndex() {
 
             {/* Top Volatile Countries */}
             <div className="space-y-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-4">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/50 mb-4">
                 Top Volatile Regions
               </div>
 
@@ -1112,7 +1119,17 @@ function EarlyWarningSpotlight() {
 
       <div className="px-6 py-6 relative z-10">
         {loading ? (
-          <div className="text-center text-white/40">—</div>
+          <div className="space-y-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.02]">
+                <div className="w-8 h-8 rounded-full bg-white/[0.04] animate-pulse flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-24 rounded bg-white/[0.04] animate-pulse" />
+                  <div className="h-3 w-16 rounded bg-white/[0.04] animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : error ? (
           <div className="text-center text-white/40">Unable to load</div>
         ) : warnings.length === 0 ? (
@@ -1234,9 +1251,19 @@ export function OverviewClient() {
     try {
       const res = await fetch(`/api/v1/overview?window=${window}`, { cache: 'no-store' })
       if (!res.ok) throw new Error('fetch failed')
-      const json = await res.json() as OverviewData
-      cache.current[window] = json
-      setData(json)
+      const json = await res.json()
+      // Validate that the response has the expected shape before using it
+      if (!json || !json.kpis || !Array.isArray(json.topStories) || !Array.isArray(json.hotRegions)) {
+        throw new Error('Invalid response shape')
+      }
+      const validated: OverviewData = {
+        ...json,
+        topStories: json.topStories ?? [],
+        hotRegions: json.hotRegions ?? [],
+        notices: json.notices ?? [],
+      }
+      cache.current[window] = validated
+      setData(validated)
       setError(false)
     } catch {
       if (!cache.current[window]) {
@@ -1327,7 +1354,7 @@ export function OverviewClient() {
           <>
             {/* ROW 1: KPI COMMAND STRIP */}
             <div className="space-y-2">
-              <KpiCommandStrip kpis={data.kpis} window={win} severityCounts={data.severityCounts} />
+              <KpiCommandStrip kpis={data.kpis} window={win} onWindowChange={setWin} severityCounts={data.severityCounts} />
             </div>
 
             {/* ROW 1.5: GLOBAL THREAT OVERVIEW */}

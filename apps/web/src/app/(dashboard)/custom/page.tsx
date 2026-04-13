@@ -66,31 +66,39 @@ export default function CustomDashboardPage() {
   const [saving, setSaving] = useState(false)
   const userId = user?.id ?? ''
 
+  const [loadError, setLoadError] = useState('')
   const load = useCallback(async () => {
     if (!userId) return
-    const res = await fetch(`/api/v1/dashboards?user_id=${userId}`)
-    const d = await res.json() as DashboardsData
-    const list = d.dashboards ?? []
-    setDashboards(list)
-    if (!active && list.length > 0) setActive(list[0] ?? null)
+    try {
+      const res = await fetch(`/api/v1/dashboards?user_id=${userId}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const d = await res.json() as DashboardsData
+      const list = d.dashboards ?? []
+      setDashboards(list)
+      if (!active && list.length > 0) setActive(list[0] ?? null)
+      setLoadError('')
+    } catch (err) { setLoadError(err instanceof Error ? err.message : 'Failed to load dashboards') }
   }, [userId, active])
 
   useEffect(() => { void load() }, [load])
 
   const createDashboard = async () => {
     if (!newName.trim() || !userId) return
-    const res = await fetch('/api/v1/dashboards', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, name: newName.trim(), widgets: [], is_default: dashboards.length === 0 }),
-    })
-    const d = await res.json() as DashboardSaved
-    if (d.dashboard) {
-      setActive(d.dashboard)
-      void load()
-    }
-    setNewName('')
-    setShowAdd(false)
+    try {
+      const res = await fetch('/api/v1/dashboards', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, name: newName.trim(), widgets: [], is_default: dashboards.length === 0 }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const d = await res.json() as DashboardSaved
+      if (d.dashboard) {
+        setActive(d.dashboard)
+        void load()
+      }
+      setNewName('')
+      setShowAdd(false)
+    } catch { setLoadError('Failed to create dashboard') }
   }
 
   const addWidget = (type: string) => {
@@ -115,20 +123,25 @@ export default function CustomDashboardPage() {
   const saveDashboard = async () => {
     if (!active || !userId) return
     setSaving(true)
-    await fetch('/api/v1/dashboards', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id: active.id, user_id: userId, widgets: active.widgets, name: active.name }),
-    })
+    try {
+      const res = await fetch('/api/v1/dashboards', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: active.id, user_id: userId, widgets: active.widgets, name: active.name }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      void load()
+    } catch { setLoadError('Failed to save dashboard') }
     setSaving(false)
-    void load()
   }
 
   const deleteDashboard = async (id: string) => {
     if (!userId) return
-    await fetch(`/api/v1/dashboards?id=${id}&user_id=${userId}`, { method: 'DELETE' })
-    setActive(null)
-    void load()
+    try {
+      await fetch(`/api/v1/dashboards?id=${id}&user_id=${userId}`, { method: 'DELETE' })
+      setActive(null)
+      void load()
+    } catch { setLoadError('Failed to delete dashboard') }
   }
 
   return (
@@ -179,6 +192,12 @@ export default function CustomDashboardPage() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        {loadError && (
+          <div className="mx-5 mt-3 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-2 text-sm text-red-400 flex items-center justify-between">
+            <span>{loadError}</span>
+            <button onClick={() => setLoadError('')} className="text-red-400/60 hover:text-red-400 ml-2">✕</button>
+          </div>
+        )}
         {!active ? (
           <div className="flex-1 flex items-center justify-center text-white/50">
             <div className="text-center">

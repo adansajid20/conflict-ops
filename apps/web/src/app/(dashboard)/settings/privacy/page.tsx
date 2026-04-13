@@ -46,8 +46,8 @@ export default function PrivacySettingsPage() {
         headers: { 'X-Confirm-Delete': 'true' }
       })
       window.location.href = '/sign-out'
-    } catch (err) {
-      console.error('Failed to delete account', err)
+    } catch {
+      // Account deletion failed — user stays on page
     }
   }
 

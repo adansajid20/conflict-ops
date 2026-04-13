@@ -73,16 +73,22 @@ export default function AdminPage() {
   const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([])
   const [loading, setLoading] = useState(false)
 
+  const [loadError, setLoadError] = useState('')
   const load = async () => {
     setLoading(true)
-    const [healthRes, eventsRes] = await Promise.all([
-      fetch('/api/health', { cache: 'no-store' }),
-      fetch('/api/v1/events?limit=10&window=24h', { cache: 'no-store' }),
-    ])
-    const healthJson = await healthRes.json() as HealthResponse
-    const eventsJson = await eventsRes.json() as { data?: RecentEvent[] }
-    setHealth(healthJson)
-    setRecentEvents(eventsJson.data ?? [])
+    setLoadError('')
+    try {
+      const [healthRes, eventsRes] = await Promise.all([
+        fetch('/api/health', { cache: 'no-store' }),
+        fetch('/api/v1/events?limit=10&window=24h', { cache: 'no-store' }),
+      ])
+      const healthJson = await healthRes.json() as HealthResponse
+      const eventsJson = await eventsRes.json() as { data?: RecentEvent[] }
+      setHealth(healthJson)
+      setRecentEvents(eventsJson.data ?? [])
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Failed to load system health')
+    }
     setLoading(false)
   }
 
@@ -132,6 +138,13 @@ export default function AdminPage() {
         animate="visible"
         className="max-w-6xl mx-auto space-y-8"
       >
+        {loadError && (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-6 py-4 text-sm text-red-400">
+            {loadError}
+            <button onClick={() => void load()} className="ml-3 underline hover:text-red-300">Retry</button>
+          </div>
+        )}
+
         {/* Health Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {cards.map((card) => {

@@ -45,7 +45,7 @@ export function getStatusLevel(h: HealthStatus | null): StatusLevel {
   if (!h) return 'loading'
   if (!h.dbOk && !(h.db_ok)) return 'outage'
   const degrade = (h.degraded_reasons?.length ?? 0) > 0
-    || h.errors.length > 0
+    || (h.errors?.length ?? 0) > 0
     || (!h.ingestOk && !(h.ingest?.ok))
   return degrade ? 'degraded' : 'nominal'
 }

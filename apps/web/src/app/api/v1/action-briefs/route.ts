@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const countryCode = searchParams.get('country_code')
-    const persona = searchParams.get('persona') as UserPersona | null
+    const personaParam = searchParams.get('persona')
 
     // country_code is required
     if (!countryCode) {
@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
     const report = generatePrescriptiveActions(riskContext)
 
     // Step 6: Filter by persona if provided
-    if (persona && ['corporate', 'humanitarian', 'government', 'investor'].includes(persona)) {
+    if (personaParam && ['corporate', 'humanitarian', 'government', 'investor'].includes(personaParam)) {
       // Map short persona names to full persona names
       const personaMapping: Record<string, UserPersona> = {
         'corporate': 'corporate_risk_manager',
@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
         'investor': 'investor_financial',
       }
 
-      const fullPersona = personaMapping[persona]
+      const fullPersona = personaMapping[personaParam]
       if (fullPersona) {
         report.actions = report.actions.filter(action => action.personas.includes(fullPersona))
 
