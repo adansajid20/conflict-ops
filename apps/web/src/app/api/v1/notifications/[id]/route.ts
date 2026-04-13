@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -7,7 +7,7 @@ import type { ApiResponse } from '@conflict-ops/shared'
 const PatchSchema = z.object({ read: z.boolean().optional(), markAll: z.boolean().optional() })
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }): Promise<NextResponse<ApiResponse<null>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   const { data: user } = await supabase.from('users').select('id,org_id').eq('clerk_user_id', userId).single()

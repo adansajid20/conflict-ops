@@ -4,7 +4,7 @@
  * Plaintext shown ONCE — then gone.
  */
 
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
@@ -23,7 +23,7 @@ async function getUser(clerkId: string) {
 }
 
 export async function GET() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = await getUser(userId)
   if (!user?.org_id) return NextResponse.json({ error: 'No org' }, { status: 400 })
@@ -39,7 +39,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = await getUser(userId)
   if (!user?.org_id) return NextResponse.json({ error: 'No org' }, { status: 400 })
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = await getUser(userId)
   if (!user?.org_id) return NextResponse.json({ error: 'No org' }, { status: 400 })

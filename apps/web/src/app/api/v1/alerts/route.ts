@@ -2,7 +2,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 /**
@@ -17,7 +17,7 @@ import { createServiceClient } from '@/lib/supabase/server'
  *   offset=0       → pagination offset
  */
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
  * - Advanced: rule_definition (AdvancedRuleDefinition), channel_routing[], dedupe_config, escalation_policy
  */
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
  *   { alertIds, ack_note }      → Add acknowledgment note
  */
 export async function PATCH(req: NextRequest) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
@@ -243,7 +243,7 @@ export async function PATCH(req: NextRequest) {
  * DELETE /api/v1/alerts — Delete a user alert rule or dismiss an alert
  */
 export async function DELETE(req: NextRequest) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()

@@ -3,10 +3,10 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { writeAuditLog } from '@/lib/audit/log'
 import type { ApiResponse } from '@conflict-ops/shared'
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 
 export async function POST(_req: Request, { params }: { params: { id: string } }): Promise<NextResponse<ApiResponse<{ shared_token: string; share_url: string }>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   const { data: actor } = await supabase.from('users').select('id,org_id').eq('clerk_user_id', userId).single()

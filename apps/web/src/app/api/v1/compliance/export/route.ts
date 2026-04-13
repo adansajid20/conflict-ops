@@ -1,9 +1,9 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   const { data: user } = await supabase.from('users').select('id,org_id,email,name,role,created_at').eq('clerk_user_id', userId).single()

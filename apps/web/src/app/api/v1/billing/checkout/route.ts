@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { stripe, PRICE_IDS } from '@/lib/stripe/client'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -12,7 +12,7 @@ const CheckoutSchema = z.object({
 })
 
 export async function POST(req: Request) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let body: unknown

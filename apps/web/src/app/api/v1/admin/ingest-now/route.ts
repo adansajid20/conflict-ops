@@ -1,11 +1,11 @@
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { inngest } from '@/inngest/client'
 
 export async function POST() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Check admin via Clerk metadata OR fallback to DB role

@@ -2,7 +2,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   const sk = process.env.STRIPE_SECRET_KEY
   if (!sk) return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 })
 
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()

@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 const Schema = z.object({ org_id: z.string(), country_codes: z.array(z.string().length(2)).min(1), date_range: z.object({ start: z.string(), end: z.string() }) })
 
 export async function POST(req: Request) {
-  const { userId } = await auth(); if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const { userId } = await safeAuth(); if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => null); const parsed = Schema.safeParse(body); if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.message }, { status: 400 })
   const supabase = createServiceClient(); const { data: user } = await supabase.from('users').select('org_id').eq('clerk_user_id', userId).single()
   if (user?.org_id !== parsed.data.org_id) return NextResponse.json({ success: false, error: 'Org mismatch' }, { status: 403 })

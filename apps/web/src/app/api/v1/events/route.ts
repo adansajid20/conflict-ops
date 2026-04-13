@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
@@ -11,7 +11,7 @@ import { getBestDescription, getEffectiveType, isStaleReliefWebContent, sanitize
 import type { ApiResponse, ConflictEvent } from '@conflict-ops/shared'
 
 export async function GET(req: Request): Promise<NextResponse> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   // Public access allowed — userId null means unauthenticated (anonymous feed view)
 
   const url = new URL(req.url)

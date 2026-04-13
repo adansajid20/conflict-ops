@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { translateEvent } from '@/lib/translation/translate'
@@ -15,7 +15,7 @@ type EventRow = {
 }
 
 export async function POST(req: Request): Promise<NextResponse<ApiResponse<{ translated: boolean; description_translated: string | null }>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => null) as TranslateBody | null

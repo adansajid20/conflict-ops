@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { computeTravelRisk, generateTravelBrief, RISK_LABELS, type TravelRiskLevel } from '@/lib/travel/risk-engine'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -11,7 +11,7 @@ async function getUser(userId: string) { const supabase = createServiceClient();
 function deterministicSummary(countryCode: string, riskLevel: TravelRiskLevel) { return { country_code: countryCode, risk_level: riskLevel, risk_label: RISK_LABELS[riskLevel], risk_score: riskLevel * 20, key_threats: riskLevel >= 4 ? ['Armed conflict risk', 'Infrastructure disruption'] : riskLevel >= 3 ? ['Political instability', 'Operational disruption'] : ['Routine travel precautions'], note: 'Deterministic fallback used because model or deeper data is unavailable.' } }
 
 export async function GET(req: Request) {
-  const { userId } = await auth(); if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const { userId } = await safeAuth(); if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const user = await getUser(userId); if (!user?.org_id) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })
   const url = new URL(req.url)
   if (url.searchParams.get('action') === 'travelers') {
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { userId } = await auth(); if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const { userId } = await safeAuth(); if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const user = await getUser(userId); if (!user?.org_id) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })
   const url = new URL(req.url)
   const body = await req.json().catch(() => null)

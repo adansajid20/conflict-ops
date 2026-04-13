@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -11,7 +11,7 @@ const RequestSchema = z.object({
 })
 
 export async function POST(req: Request): Promise<NextResponse<ApiResponse<CorrelationResult[]>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   let body: unknown = {}

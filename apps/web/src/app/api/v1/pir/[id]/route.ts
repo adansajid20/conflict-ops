@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -11,7 +11,7 @@ async function getOrgId(userId: string) {
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const orgId = await getOrgId(userId)

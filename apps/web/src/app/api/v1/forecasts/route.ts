@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCachedSnapshot, setCachedSnapshot, TTL } from '@/lib/cache/redis'
@@ -10,7 +10,7 @@ type ForecastApiData = {
 }
 
 export async function GET(req: Request): Promise<NextResponse<{ success: boolean; data?: ForecastApiData; error?: string }>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const url = new URL(req.url)

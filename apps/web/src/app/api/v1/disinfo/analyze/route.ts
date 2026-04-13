@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { ApiResponse } from '@conflict-ops/shared'
@@ -46,7 +46,7 @@ async function analyzeWithOpenAI(event: EventRow): Promise<AnalyzeResult | null>
 }
 
 export async function POST(req: Request): Promise<NextResponse<ApiResponse<AnalyzeResult>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => null) as AnalyzeBody | null

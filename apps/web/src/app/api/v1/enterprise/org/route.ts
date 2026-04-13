@@ -3,7 +3,7 @@
  * Seat management, role assignment, SSO config, tenant controls
  */
 
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
@@ -38,7 +38,7 @@ async function requireAdmin(userId: string) {
 }
 
 export async function GET() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
@@ -60,7 +60,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = await requireAdmin(userId)

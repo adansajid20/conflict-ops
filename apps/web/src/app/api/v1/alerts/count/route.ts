@@ -1,7 +1,7 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 function isMissingAlertsTable(error: { message?: string; code?: string } | null | undefined) {
@@ -10,7 +10,7 @@ function isMissingAlertsTable(error: { message?: string; code?: string } | null 
 }
 
 export async function GET() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) {
     return NextResponse.json({ count: 0 })
   }

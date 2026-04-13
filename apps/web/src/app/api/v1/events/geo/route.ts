@@ -5,7 +5,7 @@
  */
 export const dynamic = 'force-dynamic'
 
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export type GeoEvent = {
@@ -25,7 +25,7 @@ export type GeoEvent = {
 }
 
 export async function GET() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()

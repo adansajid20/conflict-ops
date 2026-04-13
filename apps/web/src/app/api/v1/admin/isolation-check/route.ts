@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { assertOrgScoped } from '@/lib/testing/tenant-isolation'
@@ -12,7 +12,7 @@ async function getAdmin(clerkUserId: string) {
 }
 
 export async function GET() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const user = await getAdmin(userId)
   if (!user?.org_id || !['owner', 'admin'].includes(String(user.role))) {

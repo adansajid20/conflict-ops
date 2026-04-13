@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -41,7 +41,7 @@ function getRedisClient(): Redis | null {
 }
 
 async function requireAdmin(): Promise<{ ok: true; userId: string } | { ok: false; response: NextResponse<ApiResponse<null>> }> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return { ok: false, response: NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 }) }
 
   const supabase = createServiceClient()

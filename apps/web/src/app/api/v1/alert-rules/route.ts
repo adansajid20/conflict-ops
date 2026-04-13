@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -34,7 +34,7 @@ function getRuleLimit(planId: string): number {
 }
 
 export async function GET(): Promise<NextResponse<ApiResponse<Array<Record<string, unknown>>>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const actor = await getActor(userId)
   if (!actor?.org_id) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })
@@ -45,7 +45,7 @@ export async function GET(): Promise<NextResponse<ApiResponse<Array<Record<strin
 }
 
 export async function POST(req: Request): Promise<NextResponse<ApiResponse<Record<string, unknown>>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const actor = await getActor(userId)
   if (!actor?.org_id) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })
@@ -83,7 +83,7 @@ export async function POST(req: Request): Promise<NextResponse<ApiResponse<Recor
 }
 
 export async function DELETE(req: Request): Promise<NextResponse<ApiResponse<null>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const actor = await getActor(userId)
   if (!actor?.org_id) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })

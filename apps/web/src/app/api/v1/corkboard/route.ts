@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -24,7 +24,7 @@ async function resolveMissionId(supabase: ReturnType<typeof createServiceClient>
 }
 
 export async function GET(req: Request) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const user = await getUser(userId)
@@ -48,7 +48,7 @@ export async function GET(req: Request) {
 }
 
 async function save(req: Request) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const user = await getUser(userId)

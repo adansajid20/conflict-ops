@@ -1,9 +1,9 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(req: Request) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   if (req.headers.get('X-Confirm-Delete') !== 'true') {
     return NextResponse.json({ success: false, error: 'Re-auth confirmation required' }, { status: 400 })

@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { fetchEconomicIndicators } from '@/lib/ingest/economic'
@@ -14,7 +14,7 @@ type EconomicMarketRow = {
 }
 
 export async function GET(): Promise<NextResponse<ApiResponse<EconomicMarketRow[]>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const indicators = await fetchEconomicIndicators()

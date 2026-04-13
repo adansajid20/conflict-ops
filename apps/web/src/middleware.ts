@@ -1,87 +1,16 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
-const isPublicRoute = createRouteMatcher([
-  '/',
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/landing(.*)',
-  '/features(.*)',
-  '/pricing(.*)',
-  '/methods(.*)',
-  '/privacy(.*)',
-  '/terms(.*)',
-  '/status(.*)',
-  '/wire(.*)',
-  '/security(.*)',
-  '/robots.txt',
-  '/sitemap.xml',
-  '/api/webhooks/(.*)',
-  '/api/public/(.*)',
-  '/api/health(.*)',
-  '/api/inngest(.*)',
-  '/api/cron/(.*)',
-  '/api/v1/article-preview(.*)',
-  '/api/v1/events(.*)',
-  '/api/v1/overview(.*)',
-  '/api/v1/feed(.*)',
-  '/api/v1/map/(.*)',
-  '/api/flights(.*)',
-  '/api/vessels(.*)',
-  '/api/acled(.*)',
-  '/api/v1/live/(.*)',
-  '/api/v1/alerts/(.*)',
-  '/api/v1/situations(.*)',
-  '/api/v1/correlation-signals(.*)',
-  '/api/v1/region-risk(.*)',
-  '/api/v1/actors(.*)',
-  '/api/v1/actors/relationships(.*)',
-  '/api/v1/actors/graph(.*)',
-  '/api/v1/intelligence-reports(.*)',
-  '/api/v1/predictions(.*)',
-  '/api/v1/trends(.*)',
-  '/api/v1/track(.*)',
-  '/api/v1/similarity(.*)',
-  '/api/v1/commodities(.*)',
-  '/api/v1/countries(.*)',
-  '/api/v1/sanctions(.*)',
-  '/api/v1/tools/(.*)',
-  '/api/v1/export/(.*)',
-  '/api/v1/early-warning(.*)',
-  '/api/v1/conflict-phases(.*)',
-  '/api/v1/action-briefs(.*)',
-  '/api/v1/volatility-index(.*)',
-  '/api/v1/risk-scores/(.*)',
-  '/api/v1/intelligence/(.*)',
-  '/api/v1/anomalies(.*)',
-  '/api/stripe/webhook(.*)',
-  '/situations(.*)',
-  '/actors(.*)',
-  '/intelligence(.*)',
-  '/overview(.*)',
-  '/intel(.*)',
-  '/map(.*)',
-])
-
-const clerkMw = clerkMiddleware((auth, req) => {
-  if (!isPublicRoute(req)) {
-    const authObj = auth()
-    if (!authObj?.userId) {
-      const signInUrl = new URL('/sign-in', req.url)
-      signInUrl.searchParams.set('redirect_url', req.nextUrl.pathname)
-      return NextResponse.redirect(signInUrl)
-    }
-  }
-})
-
-// Wrap the entire middleware so Clerk internal errors never crash the site
-export default function middleware(req: Parameters<typeof clerkMw>[0], evt: Parameters<typeof clerkMw>[1]) {
-  try {
-    return clerkMw(req, evt)
-  } catch {
-    // If Clerk crashes (missing keys, internal error), let the request through
-    return NextResponse.next()
-  }
+/**
+ * Middleware – passes all requests through.
+ *
+ * Clerk auth is handled at the component/API-route level via useUser() and
+ * auth() calls instead of at the middleware level. This avoids the hard crash
+ * that occurs when clerkMiddleware() is invoked without valid publishable /
+ * secret keys (it throws "Publishable key not valid" internally before any
+ * user-supplied try/catch can intercept it).
+ */
+export default function middleware() {
+  return NextResponse.next()
 }
 
 export const config = {

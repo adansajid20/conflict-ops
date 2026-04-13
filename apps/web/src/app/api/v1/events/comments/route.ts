@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -28,7 +28,7 @@ async function getUserContext(clerkUserId: string) {
 }
 
 export async function GET(req: Request): Promise<NextResponse<ApiResponse<CommentRecord[]>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const actor = await getUserContext(userId)
   if (!actor?.org_id) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })
@@ -60,7 +60,7 @@ export async function GET(req: Request): Promise<NextResponse<ApiResponse<Commen
 }
 
 export async function POST(req: Request): Promise<NextResponse<ApiResponse<CommentRecord>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const actor = await getUserContext(userId)
   if (!actor?.org_id) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })

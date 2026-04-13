@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { z } from 'zod'
@@ -25,7 +25,7 @@ async function getOrgId(userId: string) {
 }
 
 export async function GET() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const orgId = await getOrgId(userId)
@@ -44,7 +44,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request): Promise<NextResponse<ApiResponse<unknown>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const orgId = await getOrgId(userId)
@@ -77,7 +77,7 @@ export async function POST(req: Request): Promise<NextResponse<ApiResponse<unkno
 }
 
 export async function DELETE(req: Request): Promise<NextResponse<ApiResponse<null>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const orgId = await getOrgId(userId)

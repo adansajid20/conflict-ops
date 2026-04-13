@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { fetchMetaculusQuestions } from '@/lib/markets/metaculus'
 import { fetchPolymarketEvents } from '@/lib/markets/polymarket'
@@ -25,7 +25,7 @@ const DEMO_DATA = {
 }
 
 export async function GET(req: Request) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const url = new URL(req.url)

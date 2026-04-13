@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { getCachedSnapshot, setCachedSnapshot, TTL } from '@/lib/cache/redis'
 import { isSafeMode } from '@/lib/doctor/safe-mode-check'
@@ -10,7 +10,7 @@ function safeModeHeaders(): HeadersInit {
 }
 
 export async function GET(): Promise<NextResponse<ApiResponse<DashboardStats | { safe_mode: true; data: [] }>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }

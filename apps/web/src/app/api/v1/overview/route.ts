@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCachedSnapshot, setCachedSnapshot } from '@/lib/cache/redis'
@@ -160,7 +160,7 @@ const WINDOW_MS: Record<string, number> = {
 
 export async function GET(req: Request): Promise<NextResponse<OverviewResponse | { error: string }>> {
   let userId: string | null = null
-  try { userId = (await auth())?.userId ?? null } catch { /* Clerk auth unavailable */ }
+  try { userId = (await safeAuth())?.userId ?? null } catch { /* Clerk auth unavailable */ }
   const url = new URL(req.url)
   const win = url.searchParams.get('window') ?? '24h'
 

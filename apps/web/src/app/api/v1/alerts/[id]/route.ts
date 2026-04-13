@@ -1,6 +1,6 @@
 export const runtime = 'nodejs'
 
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -12,7 +12,7 @@ import { createServiceClient } from '@/lib/supabase/server'
  * 2. User alert rule: { name, regions, severities, keywords, frequency, ... } — updates user_alerts
  */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let body: Record<string, unknown>
@@ -105,7 +105,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
  * DELETE /api/v1/alerts/:id — Delete a user alert rule
  */
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()

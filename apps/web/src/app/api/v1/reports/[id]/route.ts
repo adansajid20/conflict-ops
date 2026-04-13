@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -12,7 +12,7 @@ const SectionSchema = z.object({
 })
 
 async function getActor() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return null
   const supabase = createServiceClient()
   const { data } = await supabase.from('users').select('id,org_id').eq('clerk_user_id', userId).single()

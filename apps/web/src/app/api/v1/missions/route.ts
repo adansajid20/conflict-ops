@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits, isAtMissionLimit } from '@/lib/plan-limits'
@@ -23,7 +23,7 @@ async function getUser(clerkUserId: string): Promise<{ id: string; org_id: strin
 }
 
 export async function GET(req: Request): Promise<NextResponse<{ success: boolean; data?: Mission[] | null; error?: string; meta?: Record<string, unknown> }>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const user = await getUser(userId)
@@ -46,7 +46,7 @@ export async function GET(req: Request): Promise<NextResponse<{ success: boolean
 }
 
 export async function POST(req: Request): Promise<NextResponse<{ success: boolean; data?: Mission | null; error?: string; meta?: Record<string, unknown> }>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const user = await getUser(userId)
@@ -83,7 +83,7 @@ export async function POST(req: Request): Promise<NextResponse<{ success: boolea
 }
 
 export async function DELETE(req: Request): Promise<NextResponse<{ success: boolean; data?: null; error?: string }>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const user = await getUser(userId)
   if (!user?.org_id) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })

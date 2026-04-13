@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { generateIntelReportSummary } from '@/lib/reports/summary'
 import type { ApiResponse } from '@conflict-ops/shared'
 import type { IntelReport } from '@/lib/reports/types'
 
 export async function POST(_req: Request, { params }: { params: { id: string } }): Promise<NextResponse<ApiResponse<{ summary: string }>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   const { data: actor } = await supabase.from('users').select('org_id').eq('clerk_user_id', userId).single()

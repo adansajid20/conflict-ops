@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { computeConfidenceScore, scoreToTier } from '@/lib/geoverify/engine'
@@ -21,7 +21,7 @@ const ExifSchema = z.object({ image_url: z.string().url() })
 async function getUser(clerkId: string) { const supabase = createServiceClient(); const { data } = await supabase.from('users').select('id, org_id').eq('clerk_user_id', clerkId).single(); return data }
 
 export async function GET(req: Request) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const user = await getUser(userId)
   if (!user?.org_id) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const user = await getUser(userId)
   if (!user?.org_id) return NextResponse.json({ success: false, error: 'No org' }, { status: 400 })

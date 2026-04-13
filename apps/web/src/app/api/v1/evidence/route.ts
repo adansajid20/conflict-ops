@@ -1,5 +1,5 @@
 import { createHash } from 'crypto'
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { ApiResponse } from '@conflict-ops/shared'
@@ -35,7 +35,7 @@ async function getUserContext(userId: string): Promise<{ orgId: string | null; a
 }
 
 export async function GET(): Promise<NextResponse<ApiResponse<Array<EvidenceRow & { tamper_detected: boolean }>>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const { orgId } = await getUserContext(userId)
@@ -60,7 +60,7 @@ export async function GET(): Promise<NextResponse<ApiResponse<Array<EvidenceRow 
 }
 
 export async function POST(req: Request): Promise<NextResponse<ApiResponse<EvidenceRow>>> {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => null) as CreateEvidenceBody | null

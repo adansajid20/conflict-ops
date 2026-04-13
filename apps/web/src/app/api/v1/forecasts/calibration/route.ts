@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrgPlanLimits } from '@/lib/plan-limits'
@@ -10,7 +10,7 @@ type ForecastRecord = { analyst_id?: string | null; org_id?: string | null; scor
 function brier(prob: number, outcome: boolean) { return (prob - (outcome ? 1 : 0)) ** 2 }
 
 export async function GET() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   const { data: user } = await supabase.from('users').select('org_id').eq('clerk_user_id', userId).single()

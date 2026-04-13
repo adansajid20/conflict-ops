@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { ensureUserProvisioned } from '@/lib/user/provision'
@@ -9,7 +9,7 @@ export async function GET(req: Request): Promise<NextResponse> {
     return NextResponse.redirect(new URL('/overview?invite=missing', req.url))
   }
 
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) {
     return NextResponse.redirect(new URL(`/sign-up?redirect_url=${encodeURIComponent(`/api/v1/enterprise/invite/accept?token=${token}`)}`, req.url))
   }

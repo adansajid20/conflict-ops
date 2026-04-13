@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 const KEYWORDS = ['ukraine','russia','gaza','israel','iran','syria','taiwan','china','sudan','yemen','red sea','lebanon','sahel','korea']
 
 export async function GET() {
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   const { data, error } = await supabase.from('prediction_markets').select('*').order('resolution_date', { ascending: true }).limit(100)

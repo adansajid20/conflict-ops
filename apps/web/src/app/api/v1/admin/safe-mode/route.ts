@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { auth } from '@clerk/nextjs/server'
+import { safeAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { setSafeMode } from '@/lib/cache/redis'
@@ -16,7 +16,7 @@ async function requireAdminOrInternal(req: Request): Promise<{ ok: true; userId:
     return { ok: true, userId: null }
   }
 
-  const { userId } = await auth()
+  const { userId } = await safeAuth()
   if (!userId) {
     return { ok: false, response: NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 }) }
   }
